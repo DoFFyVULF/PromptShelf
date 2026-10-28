@@ -24,9 +24,6 @@ fn clean_tags(tags: &[String]) -> Vec<String> {
         if seen.insert(key) {
             out.push(t);
         }
-        if out.len() >= 12 {
-            break;
-        }
     }
     out
 }

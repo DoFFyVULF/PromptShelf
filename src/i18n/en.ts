@@ -25,6 +25,7 @@ export const en = {
   "sort.rating": "By rating",
 
   "tags.all": "All",
+  "tags.title": "Tags",
 
   "group.home": "Home",
   "groups.title": "Groups",

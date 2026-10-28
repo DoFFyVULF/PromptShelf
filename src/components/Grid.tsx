@@ -257,15 +257,20 @@ function CardTile({
       <div className={`flex min-h-0 flex-1 flex-col px-3.5 pt-2.5 pb-3 transition-opacity duration-200 ease-out ${dragging ? "opacity-35" : ""}`}>
         <p className="line-clamp-2 min-h-[2.6em] text-[13.5px] leading-[1.42] text-ink">{card.prompt}</p>
 
-        {/* fixed-height row: date/rating below keep their position even with no tags */}
-        <div className="mt-2.5 flex min-h-[22px] items-center gap-1 overflow-hidden whitespace-nowrap">
-          {card.tags.slice(0, 3).map((tag) => (
+        {/* tags row: show up to 10 tags, collapse the rest */}
+        <div className="mt-2.5 flex min-h-[22px] flex-wrap items-center gap-1">
+          {card.tags.slice(0, 10).map((tag) => (
             <span key={tag} className="max-w-[96px] truncate rounded-full bg-parchment px-2 py-0.5 text-[11px] text-muted">
               {tag}
             </span>
           ))}
-          {card.tags.length > 3 && (
-            <span className="shrink-0 rounded-full px-1 text-[11px] text-faint">+{card.tags.length - 3}</span>
+          {card.tags.length > 10 && (
+            <span
+              title={card.tags.slice(10).join(", ")}
+              className="shrink-0 rounded-full border border-dashed border-hairline bg-transparent px-2 py-0.5 text-[11px] font-medium text-faint"
+            >
+              +{card.tags.length - 10}
+            </span>
           )}
         </div>
 

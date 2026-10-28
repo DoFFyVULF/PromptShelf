@@ -162,7 +162,7 @@ export function Editor({ card, staged, onStaged, settings, groupId, onClose, onS
       toast(t("toast.error"), "error");
       return;
     }
-    if (!tags.some((x) => x.toLowerCase() === v.toLowerCase()) && tags.length < 12) {
+    if (!tags.some((x) => x.toLowerCase() === v.toLowerCase())) {
       setTags([...tags, v]);
     }
     setTagDraft("");

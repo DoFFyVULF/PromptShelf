@@ -27,6 +27,7 @@ export const ru: Record<DictKey, string> = {
   "sort.rating": "По оценке",
 
   "tags.all": "Все",
+  "tags.title": "Теги",
 
   "group.home": "Домашняя",
   "groups.title": "Группы",

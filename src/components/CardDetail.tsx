@@ -270,7 +270,7 @@ export function CardDetail({ card, hasPrev, hasNext, onPrev, onNext, onClose, on
   const addTag = useCallback(() => {
     const v = tagDraft.trim().replace(/^#/, "");
     if (!v) return;
-    if (!tags.some((x) => x.toLowerCase() === v.toLowerCase()) && tags.length < 12) {
+    if (!tags.some((x) => x.toLowerCase() === v.toLowerCase())) {
       setTags([...tags, v]);
     }
     setTagDraft("");

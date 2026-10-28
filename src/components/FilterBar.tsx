@@ -1,4 +1,4 @@
-import { ChevronDown, Folder, ListChecks, X } from "lucide-react";
+import { ChevronDown, Folder, ListChecks, Tag, X } from "lucide-react";
 import { useI18n } from "../i18n";
 import type { GroupInfo, TagCount } from "../lib/types";
 
@@ -11,6 +11,7 @@ interface FilterBarProps {
   filtering: boolean;
   group: GroupInfo | null;
   onOpenGroups: () => void;
+  onOpenTags: () => void;
   selectMode: boolean;
   onToggleSelectMode: () => void;
 }
@@ -24,10 +25,12 @@ export function FilterBar({
   filtering,
   group,
   onOpenGroups,
+  onOpenTags,
   selectMode,
   onToggleSelectMode
 }: FilterBarProps) {
   const { t, count } = useI18n();
+  const hasTagsFilter = selected.length > 0;
 
   return (
     <div className="flex h-11 shrink-0 items-center gap-2 overflow-x-auto border-b border-line-soft px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -55,25 +58,25 @@ export function FilterBar({
         {t("tags.all")}
       </button>
 
-      {tags.map((tag) => {
-        const active = selected.includes(tag.name);
-        return (
-          <button
-            key={tag.name}
-            type="button"
-            onClick={() => onToggle(tag.name)}
-            aria-pressed={active}
-            className={`press h-7 shrink-0 cursor-pointer rounded-full px-3 text-[12.5px] font-medium transition-colors ${
-              active
-                ? "bg-ink text-white"
-                : "border border-hairline bg-card text-body hover:bg-parchment"
-            }`}
-          >
-            {tag.name}
-            <span className={`ml-1.5 text-[11px] ${active ? "opacity-60" : "text-faint"}`}>{tag.count}</span>
-          </button>
-        );
-      })}
+      <button
+        type="button"
+        onClick={onOpenTags}
+        aria-pressed={hasTagsFilter}
+        title={t("tags.title")}
+        className={`press flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-full px-3 text-[12.5px] font-medium transition-colors ${
+          hasTagsFilter
+            ? "bg-ink text-white"
+            : "border border-hairline bg-card text-body hover:bg-parchment"
+        }`}
+      >
+        <Tag size={12.5} className={hasTagsFilter ? "opacity-80" : "text-faint"} />
+        <span>{t("tags.title")}</span>
+        {hasTagsFilter && (
+          <span className="flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-white/20 px-1 text-[10px] font-semibold tabular-nums">
+            {selected.length}
+          </span>
+        )}
+      </button>
 
       <div className="flex-1" />
 

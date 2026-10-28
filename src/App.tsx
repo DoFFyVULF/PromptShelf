@@ -22,6 +22,7 @@ import { CardDetail } from "./components/CardDetail";
 import { Editor } from "./components/Editor";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { GroupsPanel } from "./components/GroupsPanel";
+import { TagsDialog } from "./components/TagsDialog";
 import { ToastProvider, useToast } from "./components/Toasts";
 import { CornerDownRight, ListChecks, X } from "lucide-react";
 
@@ -148,6 +149,8 @@ function Shell() {
     window.localStorage.setItem("ps-group", def.id);
   }, [groups, groupsReady, groupId]);
 
+  const [tagsOpen, setTagsOpen] = useState(false);
+
   useEffect(() => {
     void loadMeta();
     void loadGroups();
@@ -211,6 +214,10 @@ function Shell() {
   // ---------------------------------------------------------------- groups & selection
 
   const currentGroup = groups.find((g) => g.id === groupId) ?? groups.find((g) => g.is_default) ?? null;
+
+  const toggleTags = useCallback(() => {
+    setTagsOpen((on) => !on);
+  }, []);
 
   const switchGroup = useCallback(
     (id: string) => {
@@ -515,6 +522,7 @@ function Shell() {
         filtering={anyFilter}
         group={currentGroup}
         onOpenGroups={() => setGroupsOpen((v) => !v)}
+        onOpenTags={toggleTags}
         selectMode={selectMode}
         onToggleSelectMode={toggleSelectMode}
       />
@@ -569,6 +577,21 @@ function Shell() {
         onSwitch={switchGroup}
         onChanged={() => void loadGroups()}
         onMoved={(toGroup, ids) => void moveSelection(toGroup, ids)}
+      />
+
+      <TagsDialog
+        open={tagsOpen}
+        onClose={() => setTagsOpen(false)}
+        tags={tags}
+        selected={selectedTags}
+        onToggle={(tag) =>
+          setSelectedTags((prev) => (prev.includes(tag) ? prev.filter((x) => x !== tag) : [...prev, tag]))
+        }
+        onClear={() => {
+          setSelectedTags([]);
+          setQuery("");
+          setDebouncedQ("");
+        }}
       />
 
       {selectMode && (
