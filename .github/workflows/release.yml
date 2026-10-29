@@ -1,0 +1,68 @@
+name: Release
+
+# Push a tag like v0.1.5 → builds installers on GitHub's cloud and attaches
+# them to a GitHub Release: .dmg (mac, universal) and setup.exe/.msi (Windows).
+# No Rust or MSVC needed on any end user's machine.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Universal mac build: one .dmg for Apple Silicon and Intel.
+          - platform: macos-latest
+            args: --target universal-apple-darwin
+          - platform: windows-latest
+            args: ""
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Cache Rust build
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: ${{ matrix.platform }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install frontend deps
+        run: npm ci
+
+      - name: Build and release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "PromptShelf ${{ github.ref_name }}"
+          releaseBody: |
+            Installers, built from this tag (unsigned):
+
+            **Windows** — `PromptShelf_*_x64-setup.exe` (recommended) or `.msi`.
+            First launch may show a SmartScreen warning: click "More info" → "Run anyway".
+
+            **macOS** — `PromptShelf_*.dmg` (universal: Apple Silicon + Intel).
+            First launch: if Gatekeeper blocks an unsigned app, right-click the app
+            in /Applications → "Open" once.
+          releaseDraft: false
+          prerelease: false
+          args: ${{ matrix.args }}
