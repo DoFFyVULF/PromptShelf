@@ -58,7 +58,7 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: "PromptShelf ${{ github.ref_name }}"
           releaseBody: |
-            Installers, built from this tag (unsigned):
+            Installers, built from this tag with the updater signing key:
 
             **Windows** — `PromptShelf_*_x64-setup.exe` (recommended) or `.msi`.
             First launch may show a SmartScreen warning: click "More info" → "Run anyway".
