@@ -28,7 +28,9 @@
       "csp": "default-src 'self'; img-src 'self' asset: http://asset.localhost data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src ipc: http://ipc.localhost",
       "assetProtocol": {
         "enable": true,
-        "scope": ["**"]
+        "scope": [
+          "**"
+        ]
       }
     }
   },
@@ -48,7 +50,7 @@
     "updater": {
       "active": true,
       "dialog": false,
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDk3NjIxRjNBNTJCQjZENkUKUldSdWJidFNPaDlpbDBDMU91SlZZWU9CQ0svbGZjUnBYVFhHb0hnbVprSlhwaDJJb1Z1NXVpaXAK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEM5RDU0RkI4QkZCOEZBNjcKUldSbityaS91RS9WeWVOWHZiaHM2Yyt6TXA1OE80Y0MxeFVBSmJVbUh0UG4vU0tCdlE3WUVDVzQK",
       "endpoints": [
         "https://github.com/DoFFyVULF/PromptShelf/releases/latest/download/latest.json"
       ]
