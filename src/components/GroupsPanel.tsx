@@ -199,25 +199,43 @@ export function GroupsPanel({
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
         {groups.map((g) => {
           const current = g.id === currentGroupId;
+          // with an active selection a row click moves the cards instead of
+          // switching the view — switching would silently drop the selection
+          // and look like "nothing happened"
+          const moveActive = selection.length > 0 && !dragActive;
           return (
             <div
               key={g.id}
-              onClick={() => onSwitch(g.id)}
+              onClick={() => {
+                if (moveActive) {
+                  if (!current) moveHere(g, selection);
+                  return;
+                }
+                onSwitch(g.id);
+              }}
               onDragOver={(e) => {
                 e.preventDefault();
                 e.dataTransfer.dropEffect = "move";
                 setDragOverId(g.id);
-              }}
-              onDragLeave={() => setDragOverId((cur) => (cur === g.id ? null : cur))}
+              }}              onDragLeave={() => setDragOverId((cur) => (cur === g.id ? null : cur))}
               onDrop={(e) => onDrop(g, e)}
               role="button"
               tabIndex={0}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();
+                  if (moveActive) {
+                    if (!current) moveHere(g, selection);
+                    return;
+                  }
                   onSwitch(g.id);
                 }
               }}
+              title={
+                moveActive && !current
+                  ? `${t("groups.moveHere")} (${selection.length})`
+                  : undefined
+              }
               className={`group relative flex cursor-pointer items-center gap-2.5 rounded-[10px] border px-2.5 py-2 transition-[background-color,border-color,color] duration-150 ${
                 dragActive
                   ? current
@@ -229,7 +247,9 @@ export function GroupsPanel({
                       : "border-dashed border-emerald-300/70 bg-emerald-50/50 text-emerald-900/80"
                   : current
                     ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                    : "border-transparent text-body hover:bg-parchment"
+                    : moveActive
+                      ? "border-transparent text-body hover:border-emerald-200 hover:bg-emerald-50/60"
+                      : "border-transparent text-body hover:bg-parchment"
               }`}
             >
               <span

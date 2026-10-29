@@ -32,7 +32,7 @@ export const en = {
   "groups.new": "New group",
   "groups.new.placeholder": "Group name…",
   "groups.moveHere": "Move here",
-  "groups.moveTip": "Click the arrow or drop cards onto a group",
+  "groups.moveTip": "Click a group row (or drag the cards onto it) to move",
   "groups.dropHint": "Release the card on a group to move it",
   "groups.selected": "{n} selected",
   "groups.deleteHint": "Cards move to {name}",

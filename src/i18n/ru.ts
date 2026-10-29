@@ -34,7 +34,7 @@ export const ru: Record<DictKey, string> = {
   "groups.new": "Новая группа",
   "groups.new.placeholder": "Название группы…",
   "groups.moveHere": "Переместить сюда",
-  "groups.moveTip": "Нажмите на стрелку или перетащите карточки на группу",
+  "groups.moveTip": "Нажмите на группу (или перетащите карточки на неё), чтобы переместить",
   "groups.dropHint": "Отпустите карточку на нужной группе",
   "groups.selected": "Выбрано: {n}",
   "groups.deleteHint": "Карточки перейдут в {name}",
