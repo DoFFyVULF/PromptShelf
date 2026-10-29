@@ -2,7 +2,8 @@ name: Release
 
 # Push a tag like v0.1.5 → builds installers on GitHub's cloud and attaches
 # them to a GitHub Release: .dmg (mac, universal) and setup.exe/.msi (Windows).
-# No Rust or MSVC needed on any end user's machine.
+# The bundles are signed with the updater key so the in-app updater
+# (tauri-plugin-updater, endpoint = the latest release's latest.json) works.
 
 on:
   push:
@@ -36,7 +37,7 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
-          key: ${{ matrix.platform }}
+          key: ${{ matrix.platform }}-${{ matrix.args }}
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -51,6 +52,8 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "PromptShelf ${{ github.ref_name }}"

@@ -28,12 +28,13 @@
       "csp": "default-src 'self'; img-src 'self' asset: http://asset.localhost data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src ipc: http://ipc.localhost",
       "assetProtocol": {
         "enable": true,
-        "scope": ["$APPDATA/**"]
+        "scope": ["**"]
       }
     }
   },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": "all",
     "icon": [
       "icons/32x32.png",
@@ -42,5 +43,15 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "active": true,
+      "dialog": false,
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDk3NjIxRjNBNTJCQjZENkUKUldSdWJidFNPaDlpbDBDMU91SlZZWU9CQ0svbGZjUnBYVFhHb0hnbVprSlhwaDJJb1Z1NXVpaXAK",
+      "endpoints": [
+        "https://github.com/DoFFyVULF/PromptShelf/releases/latest/download/latest.json"
+      ]
+    }
   }
 }

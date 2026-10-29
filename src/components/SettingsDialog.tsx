@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Download, Upload, FolderOpen, Loader2, Eye, EyeOff, Pencil } from "lucide-react";
+import { getVersion } from "@tauri-apps/api/app";
+import { Download, Upload, FolderOpen, Loader2, Eye, EyeOff, Pencil, FolderUp, RefreshCw } from "lucide-react";
 import { save as saveFileDialog, open as openFileDialog, message } from "@tauri-apps/plugin-dialog";
+import { relaunch } from "@tauri-apps/plugin-process";
 import { useI18n } from "../i18n";
 import { api } from "../lib/api";
 import type { AppSettings, LibraryPaths } from "../lib/types";
 import { Dialog } from "./Dialog";
 import { useToast } from "./Toasts";
+import { UpdateDialog } from "./UpdateDialog";
 
 interface SettingsDialogProps {
   open: boolean;
@@ -23,6 +26,13 @@ export function SettingsDialog({ open, settings, paths, onClose, onSaved, onImpo
   const [draft, setDraft] = useState<AppSettings>(settings);
   const [saving, setSaving] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [moving, setMoving] = useState(false);
+  const [updatesOpen, setUpdatesOpen] = useState(false);
+  const [version, setVersion] = useState("");
+
+  useEffect(() => {
+    getVersion().then(setVersion).catch(() => undefined);
+  }, []);
   // API key display: masked by default; the eye reveals it, the pencil edits it.
   const [keyRevealed, setKeyRevealed] = useState(false);
   const [keyEditing, setKeyEditing] = useState(false);
@@ -139,6 +149,35 @@ export function SettingsDialog({ open, settings, paths, onClose, onSaved, onImpo
       setBusy(false);
     }
   }, [onClose, onImported, t, toast]);
+
+  const doMove = useCallback(async () => {
+    try {
+      const picked = await openFileDialog({
+        title: t("settings.location.change"),
+        directory: true,
+        multiple: false
+      });
+      if (!picked || typeof picked !== "string") return;
+      const yes = await message(t("settings.location.moveConfirm"), {
+        title: t("settings.location.change"),
+        kind: "info",
+        okLabel: t("settings.location.change")
+      });
+      if (!yes) return;
+      setMoving(true);
+      await api.moveLibrary(picked.trim());
+      toast(t("settings.location.moved"));
+      // Apply on the next start: everything (db, images, asset paths) reads
+      // the library from the manifest-resolved dir.
+      window.setTimeout(() => {
+        void relaunch().catch(() => undefined);
+      }, 900);
+    } catch {
+      toast(t("settings.location.moveError"), "error");
+    } finally {
+      setMoving(false);
+    }
+  }, [t, toast]);
 
   return (
     <Dialog open={open} onClose={onClose} labelledBy="settings-title" width={580}>
@@ -324,6 +363,16 @@ export function SettingsDialog({ open, settings, paths, onClose, onSaved, onImpo
                 <button
                   type="button"
                   className="btn-icon press shrink-0 cursor-pointer"
+                  aria-label={t("settings.location.change")}
+                  title={t("settings.location.change")}
+                  disabled={moving}
+                  onClick={doMove}
+                >
+                  {moving ? <Loader2 size={15} className="spin" /> : <FolderUp size={15} />}
+                </button>
+                <button
+                  type="button"
+                  className="btn-icon press shrink-0 cursor-pointer"
                   aria-label={t("settings.reveal")}
                   title={t("settings.reveal")}
                   onClick={() => paths && api.revealFile(paths.data_dir)}
@@ -346,7 +395,20 @@ export function SettingsDialog({ open, settings, paths, onClose, onSaved, onImpo
             <p className="text-[11.5px] text-faint">{t("settings.importNote")}</p>
           </div>
         </section>
+
+        <section>
+          <h3 className="t-section">{t("settings.updates")}</h3>
+          <div className="mt-3 flex items-center gap-3">
+            <button type="button" className="btn-ghost press cursor-pointer" onClick={() => setUpdatesOpen(true)}>
+              <RefreshCw size={14.5} />
+              {t("settings.updates.check")}
+            </button>
+            {version && <span className="text-[11.5px] text-faint">v{version}</span>}
+          </div>
+        </section>
       </div>
+
+      <UpdateDialog open={updatesOpen} onClose={() => setUpdatesOpen(false)} />
     </Dialog>
   );
 }

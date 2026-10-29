@@ -1,5 +1,3 @@
-<!-- TODO: add UI screenshots (grid, detail view, groups panel) -->
-
 <div align="center">
   <sub><b><a href="README.en.md">English</a> · <a href="README.md">Русский</a></b></sub>
 </div>
@@ -19,13 +17,33 @@
     <img src="https://img.shields.io/badge/Rust-1.77%2B-3f3f46?style=flat-square&labelColor=18181b" alt="Rust">
     <img src="https://img.shields.io/badge/SQLite-bundled-3f3f46?style=flat-square&labelColor=18181b" alt="SQLite">
   </p>
+
+  <img src="docs/PromptShelf_preview.png" alt="PromptShelf UI: a grid of cards with images, prompts and tags" width="100%">
 </div>
 
 ---
 
+## 🎯 Why
+
+Good prompts on CivitAI tend to disappear. Authors delete images or posts, clean up
+galleries, or leave the platform altogether. You save a link to come back to the prompt
+later, and by then it is gone — together with the negative prompt and every generation
+parameter.
+
+PromptShelf exists for exactly this case. One import from CivitAI — and the image, prompt,
+negative prompt, LoRAs, parameters (seed, sampler, steps, CFG), author and tags stay in
+your library on disk. The other person's page no longer matters: everything is local and
+nothing deletes it.
+
 ## ✨ Features
 
 - 🗂 **Cards** — a multiline prompt, one or more images, a note, tags, a star rating, dates.
+- 🏷 **Negative prompt** — a separate field in the editor; shown under the prompt in the
+  detail view and copied with one click.
+- 🧲 **CivitAI import** — paste a link to a CivitAI image and the app downloads it and fills
+  the card in: prompt, negative prompt, author, checkpoint, LoRAs, generation parameters
+  (seed, sampler, steps, CFG) and post tags. The popular community tags come through a
+  CivitAI API key (set in settings).
 - 🖼 **Smart compression on import** — an image is downscaled to the long-side limit
   (1200 px by default) and re-encoded to JPEG or WebP at a configurable quality (75% by default).
   Originals are not kept (optionally enable "keep originals" in settings). A thumbnail is
@@ -54,9 +72,18 @@
 - 💾 **Import/export** — the whole library exports to a single `.promptshelf` file
   (zip: SQLite + images) for backup or moving to another machine. Import replaces the current
   library.
+- 📁 **Library location** — copy the library to any folder and switch to it from settings
+  (applies after a restart; the old copy stays untouched).
+- ⬆️ **Update check** — a button in settings tells you about a new version and installs it:
+  download and restart, two clicks.
 - 🌐 **Interface languages** — English and Russian, with a switcher in the header.
 
 ## 📦 Installation
+
+### Ready-made builds
+
+Grab a package from the [releases page](https://github.com/DoFFyVULF/PromptShelf/releases/latest):
+a universal `.dmg` for macOS and `.msi` / `setup.exe` for Windows.
 
 ### Build from source
 
@@ -105,7 +132,9 @@ npm run tauri dev
 
 ## 🗃 Storage
 
-The library lives in the standard application data directory:
+The library lives in the standard application data directory
+(the location can be changed in settings — the app copies the library to the folder
+you pick):
 
 - macOS: `~/Library/Application Support/app.promptshelf.desktop/`
 - Windows: `%APPDATA%\app.promptshelf.desktop\`
@@ -133,7 +162,7 @@ npm run icons          # regenerate the icon set from app-icon.png
 
 Frontend only (no native window): `npm run dev` → http://localhost:5173
 
-Compression pipeline tests (downscale, no-upscale, EXIF rotation, previews, etc., 10 in total):
+Tests (compression pipeline, cards, migrations, etc., 13 in total):
 
 ```bash
 cd src-tauri && cargo test --lib

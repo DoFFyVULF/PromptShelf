@@ -286,7 +286,7 @@ fn other_meta(meta: &Value, item: &Value) -> Vec<MetaItem> {
 
     // leftovers: scalar values only, both casings consumed above
     let named: HashSet<&str> = [
-        "prompt", "negative_prompt", "Model", "resources", "civitaiResources", "seed", "Seed",
+        "prompt", "negativePrompt", "negative", "Negative prompt", "uc", "negative_prompt", "Model", "resources", "civitaiResources", "seed", "Seed",
         "steps", "Steps", "sampler", "Sampler", "sampler_name", "cfgScale", "CFG scale",
         "cfg_scale", "Guidance", "width", "height", "Model hash", "model_hash", "VAE", "vae",
         "Version", "version", "ComfyUI", "id",
@@ -421,6 +421,15 @@ fn run(data_dir: &std::path::Path, url: &str) -> Result<CivitaiImport, String> {
         .and_then(scalar)
         .map(|s| s.trim().to_string())
         .unwrap_or_default();
+    // CivitAI stores the negative under different keys depending on the
+    // importer: "negativePrompt" is the common A1111/Forge casing, snake_case
+    // and "Negative prompt" occur too; "uc" is NovelAI's unconditional prompt.
+    let negative_prompt = pick(
+        meta,
+        &["negativePrompt", "negative_prompt", "Negative prompt", "negative", "uc"],
+    )
+    .map(|s| s.trim().to_string())
+    .unwrap_or_default();
 
     // LoRAs: prompt tags first (no requests), then civitaiResources → API lookup,
     // finally the legacy "resources" name/weight list.
@@ -508,6 +517,7 @@ fn run(data_dir: &std::path::Path, url: &str) -> Result<CivitaiImport, String> {
     Ok(CivitaiImport {
         image,
         prompt,
+        negative_prompt,
         author,
         checkpoint,
         loras,
@@ -624,7 +634,16 @@ mod tests {
         );
         let seed = res.meta.iter().find(|m| m.k == "Seed").map(|m| m.v.clone());
         assert_eq!(seed.as_deref(), Some("557832969775936"));
-        let _ = std::fs::remove_file(&res.image.temp_path);
+
+        // Negative prompt: CivitAI stores it camelCase ("negativePrompt"); this
+        // second image is a case where the negative is present in the meta.
+        let res2 = run(&dir, "https://civitai.com/images/9173928").expect("import should succeed");
+        assert!(
+            !res2.negative_prompt.is_empty(),
+            "negativePrompt must be picked up: {:?}",
+            res2.negative_prompt
+        );
+        let _ = std::fs::remove_file(&res2.image.temp_path);
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

@@ -50,6 +50,8 @@ export function CardDetail({ card, hasPrev, hasNext, onPrev, onNext, onClose, on
   const [saving, setSaving] = useState(false);
   const [adding, setAdding] = useState(0);
   const [prompt, setPrompt] = useState(card.prompt);
+  const [negativePrompt, setNegativePrompt] = useState(card.negative_prompt ?? "");
+  const [copiedNeg, setCopiedNeg] = useState(false);
   const [note, setNote] = useState(card.note ?? "");
   const [rating, setRating] = useState(card.rating);
   const [tags, setTags] = useState<string[]>(card.tags);
@@ -74,6 +76,8 @@ export function CardDetail({ card, hasPrev, hasNext, onPrev, onNext, onClose, on
     setEditing(false);
     setSaving(false);
     setPrompt(card.prompt);
+    setNegativePrompt(card.negative_prompt ?? "");
+    setCopiedNeg(false);
     setNote(card.note ?? "");
     setRating(card.rating);
     setTags(card.tags);
@@ -107,6 +111,7 @@ export function CardDetail({ card, hasPrev, hasNext, onPrev, onNext, onClose, on
 
   const startEdit = useCallback(() => {
     setPrompt(card.prompt);
+    setNegativePrompt(card.negative_prompt ?? "");
     setNote(card.note ?? "");
     setRating(card.rating);
     setTags(card.tags);
@@ -127,6 +132,7 @@ export function CardDetail({ card, hasPrev, hasNext, onPrev, onNext, onClose, on
       await api.updateCard({
         id: card.id,
         prompt: prompt.trim(),
+        negative_prompt: negativePrompt.trim(),
         note,
         rating,
         tags,
@@ -143,7 +149,7 @@ export function CardDetail({ card, hasPrev, hasNext, onPrev, onNext, onClose, on
     } finally {
       setSaving(false);
     }
-  }, [card, loras, loraDraft, note, onChanged, prompt, rating, t, tags, toast, author, checkpoint]);
+  }, [card, loras, loraDraft, note, onChanged, prompt, negativePrompt, rating, t, tags, toast, author, checkpoint]);
 
   // ---------------------------------------------------------------- actions
 
@@ -172,6 +178,14 @@ export function CardDetail({ card, hasPrev, hasNext, onPrev, onNext, onClose, on
     }
   }, [card.prompt, copyText, t, toast]);
 
+  const copyNegative = useCallback(async () => {
+    if (await copyText(card.negative_prompt ?? "")) {
+      setCopiedNeg(true);
+      toast(t("toast.copied"));
+      window.setTimeout(() => setCopiedNeg(false), 1600);
+    }
+  }, [card.negative_prompt, copyText, t, toast]);
+
   const copyLora = useCallback(
     async (lora: LoraItem) => {
       if (await copyText(`<lora:${lora.name}:${lora.value || "1"}>`)) {
@@ -191,6 +205,7 @@ export function CardDetail({ card, hasPrev, hasNext, onPrev, onNext, onClose, on
         await api.updateCard({
           id: card.id,
           prompt: card.prompt,
+          negative_prompt: card.negative_prompt ?? "",
           note: card.note ?? "",
           rating: v,
           tags: card.tags,
@@ -457,6 +472,21 @@ export function CardDetail({ card, hasPrev, hasNext, onPrev, onNext, onClose, on
                   />
                 </section>
 
+                <section>
+                  <label className="t-section block" htmlFor="detail-negative">
+                    {t("editor.negative")}
+                  </label>
+                  <textarea
+                    id="detail-negative"
+                    value={negativePrompt}
+                    onChange={(e) => setNegativePrompt(e.target.value)}
+                    placeholder={t("editor.negative.placeholder")}
+                    spellCheck={false}
+                    rows={2}
+                    className="field mt-2 resize-none select-text"
+                  />
+                </section>
+
                 <LoraEditor loras={loras} onChange={setLoras} draft={loraDraft} onDraft={setLoraDraft} t={t} />
 
                 <section className="grid grid-cols-2 gap-5">
@@ -565,6 +595,26 @@ export function CardDetail({ card, hasPrev, hasNext, onPrev, onNext, onClose, on
                     {card.prompt}
                   </div>
                 </section>
+
+                {card.negative_prompt && (
+                  <section className="group/negative relative">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[10.5px] font-semibold tracking-[0.07em] text-faint uppercase select-none">{t("detail.negative")}</p>
+                      <button
+                        type="button"
+                        aria-label={t("action.copy")}
+                        title={t("action.copy")}
+                        onClick={copyNegative}
+                        className="press -mr-1 flex h-6.5 w-6.5 cursor-pointer items-center justify-center rounded-md text-faint opacity-0 transition-opacity duration-150 group-hover/negative:opacity-100 hover:bg-zinc-100 hover:text-ink"
+                      >
+                        {copiedNeg ? <Check size={12.5} /> : <Copy size={12.5} />}
+                      </button>
+                    </div>
+                    <div className="mt-2 mb-1 rounded-xl bg-parchment px-4 py-3.5 text-[13.5px] leading-[1.62] whitespace-pre-wrap text-muted select-text">
+                      {card.negative_prompt}
+                    </div>
+                  </section>
+                )}
 
                 {card.loras.length > 0 && (
                   <section>

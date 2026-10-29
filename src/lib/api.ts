@@ -14,7 +14,21 @@ import type {
   UpdateCardInput
 } from "./types";
 
-export const assetUrl = (path: string): string => convertFileSrc(path);
+// The active library dir (from get_library_paths). Image paths in the DB are
+// stored relative to it, while convertFileSrc needs an absolute path — the join
+// below also makes a custom library location work.
+let libraryDir = "";
+export function setLibraryDir(dir: string) {
+  libraryDir = dir.replace(/[\\/]+$/, "");
+}
+
+const isAbsolute = (p: string) => p.startsWith("/") || /^[a-zA-Z]:[\\/]/.test(p);
+
+export const assetUrl = (path: string): string => {
+  if (!path || isAbsolute(path)) return convertFileSrc(path);
+  const sep = libraryDir.includes("\\") ? "\\" : "/";
+  return convertFileSrc(libraryDir ? `${libraryDir}${sep}${path}` : path);
+};
 
 export const api = {
   listCards: (filter: ListFilter) => invoke<CardSummary[]>("list_cards", { filter }),
@@ -49,6 +63,7 @@ export const api = {
   importLibrary: (path: string) => invoke<void>("import_library", { path }),
 
   getLibraryPaths: () => invoke<LibraryPaths>("get_library_paths"),
+  moveLibrary: (newDir: string) => invoke<void>("move_library", { newDir }),
   revealFile: (path: string) => invoke<void>("reveal_file", { path }),
   copyText: (text: string) => invoke<void>("copy_text", { text })
 };

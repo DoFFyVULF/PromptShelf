@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ImageDown } from "lucide-react";
 import { I18nProvider, useI18n } from "./i18n";
-import { api } from "./lib/api";
+import { api, setLibraryDir } from "./lib/api";
 import type {
   AppSettings,
   CardDetail as CardDetailData,
@@ -109,6 +109,7 @@ function Shell() {
       const [s, p] = await Promise.all([api.getSettings(), api.getLibraryPaths()]);
       setSettings(s);
       setPaths(p);
+      setLibraryDir(p.data_dir);
       setLang(s.lang);
       window.localStorage.setItem("ps-lang", s.lang);
     } catch {
@@ -326,6 +327,7 @@ function Shell() {
     stagedRef.current = [entry];
     setCivImport({
       prompt: res.prompt,
+      negative_prompt: res.negative_prompt,
       author: res.author,
       checkpoint: res.checkpoint,
       loras: res.loras,

@@ -27,6 +27,7 @@ export interface CardSummary {
 export interface CardDetail {
   id: string;
   prompt: string;
+  negative_prompt: string;
   note: string | null;
   rating: number;
   created_at: string;
@@ -67,6 +68,7 @@ export interface ListFilter {
 
 export interface NewCardInput {
   prompt: string;
+  negative_prompt: string;
   note: string;
   rating: number;
   tags: string[];
@@ -81,6 +83,7 @@ export interface NewCardInput {
 export interface UpdateCardInput {
   id: string;
   prompt: string;
+  negative_prompt: string;
   note: string;
   rating: number;
   tags: string[];
@@ -130,6 +133,7 @@ export interface PasteImageResult {
 export interface CivitaiImport {
   image: PasteImageResult;
   prompt: string;
+  negative_prompt: string;
   author: string;
   checkpoint: string;
   loras: LoraItem[];

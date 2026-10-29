@@ -39,6 +39,7 @@ fn test_card_crud_cover_and_loras() {
 
     let input = NewCardInput {
         prompt: "a woman with a vintage aesthetic".to_string(),
+        negative_prompt: String::new(),
         note: "v2 works better".to_string(),
         rating: 4,
         tags: vec!["portrait".to_string(), "film".to_string()],
@@ -114,6 +115,7 @@ fn test_card_crud_cover_and_loras() {
         UpdateCardInput {
             id: detail.id.clone(),
             prompt: "updated prompt".to_string(),
+            negative_prompt: String::new(),
             note: String::new(),
             rating: 5,
             tags: vec!["only-one".to_string()],
@@ -207,6 +209,7 @@ fn test_add_image_sets_cover_and_sort() {    let dir = tmp_dir("addimg");
         &dir,
         NewCardInput {
             prompt: "p".to_string(),
+            negative_prompt: String::new(),
             note: String::new(),
             rating: 0,
             tags: vec![],
@@ -273,6 +276,7 @@ fn test_groups_crud_move_and_default() {
         &dir,
         NewCardInput {
             prompt: "in default".to_string(),
+            negative_prompt: String::new(),
             note: String::new(),
             rating: 0,
             tags: vec![],

@@ -305,22 +305,23 @@ pub fn get_card_inner(dir: &Path, id: &str) -> Result<CardDetail, String> {
 
     let mut card = conn
         .query_row(
-            "SELECT id, prompt, note, rating, created_at, updated_at, loras, group_id, author, checkpoint, meta_json FROM cards WHERE id = ?1",
+            "SELECT id, prompt, negative_prompt, note, rating, created_at, updated_at, loras, group_id, author, checkpoint, meta_json FROM cards WHERE id = ?1",
             params![id],
             |r| {
-                let loras_raw: String = r.get(6)?;
-                let meta_raw: String = r.get(10)?;
+                let loras_raw: String = r.get(7)?;
+                let meta_raw: String = r.get(11)?;
                 Ok(CardDetail {
                     id: r.get(0)?,
                     prompt: r.get(1)?,
-                    note: r.get(2)?,
-                    rating: r.get(3)?,
-                    created_at: r.get(4)?,
-                    updated_at: r.get(5)?,
+                    negative_prompt: r.get(2)?,
+                    note: r.get(3)?,
+                    rating: r.get(4)?,
+                    created_at: r.get(5)?,
+                    updated_at: r.get(6)?,
                     loras: parse_loras(&loras_raw),
-                    group_id: r.get::<_, Option<String>>(7)?.unwrap_or_default(),
-                    author: r.get(8)?,
-                    checkpoint: r.get(9)?,
+                    group_id: r.get::<_, Option<String>>(8)?.unwrap_or_default(),
+                    author: r.get(9)?,
+                    checkpoint: r.get(10)?,
                     meta: parse_meta(&meta_raw),
                     tags: Vec::new(),
                     images: Vec::new(),
@@ -395,6 +396,7 @@ pub fn create_card_inner(dir: &Path, input: NewCardInput) -> Result<CardDetail, 
     let ts = now();
     let rating = input.rating.clamp(0, 5);
     let tags = clean_tags(&input.tags);
+    let negative_prompt = input.negative_prompt.trim().to_string();
     let note = input.note.trim().to_string();
     let loras = loras_json(&input.loras);
     let author = input.author.as_deref().map(str::trim).filter(|s| !s.is_empty()).map(|s| s.to_string());
@@ -414,9 +416,9 @@ pub fn create_card_inner(dir: &Path, input: NewCardInput) -> Result<CardDetail, 
     };
 
     conn.execute(
-        "INSERT INTO cards(id, prompt, note, rating, created_at, updated_at, loras, group_id, author, checkpoint, meta_json)
-         VALUES(?1,?2,?3,?4,?5,?5,?6,?7,?8,?9,?10)",
-        params![id, prompt, note, rating, ts, loras, group_id, author, checkpoint, meta],
+        "INSERT INTO cards(id, prompt, negative_prompt, note, rating, created_at, updated_at, loras, group_id, author, checkpoint, meta_json)
+         VALUES(?1,?2,?3,?4,?5,?6,?6,?7,?8,?9,?10,?11)",
+        params![id, prompt, negative_prompt, note, rating, ts, loras, group_id, author, checkpoint, meta],
     )
     .map_err(es)?;
 
@@ -459,10 +461,11 @@ pub fn update_card_inner(dir: &Path, input: UpdateCardInput) -> Result<(), Strin
     let author = input.author.as_deref().map(str::trim).filter(|s| !s.is_empty()).map(|s| s.to_string());
     let checkpoint = input.checkpoint.as_deref().map(str::trim).filter(|s| !s.is_empty()).map(|s| s.to_string());
     let meta = meta_json(&input.meta);
+    let negative_prompt = input.negative_prompt.trim().to_string();
 
     conn.execute(
-        "UPDATE cards SET prompt = ?1, note = ?2, rating = ?3, loras = ?4, author = ?5, checkpoint = ?6, meta_json = ?7, updated_at = ?8 WHERE id = ?9",
-        params![prompt, note, rating, loras, author, checkpoint, meta, now(), input.id],
+        "UPDATE cards SET prompt = ?1, negative_prompt = ?2, note = ?3, rating = ?4, loras = ?5, author = ?6, checkpoint = ?7, meta_json = ?8, updated_at = ?9 WHERE id = ?10",
+        params![prompt, negative_prompt, note, rating, loras, author, checkpoint, meta, now(), input.id],
     )
     .map_err(es)?;
 

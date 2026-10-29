@@ -29,6 +29,7 @@ pub struct CardSummary {
 pub struct CardDetail {
     pub id: String,
     pub prompt: String,
+    pub negative_prompt: String,
     pub note: Option<String>,
     pub rating: i64,
     pub created_at: String,
@@ -74,6 +75,8 @@ pub struct MetaItem {
 pub struct NewCardInput {
     pub prompt: String,
     #[serde(default)]
+    pub negative_prompt: String,
+    #[serde(default)]
     pub note: String,
     #[serde(default)]
     pub rating: i64,
@@ -97,6 +100,8 @@ pub struct NewCardInput {
 pub struct UpdateCardInput {
     pub id: String,
     pub prompt: String,
+    #[serde(default)]
+    pub negative_prompt: String,
     #[serde(default)]
     pub note: String,
     #[serde(default)]
@@ -198,6 +203,7 @@ pub struct CivitaiImport {
     /// The original photo saved to a temp file (field: temp_path, preview, width, height).
     pub image: PasteImageResult,
     pub prompt: String,
+    pub negative_prompt: String,
     pub author: String,
     pub checkpoint: String,
     pub loras: Vec<Lora>,

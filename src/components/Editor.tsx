@@ -28,6 +28,7 @@ export function Editor({ card, staged, onStaged, settings, groupId, imported, on
   const { toast } = useToast();
 
   const [prompt, setPrompt] = useState(card?.prompt ?? imported?.prompt ?? "");
+  const [negativePrompt, setNegativePrompt] = useState(card?.negative_prompt ?? imported?.negative_prompt ?? "");
   const [note, setNote] = useState(card?.note ?? "");
   const [tags, setTags] = useState<string[]>(card?.tags ?? imported?.tags ?? []);
   const [tagDraft, setTagDraft] = useState("");
@@ -193,6 +194,7 @@ export function Editor({ card, staged, onStaged, settings, groupId, imported, on
         await api.updateCard({
           id: card.id,
           prompt: prompt.trim(),
+          negative_prompt: negativePrompt.trim(),
           note,
           rating,
           tags,
@@ -212,6 +214,7 @@ export function Editor({ card, staged, onStaged, settings, groupId, imported, on
       } else {
         const created = await api.createCard({
           prompt: prompt.trim(),
+          negative_prompt: negativePrompt.trim(),
           note,
           rating,
           tags,
@@ -229,7 +232,7 @@ export function Editor({ card, staged, onStaged, settings, groupId, imported, on
       toast(msg.includes("PROMPT_REQUIRED") ? t("toast.promptRequired") : t("toast.error"), "error");
       setSaving(false);
     }
-  }, [card, groupId, loras, loraDraft, note, onSaved, prompt, rating, removed, staged, t, tags, toast, author, checkpoint, meta]);
+  }, [card, groupId, loras, loraDraft, note, onSaved, prompt, negativePrompt, rating, removed, staged, t, tags, toast, author, checkpoint, meta]);
 
   const existing = (card?.images ?? []).filter((i) => !removed.includes(i.id));
   const hasImages = existing.length > 0 || staged.length > 0;
@@ -276,6 +279,22 @@ export function Editor({ card, staged, onStaged, settings, groupId, imported, on
                 {error}
               </p>
             )}
+          </section>
+
+          <section>
+            <label className="t-section block" htmlFor="editor-negative">
+              {t("editor.negative")}
+            </label>
+            <textarea
+              id="editor-negative"
+              value={negativePrompt}
+              onChange={(e) => setNegativePrompt(e.target.value)}
+              placeholder={t("editor.negative.placeholder")}
+              spellCheck={false}
+              rows={2}
+              className="field mt-2 resize-none select-text"
+              style={{ minHeight: 44 }}
+            />
           </section>
 
           <section>
