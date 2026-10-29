@@ -210,21 +210,6 @@ body {
 /* Import from CivitAI: reveals below the New Prompt button on hover with a
    spring overshoot. The wrapper's padding keeps the cursor connected across
    the gap so the highlight doesn't flicker off. */
-.civitai-pop {
-  opacity: 0;
-  transform: translateY(-7px) scale(0.92);
-  pointer-events: none;
-  transition:
-    transform 0.26s var(--ease-spring),
-    opacity 0.16s var(--ease-apple);
-}
-.new-pop:hover .civitai-pop,
-.new-pop:focus-within .civitai-pop {
-  opacity: 1;
-  transform: none;
-  pointer-events: auto;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .anim-tile,
   .anim-fade,
@@ -232,9 +217,6 @@ body {
   .anim-toast,
   .spin {
     animation: none !important;
-  }
-  .civitai-pop {
-    transition: none;
   }
 }
 

@@ -80,23 +80,21 @@ export function TopBar({ query, onQuery, sort, onSort, lang, onLang, onNew, onIm
         <Settings2 size={17} />
       </button>
 
-      <div className="new-pop relative">
-        <button type="button" className="btn-primary press cursor-pointer" onClick={onNew}>
-          <Plus size={16} strokeWidth={2.2} />
-          <span className="hidden lg:inline">{t("action.new")}</span>
-        </button>
-        {/* Hover bridge: the pt-2 padding keeps the cursor connected over the gap */}
-        <div className="absolute right-0 top-full z-50 pt-2">
-          <button
-            type="button"
-            className="civitai-pop btn-primary press cursor-pointer whitespace-nowrap shadow-panel"
-            onClick={onImportCivitai}
-          >
-            <CloudDownload size={15.5} strokeWidth={2} />
-            <span className="hidden lg:inline">{t("import.civitai")}</span>
-          </button>
-        </div>
-      </div>
+      <button
+        type="button"
+        className="btn-ghost press cursor-pointer whitespace-nowrap"
+        aria-label={t("import.civitai")}
+        title={t("import.civitai")}
+        onClick={onImportCivitai}
+      >
+        <CloudDownload size={15.5} strokeWidth={2} />
+        <span className="hidden lg:inline">{t("import.civitai")}</span>
+      </button>
+
+      <button type="button" className="btn-primary press cursor-pointer" onClick={onNew}>
+        <Plus size={16} strokeWidth={2.2} />
+        <span className="hidden lg:inline">{t("action.new")}</span>
+      </button>
     </header>
   );
 }
