@@ -27,6 +27,7 @@ arboard = "3"
 zip = { version = "2", default-features = false, features = ["deflate"] }
 kamadak-exif = "0.6"
 base64 = "0.22"
+ureq = { version = "2", features = ["gzip"] }
 
 [profile.release]
 codegen-units = 1

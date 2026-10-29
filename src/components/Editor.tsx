@@ -4,7 +4,7 @@ import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
 import { useI18n } from "../i18n";
 import { modKey } from "../lib/platform";
 import { api, assetUrl } from "../lib/api";
-import type { AppSettings, CardDetail, LoraItem, StagedImage } from "../lib/types";
+import type { AppSettings, CardDetail, CivitaiImport, LoraItem, StagedImage } from "../lib/types";
 import { Stars } from "./Stars";
 import { useToast } from "./Toasts";
 import { LoraEditor, applyLoraDraft, type LoraDraft } from "./LoraEditor";
@@ -17,20 +17,26 @@ interface EditorProps {
   onStaged: (next: StagedImage[]) => void;
   settings: AppSettings | null;
   groupId: string;
+  /** Prefill from a CivitAI import (fresh dialog, card == null). */
+  imported?: Omit<CivitaiImport, "image"> | null;
   onClose: () => void;
   onSaved: (detail: CardDetail) => void;
 }
 
-export function Editor({ card, staged, onStaged, settings, groupId, onClose, onSaved }: EditorProps) {
+export function Editor({ card, staged, onStaged, settings, groupId, imported, onClose, onSaved }: EditorProps) {
   const { t } = useI18n();
   const { toast } = useToast();
 
-  const [prompt, setPrompt] = useState(card?.prompt ?? "");
+  const [prompt, setPrompt] = useState(card?.prompt ?? imported?.prompt ?? "");
   const [note, setNote] = useState(card?.note ?? "");
-  const [tags, setTags] = useState<string[]>(card?.tags ?? []);
+  const [tags, setTags] = useState<string[]>(card?.tags ?? imported?.tags ?? []);
   const [tagDraft, setTagDraft] = useState("");
   const [rating, setRating] = useState(card?.rating ?? 0);
-  const [loras, setLoras] = useState<LoraItem[]>(card?.loras ?? []);
+  const [loras, setLoras] = useState<LoraItem[]>(card?.loras ?? imported?.loras ?? []);
+  const [author, setAuthor] = useState(card?.author ?? imported?.author ?? "");
+  const [checkpoint, setCheckpoint] = useState(card?.checkpoint ?? imported?.checkpoint ?? "");
+  // "Other metadata" from an import travels with the card; edited nowhere.
+  const [meta] = useState(card?.meta ?? imported?.meta ?? []);
   const [loraDraft, setLoraDraft] = useState<LoraDraft | null>(null);
   const [removed, setRemoved] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
@@ -184,7 +190,17 @@ export function Editor({ card, staged, onStaged, settings, groupId, onClose, onS
     try {
       const finalLoras = applyLoraDraft(loras, loraDraft);
       if (card) {
-        await api.updateCard({ id: card.id, prompt: prompt.trim(), note, rating, tags, loras: finalLoras });
+        await api.updateCard({
+          id: card.id,
+          prompt: prompt.trim(),
+          note,
+          rating,
+          tags,
+          loras: finalLoras,
+          author: author.trim() || null,
+          checkpoint: checkpoint.trim() || null,
+          meta
+        });
         for (const id of removed) {
           await api.deleteCardImage(id);
         }
@@ -201,7 +217,10 @@ export function Editor({ card, staged, onStaged, settings, groupId, onClose, onS
           tags,
           loras: finalLoras,
           group_id: groupId,
-          images: staged.map((s) => s.path)
+          images: staged.map((s) => s.path),
+          author: author.trim() || null,
+          checkpoint: checkpoint.trim() || null,
+          meta
         });
         onSaved(created);
       }
@@ -210,7 +229,7 @@ export function Editor({ card, staged, onStaged, settings, groupId, onClose, onS
       toast(msg.includes("PROMPT_REQUIRED") ? t("toast.promptRequired") : t("toast.error"), "error");
       setSaving(false);
     }
-  }, [card, groupId, loras, loraDraft, note, onSaved, prompt, rating, removed, staged, t, tags, toast]);
+  }, [card, groupId, loras, loraDraft, note, onSaved, prompt, rating, removed, staged, t, tags, toast, author, checkpoint, meta]);
 
   const existing = (card?.images ?? []).filter((i) => !removed.includes(i.id));
   const hasImages = existing.length > 0 || staged.length > 0;
@@ -348,6 +367,58 @@ export function Editor({ card, staged, onStaged, settings, groupId, onClose, onS
           </section>
 
           <LoraEditor loras={loras} onChange={setLoras} draft={loraDraft} onDraft={setLoraDraft} t={t} />
+
+          <section className="grid grid-cols-2 gap-5">
+            <div>
+              <label className="t-section block" htmlFor="editor-author">
+                {t("editor.author")}
+              </label>
+              <input
+                id="editor-author"
+                type="text"
+                value={author}
+                onChange={(e) => setAuthor(e.target.value)}
+                placeholder={t("editor.author.placeholder")}
+                spellCheck={false}
+                className="field mt-2 select-text"
+              />
+            </div>
+            <div>
+              <label className="t-section block" htmlFor="editor-checkpoint">
+                {t("editor.checkpoint")}
+              </label>
+              <input
+                id="editor-checkpoint"
+                type="text"
+                value={checkpoint}
+                onChange={(e) => setCheckpoint(e.target.value)}
+                placeholder={t("editor.checkpoint.placeholder")}
+                spellCheck={false}
+                className="field mt-2 select-text"
+              />
+            </div>
+          </section>
+
+          {meta.length > 0 && (
+            <section>
+              <div className="flex items-baseline justify-between">
+                <span className="t-section">{t("editor.meta")}</span>
+                <span className="text-[11px] text-faint">{t("editor.meta.hint")}</span>
+              </div>
+              <div className="mt-2.5 rounded-xl bg-parchment px-4 py-3">
+                <div className="grid gap-x-6 gap-y-1 sm:grid-cols-2">
+                  {meta.map((row) => (
+                    <div key={row.k} className="flex min-w-0 gap-2.5 text-[12.5px]">
+                      <span className="shrink-0 text-faint">{row.k}</span>
+                      <span title={row.v} className="min-w-0 truncate text-body select-text">
+                        {row.v}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+          )}
 
           <section className="grid grid-cols-2 gap-5">
             <div>

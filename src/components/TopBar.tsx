@@ -1,4 +1,4 @@
-import { Search, Plus, Settings2, ChevronDown } from "lucide-react";
+import { Search, Plus, Settings2, ChevronDown, CloudDownload } from "lucide-react";
 import { useI18n } from "../i18n";
 import { modKey } from "../lib/platform";
 import type { Sort } from "../lib/types";
@@ -11,10 +11,11 @@ interface TopBarProps {
   lang: "en" | "ru";
   onLang: (l: "en" | "ru") => void;
   onNew: () => void;
+  onImportCivitai: () => void;
   onSettings: () => void;
 }
 
-export function TopBar({ query, onQuery, sort, onSort, lang, onLang, onNew, onSettings }: TopBarProps) {
+export function TopBar({ query, onQuery, sort, onSort, lang, onLang, onNew, onImportCivitai, onSettings }: TopBarProps) {
   const { t } = useI18n();
 
   return (
@@ -79,10 +80,23 @@ export function TopBar({ query, onQuery, sort, onSort, lang, onLang, onNew, onSe
         <Settings2 size={17} />
       </button>
 
-      <button type="button" className="btn-primary press cursor-pointer" onClick={onNew}>
-        <Plus size={16} strokeWidth={2.2} />
-        <span className="hidden lg:inline">{t("action.new")}</span>
-      </button>
+      <div className="new-pop relative">
+        <button type="button" className="btn-primary press cursor-pointer" onClick={onNew}>
+          <Plus size={16} strokeWidth={2.2} />
+          <span className="hidden lg:inline">{t("action.new")}</span>
+        </button>
+        {/* Hover bridge: the pt-2 padding keeps the cursor connected over the gap */}
+        <div className="absolute right-0 top-full z-50 pt-2">
+          <button
+            type="button"
+            className="civitai-pop btn-primary press cursor-pointer whitespace-nowrap shadow-panel"
+            onClick={onImportCivitai}
+          >
+            <CloudDownload size={15.5} strokeWidth={2} />
+            <span className="hidden lg:inline">{t("import.civitai")}</span>
+          </button>
+        </div>
+      </div>
     </header>
   );
 }

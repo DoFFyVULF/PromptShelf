@@ -3,6 +3,7 @@ import type {
   AppSettings,
   CardDetail,
   CardSummary,
+  CivitaiImport,
   GroupInfo,
   LibraryPaths,
   ListFilter,
@@ -40,6 +41,7 @@ export const api = {
   pasteImageFromClipboard: () => invoke<PasteImageResult | null>("paste_image_from_clipboard"),
   saveTempImage: (bytes: Uint8Array) => invoke<PasteImageResult | null>("save_temp_image", { bytes: Array.from(bytes) }),
   importDroppedFile: (name: string, base64: string) => invoke<PasteImageResult>("import_dropped_file", { input: { name, data: base64 } }),
+  civitaiImport: (url: string) => invoke<CivitaiImport>("civitai_import", { url }),
   previewImage: (path: string) => invoke<string>("preview_image", { path }),
   discardTemp: (path: string) => invoke<void>("discard_temp", { path }),
 

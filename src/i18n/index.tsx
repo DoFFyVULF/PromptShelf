@@ -41,12 +41,15 @@ export function I18nProvider({ lang, setLang, children }: { lang: Lang; setLang:
   const count = useCallback(
     (n: number) => {
       if (n === 0) return DICTS[lang]["grid.count.zero"];
-      if (lang === "ru") {
-        const form = ruPluralForm(n);
-        return DICTS.ru[`plurals.ru.${form}` as keyof typeof ru].replace("{n}", String(n)).replace("{form}", "");
-      }
-      const key = n === 1 ? "plurals.prompts.one" : "plurals.prompts.other";
-      return `${n} ${DICTS.en[key as keyof typeof en]}`;
+      const key: DictKey =
+        lang === "ru"
+          ? `plurals.ru.${ruPluralForm(n)}`
+          : n === 1
+            ? "plurals.prompts.one"
+            : "plurals.prompts.other";
+      // "{n} {form}" template in both languages; ru plurals carry only the
+      // word ("промпт"/"промпта"/"промптов") and en only the noun.
+      return DICTS[lang]["grid.count"].replace("{n}", String(n)).replace("{form}", DICTS[lang][key]);
     },
     [lang]
   );

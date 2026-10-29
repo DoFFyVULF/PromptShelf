@@ -48,6 +48,9 @@ fn test_card_crud_cover_and_loras() {
             value: "0.7".to_string(),
         }],
         group_id: None,
+        author: None,
+        checkpoint: None,
+        meta: vec![],
     };
 
     let detail = create_card_inner(&dir, input).unwrap();
@@ -124,6 +127,9 @@ fn test_card_crud_cover_and_loras() {
                     value: "0.5".to_string(),
                 },
             ],
+            author: Some("  SomeAuthor  ".to_string()),
+            checkpoint: None,
+            meta: vec![crate::models::MetaItem { k: "Seed".to_string(), v: "42".to_string() }],
         },
     )
     .unwrap();
@@ -207,6 +213,9 @@ fn test_add_image_sets_cover_and_sort() {    let dir = tmp_dir("addimg");
             images: vec![],
             group_id: None,
             loras: vec![],
+            author: None,
+            checkpoint: None,
+            meta: vec![],
         },
     )
     .unwrap();
@@ -270,6 +279,9 @@ fn test_groups_crud_move_and_default() {
             images: vec![],
             loras: vec![],
             group_id: None,
+            author: None,
+            checkpoint: None,
+            meta: vec![],
         },
     )
     .unwrap();

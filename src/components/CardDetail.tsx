@@ -11,11 +11,14 @@ import {
   ImageOff,
   Maximize2,
   Star,
-  Loader2
+  Loader2,
+  User,
+  Cpu
 } from "lucide-react";
 import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
 import { useI18n } from "../i18n";
 import { api, assetUrl } from "../lib/api";
+import { modKey } from "../lib/platform";
 import type { CardDetail as CardDetailType, ImageInfo, LoraItem } from "../lib/types";
 import { Stars } from "./Stars";
 import { useToast } from "./Toasts";
@@ -51,6 +54,8 @@ export function CardDetail({ card, hasPrev, hasNext, onPrev, onNext, onClose, on
   const [rating, setRating] = useState(card.rating);
   const [tags, setTags] = useState<string[]>(card.tags);
   const [tagDraft, setTagDraft] = useState("");
+  const [author, setAuthor] = useState(card.author ?? "");
+  const [checkpoint, setCheckpoint] = useState(card.checkpoint ?? "");
   const [loras, setLoras] = useState<LoraItem[]>(card.loras ?? []);
   const [loraDraft, setLoraDraft] = useState<LoraDraft | null>(null);
 
@@ -72,6 +77,8 @@ export function CardDetail({ card, hasPrev, hasNext, onPrev, onNext, onClose, on
     setNote(card.note ?? "");
     setRating(card.rating);
     setTags(card.tags);
+    setAuthor(card.author ?? "");
+    setCheckpoint(card.checkpoint ?? "");
     setLoras(card.loras ?? []);
     setLoraDraft(null);
   }, [card.id]);
@@ -103,6 +110,8 @@ export function CardDetail({ card, hasPrev, hasNext, onPrev, onNext, onClose, on
     setNote(card.note ?? "");
     setRating(card.rating);
     setTags(card.tags);
+    setAuthor(card.author ?? "");
+    setCheckpoint(card.checkpoint ?? "");
     setLoras(card.loras ?? []);
     setLoraDraft(null);
     setEditing(true);
@@ -121,7 +130,10 @@ export function CardDetail({ card, hasPrev, hasNext, onPrev, onNext, onClose, on
         note,
         rating,
         tags,
-        loras: applyLoraDraft(loras, loraDraft)
+        loras: applyLoraDraft(loras, loraDraft),
+        author: author.trim() || null,
+        checkpoint: checkpoint.trim() || null,
+        meta: card.meta ?? []
       });
       const fresh = await api.getCard(card.id);
       onChanged(fresh);
@@ -131,7 +143,7 @@ export function CardDetail({ card, hasPrev, hasNext, onPrev, onNext, onClose, on
     } finally {
       setSaving(false);
     }
-  }, [card.id, loras, loraDraft, note, onChanged, prompt, rating, t, tags, toast]);
+  }, [card, loras, loraDraft, note, onChanged, prompt, rating, t, tags, toast, author, checkpoint]);
 
   // ---------------------------------------------------------------- actions
 
@@ -182,7 +194,10 @@ export function CardDetail({ card, hasPrev, hasNext, onPrev, onNext, onClose, on
           note: card.note ?? "",
           rating: v,
           tags: card.tags,
-          loras: card.loras ?? []
+          loras: card.loras ?? [],
+          author: card.author ?? null,
+          checkpoint: card.checkpoint ?? null,
+          meta: card.meta ?? []
         });
         onChanged({ ...card, rating: v });
       } catch {
@@ -444,6 +459,37 @@ export function CardDetail({ card, hasPrev, hasNext, onPrev, onNext, onClose, on
 
                 <LoraEditor loras={loras} onChange={setLoras} draft={loraDraft} onDraft={setLoraDraft} t={t} />
 
+                <section className="grid grid-cols-2 gap-5">
+                  <div>
+                    <label className="t-section block" htmlFor="detail-author">
+                      {t("editor.author")}
+                    </label>
+                    <input
+                      id="detail-author"
+                      type="text"
+                      value={author}
+                      onChange={(e) => setAuthor(e.target.value)}
+                      placeholder={t("editor.author.placeholder")}
+                      spellCheck={false}
+                      className="field mt-2 select-text"
+                    />
+                  </div>
+                  <div>
+                    <label className="t-section block" htmlFor="detail-checkpoint">
+                      {t("editor.checkpoint")}
+                    </label>
+                    <input
+                      id="detail-checkpoint"
+                      type="text"
+                      value={checkpoint}
+                      onChange={(e) => setCheckpoint(e.target.value)}
+                      placeholder={t("editor.checkpoint.placeholder")}
+                      spellCheck={false}
+                      className="field mt-2 select-text"
+                    />
+                  </div>
+                </section>
+
                 <section>
                   <label className="t-section block" htmlFor="detail-note">
                     {t("editor.note")}
@@ -542,10 +588,41 @@ export function CardDetail({ card, hasPrev, hasNext, onPrev, onNext, onClose, on
                   </section>
                 )}
 
+                {(card.author || card.checkpoint) && (
+                  <section className="flex flex-wrap gap-x-5 gap-y-1.5">
+                    {card.author && (
+                      <span className="flex cursor-default items-center gap-1.5 text-[12.5px] text-muted" title={t("editor.author")}>
+                        <User size={12.5} className="shrink-0 text-faint" />
+                        <span className="max-w-[220px] truncate">{card.author}</span>
+                      </span>
+                    )}
+                    {card.checkpoint && (
+                      <span className="flex cursor-default items-center gap-1.5 text-[12.5px] text-muted" title={t("editor.checkpoint")}>
+                        <Cpu size={12.5} className="shrink-0 text-faint" />
+                        <span className="max-w-[240px] truncate">{card.checkpoint}</span>
+                      </span>
+                    )}
+                  </section>
+                )}
+
                 {card.note && (
                   <section>
                     <p className="text-[10.5px] font-semibold tracking-[0.07em] text-faint uppercase select-none">{t("detail.note")}</p>
                     <p className="mt-1.5 text-[13px] leading-relaxed whitespace-pre-wrap text-muted select-text">{card.note}</p>
+                  </section>
+                )}
+
+                {(card.meta?.length ?? 0) > 0 && (
+                  <section>
+                    <p className="text-[10.5px] font-semibold tracking-[0.07em] text-faint uppercase select-none">{t("detail.other")}</p>
+                    <div className="mt-2 rounded-xl bg-parchment px-4 py-3 text-[12.5px]">
+                      {card.meta.map((row) => (
+                        <div key={row.k} className="flex gap-3 py-[1.5px]">
+                          <span className="w-[96px] shrink-0 text-faint">{row.k}</span>
+                          <span className="min-w-0 break-all text-body select-text">{row.v}</span>
+                        </div>
+                      ))}
+                    </div>
                   </section>
                 )}
 
@@ -578,7 +655,7 @@ export function CardDetail({ card, hasPrev, hasNext, onPrev, onNext, onClose, on
                 <button type="button" className="btn-primary press min-w-0 cursor-pointer flex-1" onClick={copyPrompt}>
                   {copied ? <Check size={15} /> : <Copy size={14.5} />}
                   <span className="truncate">{copied ? t("toast.copied") : t("action.copy")}</span>
-                  <kbd className="kbd hidden border-zinc-600 bg-transparent text-zinc-400 xl:flex">C</kbd>
+                  <kbd className="kbd hidden border-zinc-600 bg-transparent text-zinc-400 xl:flex">{modKey}C</kbd>
                 </button>
                 <button type="button" className="btn-ghost press cursor-pointer" onClick={startEdit}>
                   <Pencil size={14.5} />

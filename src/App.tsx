@@ -6,6 +6,7 @@ import type {
   AppSettings,
   CardDetail as CardDetailData,
   CardSummary,
+  CivitaiImport,
   GroupInfo,
   Lang,
   LibraryPaths,
@@ -20,6 +21,7 @@ import { CardGrid, GridSkeleton, CARD_DRAG_TYPE } from "./components/Grid";
 import { EmptyState } from "./components/EmptyState";
 import { CardDetail } from "./components/CardDetail";
 import { Editor } from "./components/Editor";
+import { ImportDialog } from "./components/ImportDialog";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { GroupsPanel } from "./components/GroupsPanel";
 import { TagsDialog } from "./components/TagsDialog";
@@ -60,6 +62,10 @@ function Shell() {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorCard, setEditorCard] = useState<CardDetailData | null>(null);
   const [staged, setStaged] = useState<StagedImage[]>([]);
+
+  const [importOpen, setImportOpen] = useState(false);
+  // prefill for the editor after a CivitAI fetch (prompt/author/…)
+  const [civImport, setCivImport] = useState<Omit<CivitaiImport, "image"> | null>(null);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -271,11 +277,13 @@ function Shell() {
   const closeEditor = useCallback(() => {
     setEditorOpen(false);
     setEditorCard(null);
+    setCivImport(null);
     clearStaged();
   }, [clearStaged]);
 
   const openEditorNew = useCallback(() => {
     setEditorCard(null);
+    setCivImport(null);
     setEditorOpen(true);
   }, []);
 
@@ -285,6 +293,7 @@ function Shell() {
       setEditorCard(null);
       setStaged([]);
       stagedRef.current = [];
+      setCivImport(null);
       await loadCards();
       setDetailId(fresh.id);
       void loadMeta();
@@ -308,8 +317,27 @@ function Shell() {
     }
   }, []);
 
-  const pasteGlobally = useCallback(async () => {
-    try {
+  // CivitAI import flow: fetch in the backend, stage the downloaded photo
+  // like a paste, then prefill the editor with prompt/author/LoRAs/tags/meta.
+  const runCivitaiImport = useCallback(async (url: string) => {
+    const res = await api.civitaiImport(url);
+    const entry = { path: res.image.temp_path, preview: res.image.preview };
+    setStaged([entry]);
+    stagedRef.current = [entry];
+    setCivImport({
+      prompt: res.prompt,
+      author: res.author,
+      checkpoint: res.checkpoint,
+      loras: res.loras,
+      tags: res.tags,
+      meta: res.meta
+    });
+    setImportOpen(false);
+    setEditorCard(null);
+    setEditorOpen(true);
+  }, []);
+
+  const pasteGlobally = useCallback(async () => {    try {
       const res = await api.pasteImageFromClipboard();
       if (!res) {
         toast(t("toast.imageCopied"), "info");
@@ -321,6 +349,7 @@ function Shell() {
         return next;
       });
       setEditorCard(null);
+      setCivImport(null);
       setEditorOpen(true);
     } catch {
       toast(t("toast.error"), "error");
@@ -465,6 +494,7 @@ function Shell() {
         });
         if (ok.length > 0 && !editorOpenRef.current) {
           setEditorCard(null);
+          setCivImport(null);
           setEditorOpen(true);
         }
       })();
@@ -506,6 +536,7 @@ function Shell() {
         lang={lang}
         onLang={switchLang}
         onNew={openEditorNew}
+        onImportCivitai={() => setImportOpen(true)}
         onSettings={() => setSettingsOpen(true)}
       />
 
@@ -652,6 +683,7 @@ function Shell() {
           onStaged={setStaged}
           settings={settings}
           groupId={groupId}
+          imported={civImport}
           onClose={closeEditor}
           onSaved={(d) => void onEditorSaved(d)}
         />
@@ -667,6 +699,12 @@ function Shell() {
           onImported={onImported}
         />
       )}
+
+      <ImportDialog
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImport={runCivitaiImport}
+      />
 
       {dragging && (
         <div className="anim-fade pointer-events-none fixed inset-0 z-[150] flex items-center justify-center bg-canvas/70 backdrop-blur-sm">

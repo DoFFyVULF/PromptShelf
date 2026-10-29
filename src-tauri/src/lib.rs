@@ -1,4 +1,5 @@
 mod cards;
+mod civitai;
 mod images;
 mod models;
 mod store;
@@ -49,6 +50,7 @@ pub fn run() {
             cards::delete_group,
             cards::move_cards,
             images::import_dropped_file,
+            civitai::civitai_import,
             store::get_settings,
             store::set_settings,
             images::paste_image_from_clipboard,

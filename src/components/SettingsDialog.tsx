@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { Download, Upload, FolderOpen, Loader2 } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Download, Upload, FolderOpen, Loader2, Eye, EyeOff, Pencil } from "lucide-react";
 import { save as saveFileDialog, open as openFileDialog, message } from "@tauri-apps/plugin-dialog";
 import { useI18n } from "../i18n";
 import { api } from "../lib/api";
@@ -23,9 +23,18 @@ export function SettingsDialog({ open, settings, paths, onClose, onSaved, onImpo
   const [draft, setDraft] = useState<AppSettings>(settings);
   const [saving, setSaving] = useState(false);
   const [busy, setBusy] = useState(false);
+  // API key display: masked by default; the eye reveals it, the pencil edits it.
+  const [keyRevealed, setKeyRevealed] = useState(false);
+  const [keyEditing, setKeyEditing] = useState(false);
+  const keyBeforeEdit = useRef("");
+  const keyInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (open) setDraft(settings);
+    if (open) {
+      setDraft(settings);
+      setKeyRevealed(false);
+      setKeyEditing(false);
+    }
   }, [open, settings]);
 
   const save = useCallback(
@@ -37,7 +46,8 @@ export function SettingsDialog({ open, settings, paths, onClose, onSaved, onImpo
           quality: next.quality,
           format: next.format,
           originals: next.originals,
-          thumbs: next.thumbs
+          thumbs: next.thumbs,
+          civitai_api_key: next.civitai_api_key ?? ""
         });
         onSaved(s);
         toast(t("toast.settingsSaved"));
@@ -58,6 +68,31 @@ export function SettingsDialog({ open, settings, paths, onClose, onSaved, onImpo
     },
     [draft, save]
   );
+
+  const startKeyEdit = useCallback(() => {
+    keyBeforeEdit.current = draft.civitai_api_key ?? "";
+    setKeyEditing(true);
+    setKeyRevealed(true);
+    window.setTimeout(() => {
+      keyInputRef.current?.focus();
+      keyInputRef.current?.select();
+    }, 30);
+  }, [draft.civitai_api_key]);
+
+  const commitKey = useCallback(() => {
+    const v = (draft.civitai_api_key ?? "").trim();
+    if (v !== (keyBeforeEdit.current || "").trim()) {
+      update({ civitai_api_key: v });
+    }
+    setKeyEditing(false);
+    setKeyRevealed(false);
+  }, [draft.civitai_api_key, update]);
+
+  const cancelKeyEdit = useCallback(() => {
+    setDraft((d) => ({ ...d, civitai_api_key: keyBeforeEdit.current }));
+    setKeyEditing(false);
+    setKeyRevealed(false);
+  }, []);
 
   const doExport = useCallback(async () => {
     try {
@@ -201,6 +236,79 @@ export function SettingsDialog({ open, settings, paths, onClose, onSaved, onImpo
             </label>
 
             <p className="text-[11.5px] text-faint">{t("settings.applyNote")}</p>
+          </div>
+        </section>
+
+        <section>
+          <h3 className="t-section">{t("settings.civitai")}</h3>
+          <div className="mt-3 space-y-2">
+            <label className="block text-[13.5px] font-medium text-ink" htmlFor="settings-civitai-key">
+              {t("settings.civitaiKey")}
+            </label>
+            <div className="flex items-center gap-2">
+              {keyEditing ? (
+                <div className="min-w-0 flex-1">
+                  <input
+                    ref={keyInputRef}
+                    id="settings-civitai-key"
+                    type="text"
+                    value={draft.civitai_api_key ?? ""}
+                    onChange={(e) => setDraft({ ...draft, civitai_api_key: e.target.value })}
+                    onBlur={commitKey}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        e.currentTarget.blur();
+                      } else if (e.key === "Escape") {
+                        e.preventDefault();
+                        cancelKeyEdit();
+                      }
+                    }}
+                    placeholder={t("settings.civitaiKey.placeholder")}
+                    spellCheck={false}
+                    autoComplete="off"
+                    className="field select-text font-mono text-[12px]"
+                  />
+                </div>
+              ) : (
+                <>
+                  <code
+                    className="min-w-0 flex-1 truncate rounded-lg bg-parchment px-3 py-2 font-mono text-[11.5px] text-muted select-text"
+                    title={keyRevealed ? (draft.civitai_api_key || undefined) : undefined}
+                  >
+                    {draft.civitai_api_key ? (
+                      keyRevealed ? (
+                        draft.civitai_api_key
+                      ) : (
+                        "••••••••••"
+                      )
+                    ) : (
+                      <span className="text-faint">{t("settings.civitaiKey.empty")}</span>
+                    )}
+                  </code>
+                  <button
+                    type="button"
+                    className="btn-icon press shrink-0 cursor-pointer"
+                    aria-label={keyRevealed ? t("settings.civitaiKey.hide") : t("settings.civitaiKey.show")}
+                    title={keyRevealed ? t("settings.civitaiKey.hide") : t("settings.civitaiKey.show")}
+                    disabled={!draft.civitai_api_key}
+                    onClick={() => setKeyRevealed((v) => !v)}
+                  >
+                    {keyRevealed ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-icon press shrink-0 cursor-pointer"
+                    aria-label={t("settings.civitaiKey.edit")}
+                    title={t("settings.civitaiKey.edit")}
+                    onClick={startKeyEdit}
+                  >
+                    <Pencil size={16} />
+                  </button>
+                </>
+              )}
+            </div>
+            <p className="text-[11.5px] text-faint">{t("settings.civitaiKey.hint")}</p>
           </div>
         </section>
 

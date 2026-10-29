@@ -12,7 +12,10 @@ CREATE TABLE IF NOT EXISTS cards (
     updated_at TEXT NOT NULL,
     cover_image_id TEXT,
     loras TEXT NOT NULL DEFAULT '[]',
-    group_id TEXT
+    group_id TEXT,
+    author TEXT,
+    checkpoint TEXT,
+    meta_json TEXT NOT NULL DEFAULT '[]'
 );
 CREATE TABLE IF NOT EXISTS groups (
     id TEXT PRIMARY KEY,
@@ -91,6 +94,16 @@ fn ensure_columns(conn: &Connection) -> Result<(), String> {
         conn.execute("ALTER TABLE cards ADD COLUMN group_id TEXT", [])
             .map_err(es)?;
     }
+    if !names.iter().any(|n| n == "author") {
+        conn.execute("ALTER TABLE cards ADD COLUMN author TEXT", []).map_err(es)?;
+    }
+    if !names.iter().any(|n| n == "checkpoint") {
+        conn.execute("ALTER TABLE cards ADD COLUMN checkpoint TEXT", []).map_err(es)?;
+    }
+    if !names.iter().any(|n| n == "meta_json") {
+        conn.execute("ALTER TABLE cards ADD COLUMN meta_json TEXT NOT NULL DEFAULT '[]'", [])
+            .map_err(es)?;
+    }
     Ok(())
 }
 
@@ -152,6 +165,7 @@ pub fn read_settings(conn: &Connection) -> Result<AppSettings, String> {
                     s.lang = v;
                 }
             }
+            "civitai_api_key" => s.civitai_api_key = v,
             _ => {}
         }
     }
@@ -201,6 +215,9 @@ pub fn set_settings(
         if v == "en" || v == "ru" {
             put_setting(&conn, "lang", &v)?;
         }
+    }
+    if let Some(v) = patch.civitai_api_key {
+        put_setting(&conn, "civitai_api_key", v.trim())?;
     }
     read_settings(&conn)
 }

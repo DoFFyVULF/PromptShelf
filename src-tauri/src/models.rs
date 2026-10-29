@@ -37,6 +37,10 @@ pub struct CardDetail {
     pub loras: Vec<Lora>,
     pub group_id: String,
     pub images: Vec<ImageInfo>,
+    pub author: Option<String>,
+    pub checkpoint: Option<String>,
+    /// Ordered "other metadata" rows (seed, steps, sampler…) from an import.
+    pub meta: Vec<MetaItem>,
 }
 
 #[derive(Deserialize)]
@@ -58,6 +62,14 @@ pub struct Lora {
     pub value: String,
 }
 
+/// One "other metadata" row, e.g. k = "Seed", v = "557832969775936".
+/// A Vec keeps the original order (serde_json::Map sorts by key).
+#[derive(Serialize, Deserialize, Clone)]
+pub struct MetaItem {
+    pub k: String,
+    pub v: String,
+}
+
 #[derive(Deserialize)]
 pub struct NewCardInput {
     pub prompt: String,
@@ -73,6 +85,12 @@ pub struct NewCardInput {
     pub loras: Vec<Lora>,
     #[serde(default)]
     pub group_id: Option<String>,
+    #[serde(default)]
+    pub author: Option<String>,
+    #[serde(default)]
+    pub checkpoint: Option<String>,
+    #[serde(default)]
+    pub meta: Vec<MetaItem>,
 }
 
 #[derive(Deserialize)]
@@ -87,6 +105,12 @@ pub struct UpdateCardInput {
     pub tags: Vec<String>,
     #[serde(default)]
     pub loras: Vec<Lora>,
+    #[serde(default)]
+    pub author: Option<String>,
+    #[serde(default)]
+    pub checkpoint: Option<String>,
+    #[serde(default)]
+    pub meta: Vec<MetaItem>,
 }
 
 #[derive(Serialize)]
@@ -129,6 +153,8 @@ pub struct AppSettings {
     /// false → skip the separate thumbnail file; the compressed image is reused as preview.
     pub thumbs: bool,
     pub lang: String,
+    /// CivitAI API key for gated/region-filtered image fetches ("" → none).
+    pub civitai_api_key: String,
 }
 
 #[derive(Deserialize, Default)]
@@ -139,6 +165,7 @@ pub struct SettingsPatch {
     pub originals: Option<bool>,
     pub thumbs: Option<bool>,
     pub lang: Option<String>,
+    pub civitai_api_key: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -156,12 +183,26 @@ pub struct DroppedFileInput {
     pub data: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub struct PasteImageResult {
     pub temp_path: String,
     pub preview: String,
     pub width: u32,
     pub height: u32,
+}
+
+/// Everything Prefill imports can pre-fill in the editor, plus the staged
+/// image that lands in the normal paste/drop import pipeline.
+#[derive(Serialize, Clone)]
+pub struct CivitaiImport {
+    /// The original photo saved to a temp file (field: temp_path, preview, width, height).
+    pub image: PasteImageResult,
+    pub prompt: String,
+    pub author: String,
+    pub checkpoint: String,
+    pub loras: Vec<Lora>,
+    pub tags: Vec<String>,
+    pub meta: Vec<MetaItem>,
 }
 
 pub fn app_settings_default() -> AppSettings {
@@ -172,6 +213,7 @@ pub fn app_settings_default() -> AppSettings {
         originals: false,
         thumbs: true,
         lang: "en".to_string(),
+        civitai_api_key: String::new(),
     }
 }
 

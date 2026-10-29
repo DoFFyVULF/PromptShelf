@@ -35,6 +35,14 @@ export interface CardDetail {
   loras: LoraItem[];
   group_id: string;
   images: ImageInfo[];
+  author: string | null;
+  checkpoint: string | null;
+  meta: MetaItem[];
+}
+
+export interface MetaItem {
+  k: string;
+  v: string;
 }
 
 export interface LoraItem {
@@ -65,6 +73,9 @@ export interface NewCardInput {
   images: string[];
   loras: LoraItem[];
   group_id: string;
+  author: string | null;
+  checkpoint: string | null;
+  meta: MetaItem[];
 }
 
 export interface UpdateCardInput {
@@ -74,6 +85,9 @@ export interface UpdateCardInput {
   rating: number;
   tags: string[];
   loras: LoraItem[];
+  author: string | null;
+  checkpoint: string | null;
+  meta: MetaItem[];
 }
 
 export interface TagCount {
@@ -88,6 +102,7 @@ export interface AppSettings {
   originals: boolean;
   thumbs: boolean;
   lang: Lang;
+  civitai_api_key: string | null;
 }
 
 export interface SettingsPatch {
@@ -97,6 +112,7 @@ export interface SettingsPatch {
   originals?: boolean;
   thumbs?: boolean;
   lang?: Lang;
+  civitai_api_key?: string | null;
 }
 
 export interface LibraryPaths {
@@ -109,6 +125,16 @@ export interface PasteImageResult {
   preview: string;
   width: number;
   height: number;
+}
+
+export interface CivitaiImport {
+  image: PasteImageResult;
+  prompt: string;
+  author: string;
+  checkpoint: string;
+  loras: LoraItem[];
+  tags: string[];
+  meta: MetaItem[];
 }
 
 export interface StagedImage {

@@ -17,7 +17,7 @@ fn clean_tags(tags: &[String]) -> Vec<String> {
     let mut out = Vec::new();
     for t in tags {
         let t = t.trim().trim_start_matches('#').to_string();
-        if t.is_empty() || t.len() > 32 {
+        if t.is_empty() || t.len() > 48 {
             continue;
         }
         let key = t.to_lowercase();
@@ -53,6 +53,34 @@ fn loras_json(loras: &[Lora]) -> String {
 }
 
 fn parse_loras(s: &str) -> Vec<Lora> {
+    serde_json::from_str(s).unwrap_or_default()
+}
+
+/// Trims/clamps every metadata row; de-duplicates by key.
+fn clean_meta(meta: &[crate::models::MetaItem]) -> Vec<crate::models::MetaItem> {
+    let mut seen = HashSet::new();
+    let mut out = Vec::new();
+    for m in meta {
+        let k = m.k.trim().to_string();
+        let v = m.v.trim().to_string();
+        if k.is_empty() || k.len() > 48 || v.is_empty() || v.len() > 400 {
+            continue;
+        }
+        if seen.insert(k.to_lowercase()) {
+            out.push(crate::models::MetaItem { k, v });
+        }
+        if out.len() >= 24 {
+            break;
+        }
+    }
+    out
+}
+
+fn meta_json(meta: &[crate::models::MetaItem]) -> String {
+    serde_json::to_string(&clean_meta(meta)).unwrap_or_else(|_| "[]".to_string())
+}
+
+fn parse_meta(s: &str) -> Vec<crate::models::MetaItem> {
     serde_json::from_str(s).unwrap_or_default()
 }
 
@@ -277,10 +305,11 @@ pub fn get_card_inner(dir: &Path, id: &str) -> Result<CardDetail, String> {
 
     let mut card = conn
         .query_row(
-            "SELECT id, prompt, note, rating, created_at, updated_at, loras, group_id FROM cards WHERE id = ?1",
+            "SELECT id, prompt, note, rating, created_at, updated_at, loras, group_id, author, checkpoint, meta_json FROM cards WHERE id = ?1",
             params![id],
             |r| {
                 let loras_raw: String = r.get(6)?;
+                let meta_raw: String = r.get(10)?;
                 Ok(CardDetail {
                     id: r.get(0)?,
                     prompt: r.get(1)?,
@@ -290,6 +319,9 @@ pub fn get_card_inner(dir: &Path, id: &str) -> Result<CardDetail, String> {
                     updated_at: r.get(5)?,
                     loras: parse_loras(&loras_raw),
                     group_id: r.get::<_, Option<String>>(7)?.unwrap_or_default(),
+                    author: r.get(8)?,
+                    checkpoint: r.get(9)?,
+                    meta: parse_meta(&meta_raw),
                     tags: Vec::new(),
                     images: Vec::new(),
                 })
@@ -365,6 +397,9 @@ pub fn create_card_inner(dir: &Path, input: NewCardInput) -> Result<CardDetail, 
     let tags = clean_tags(&input.tags);
     let note = input.note.trim().to_string();
     let loras = loras_json(&input.loras);
+    let author = input.author.as_deref().map(str::trim).filter(|s| !s.is_empty()).map(|s| s.to_string());
+    let checkpoint = input.checkpoint.as_deref().map(str::trim).filter(|s| !s.is_empty()).map(|s| s.to_string());
+    let meta = meta_json(&input.meta);
 
     let group_id = match input.group_id.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
         Some(g) => {
@@ -379,8 +414,9 @@ pub fn create_card_inner(dir: &Path, input: NewCardInput) -> Result<CardDetail, 
     };
 
     conn.execute(
-        "INSERT INTO cards(id, prompt, note, rating, created_at, updated_at, loras, group_id) VALUES(?1,?2,?3,?4,?5,?5,?6,?7)",
-        params![id, prompt, note, rating, ts, loras, group_id],
+        "INSERT INTO cards(id, prompt, note, rating, created_at, updated_at, loras, group_id, author, checkpoint, meta_json)
+         VALUES(?1,?2,?3,?4,?5,?5,?6,?7,?8,?9,?10)",
+        params![id, prompt, note, rating, ts, loras, group_id, author, checkpoint, meta],
     )
     .map_err(es)?;
 
@@ -420,10 +456,13 @@ pub fn update_card_inner(dir: &Path, input: UpdateCardInput) -> Result<(), Strin
     let tags = clean_tags(&input.tags);
     let note = input.note.trim().to_string();
     let loras = loras_json(&input.loras);
+    let author = input.author.as_deref().map(str::trim).filter(|s| !s.is_empty()).map(|s| s.to_string());
+    let checkpoint = input.checkpoint.as_deref().map(str::trim).filter(|s| !s.is_empty()).map(|s| s.to_string());
+    let meta = meta_json(&input.meta);
 
     conn.execute(
-        "UPDATE cards SET prompt = ?1, note = ?2, rating = ?3, loras = ?4, updated_at = ?5 WHERE id = ?6",
-        params![prompt, note, rating, loras, now(), input.id],
+        "UPDATE cards SET prompt = ?1, note = ?2, rating = ?3, loras = ?4, author = ?5, checkpoint = ?6, meta_json = ?7, updated_at = ?8 WHERE id = ?9",
+        params![prompt, note, rating, loras, author, checkpoint, meta, now(), input.id],
     )
     .map_err(es)?;
 
