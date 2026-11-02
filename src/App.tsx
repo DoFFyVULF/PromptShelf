@@ -24,6 +24,7 @@ import { EmptyState } from "./components/EmptyState";
 import { CardDetail } from "./components/CardDetail";
 import { Editor } from "./components/Editor";
 import { ImportDialog } from "./components/ImportDialog";
+import { ImportReceipts, type ImportReceipt } from "./components/ImportReceipts";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { GroupsPanel } from "./components/GroupsPanel";
 import { TagsDialog } from "./components/TagsDialog";
@@ -81,13 +82,14 @@ function Shell() {
   const [staged, setStaged] = useState<StagedImage[]>([]);
 
   const [importOpen, setImportOpen] = useState(false);
-  // duplicate warning state for the CivitAI import flow; pendingDupUrl keeps
-  // the link that was interrupted by the dialog so "continue" can resume it
+  // duplicate warning state for the CivitAI import flow; pendingDup keeps the
+  // interrupted import — just the url when the link wasn't fetched yet, or the
+  // full fetched result — so "continue" can resume without a second download
   const [dupHits, setDupHits] = useState<DuplicateHit[] | null>(null);
-  const pendingDupUrl = useRef<string | null>(null);
-  const dupBypassRef = useRef(false);
-  // prefill for the editor after a CivitAI fetch (prompt/author/…)
-  const [civImport, setCivImport] = useState<Omit<CivitaiImport, "image"> | null>(null);
+  const pendingDup = useRef<{ url: string; pre: CivitaiImport | null } | null>(null);
+  // floating confirmations for auto-imported cards (photo + prompt head;
+  // undo appears on hover), newest first
+  const [receipts, setReceipts] = useState<ImportReceipt[]>([]);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -303,13 +305,11 @@ function Shell() {
   const closeEditor = useCallback(() => {
     setEditorOpen(false);
     setEditorCard(null);
-    setCivImport(null);
     clearStaged();
   }, [clearStaged]);
 
   const openEditorNew = useCallback(() => {
     setEditorCard(null);
-    setCivImport(null);
     setEditorOpen(true);
   }, []);
 
@@ -319,7 +319,6 @@ function Shell() {
       setEditorCard(null);
       setStaged([]);
       stagedRef.current = [];
-      setCivImport(null);
       await loadCards();
       setDetailId(fresh.id);
       void loadMeta();
@@ -343,48 +342,99 @@ function Shell() {
     }
   }, []);
 
-  // CivitAI import flow: the link is resolved to its origin key first and
-  // checked against the library BEFORE anything is downloaded; the fetch,
-  // staging like a paste, and the editor prefill follow (prompt/author/…).
-  const startCivitaiImport = useCallback(async (url: string) => {
-    const res = await api.civitaiImport(url);
-    const entry = { path: res.image.temp_path, preview: res.image.preview };
-    setStaged([entry]);
-    stagedRef.current = [entry];
-    // warned: the user already approved adding this duplicate upstream, so the
-    // editor skips its own duplicate gate for this card
-    const warned = dupBypassRef.current || undefined;
-    dupBypassRef.current = false;
-    setCivImport({
-      prompt: res.prompt,
-      negative_prompt: res.negative_prompt,
-      author: res.author,
-      checkpoint: res.checkpoint,
-      loras: res.loras,
-      tags: res.tags,
-      meta: res.meta,
-      source_key: res.source_key,
-      warned
-    });
-    setImportOpen(false);
-    setEditorCard(null);
-    setEditorOpen(true);
+  // ------------------------------------------------- import receipts
+
+  // Floating confirmations for auto-imported cards; the cap keeps a burst of
+  // imports from stacking forever (oldest just drops out).
+  const pushReceipt = useCallback((r: ImportReceipt) => {
+    setReceipts((prev) => [r, ...prev].slice(0, 5));
   }, []);
 
+  const dropReceipt = useCallback((id: string) => {
+    setReceipts((prev) => prev.filter((r) => r.id !== id));
+  }, []);
+
+  const undoImport = useCallback(
+    async (id: string) => {
+      dropReceipt(id);
+      setDetailId((cur) => (cur === id ? null : cur));
+      setSelection((prev) => prev.filter((x) => x !== id));
+      try {
+        await api.deleteCard(id);
+      } catch {
+        toast(t("toast.error"), "error");
+      }
+      await loadCards();
+    },
+    [dropReceipt, loadCards, t, toast]
+  );
+
+  const openReceipt = useCallback(
+    (id: string) => {
+      dropReceipt(id);
+      setImportOpen(false);
+      setDetailId(id);
+    },
+    [dropReceipt]
+  );
+
+  // CivitAI import flow: the link is resolved to its origin key and checked
+  // against the library BEFORE anything is downloaded; if clean, the result is
+  // saved as a card immediately (no editor popup) and a floating receipt
+  // confirms it — the dialog stays open for the next link.
+  const createFromImport = useCallback(
+    async (res: CivitaiImport) => {
+      try {
+        const created = await api.createCard({
+          prompt: res.prompt,
+          negative_prompt: res.negative_prompt,
+          note: "",
+          rating: 0,
+          tags: res.tags,
+          images: [res.image.temp_path],
+          loras: res.loras,
+          group_id: groupId,
+          author: res.author || null,
+          checkpoint: res.checkpoint || null,
+          meta: res.meta,
+          source_key: res.source_key
+        });
+        pushReceipt({ id: created.id, thumb: res.image.preview, prompt: res.prompt });
+        await loadCards();
+      } catch (e) {
+        // the image was staged into the temp dir but never landed on a card —
+        // don't leave the file behind
+        void api.discardTemp(res.image.temp_path).catch(() => undefined);
+        throw e;
+      }
+    },
+    [groupId, loadCards, pushReceipt]
+  );
+
   const runCivitaiImport = useCallback(
-    async (url: string) => {
+    async (url: string): Promise<"created" | "dup"> => {
       const sk = await api.civitaiSourceKey(url).catch(() => null);
       if (sk) {
         const hits = await api.checkDuplicates({ source_key: sk });
         if (hits.length > 0) {
-          pendingDupUrl.current = url;
+          pendingDup.current = { url, pre: null };
           setDupHits(hits);
-          return;
+          return "dup";
         }
       }
-      await startCivitaiImport(url);
+      const res = await api.civitaiImport(url);
+      // same-prompt-different-link protection: warn before creating; the
+      // dialog keeps the full result, so "continue" doesn't re-download
+      const hits = await api.checkDuplicates({ prompt: res.prompt, source_key: res.source_key ?? null });
+      if (hits.length > 0) {
+        pendingDup.current = { url, pre: res };
+        setDupHits(hits);
+        return "dup";
+      }
+      await createFromImport(res);
+      return "created";
     },
-    [startCivitaiImport]
+    [createFromImport]
   );
 
   const pasteGlobally = useCallback(async () => {    try {
@@ -399,7 +449,6 @@ function Shell() {
         return next;
       });
       setEditorCard(null);
-      setCivImport(null);
       setEditorOpen(true);
     } catch {
       toast(t("toast.error"), "error");
@@ -544,7 +593,6 @@ function Shell() {
         });
         if (ok.length > 0 && !editorOpenRef.current) {
           setEditorCard(null);
-          setCivImport(null);
           setEditorOpen(true);
         }
       })();
@@ -742,7 +790,6 @@ function Shell() {
           onStaged={setStaged}
           settings={settings}
           groupId={groupId}
-          imported={civImport}
           onClose={closeEditor}
           onSaved={(d) => void onEditorSaved(d)}
           onOpenExisting={(id) => {
@@ -777,24 +824,38 @@ function Shell() {
         hits={dupHits ?? []}
         proceedKey="dup.proceed"
         onProceed={() => {
-          const url = pendingDupUrl.current;
+          const p = pendingDup.current;
           setDupHits(null);
-          pendingDupUrl.current = null;
-          if (url) {
-            dupBypassRef.current = true;
-            void startCivitaiImport(url).catch(() => undefined);
-          }
+          pendingDup.current = null;
+          if (!p) return;
+          void (async () => {
+            // the user approved the duplicate — create it without further checks
+            const res = p.pre ?? (await api.civitaiImport(p.url));
+            await createFromImport(res);
+          })().catch(() => toast(t("toast.error"), "error"));
         }}
         onOpen={(id) => {
+          const p = pendingDup.current;
+          if (p?.pre) void api.discardTemp(p.pre.image.temp_path).catch(() => undefined);
           setDupHits(null);
-          pendingDupUrl.current = null;
+          pendingDup.current = null;
           setImportOpen(false);
           setDetailId(id);
         }}
         onClose={() => {
+          const p = pendingDup.current;
+          // leaving two hits without a decision must not leak the staged image
+          if (p?.pre) void api.discardTemp(p.pre.image.temp_path).catch(() => undefined);
           setDupHits(null);
-          pendingDupUrl.current = null;
+          pendingDup.current = null;
         }}
+      />
+
+      <ImportReceipts
+        items={receipts}
+        onOpen={openReceipt}
+        onUndo={(id) => void undoImport(id)}
+        onExpire={dropReceipt}
       />
 
       {dragging && (

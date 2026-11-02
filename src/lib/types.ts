@@ -146,8 +146,6 @@ export interface CivitaiImport {
   meta: MetaItem[];
   /** Origin fingerprint from the pasted CivitAI link (dup detection). */
   source_key?: string | null;
-  /** Frontend-only marker: the user already confirmed the duplicate upstream. */
-  warned?: boolean;
 }
 
 /** Existing card that matched a duplicate check for the dialog UI. */

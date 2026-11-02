@@ -6,8 +6,12 @@ import { Dialog, DialogCloseButton } from "./Dialog";
 interface ImportDialogProps {
   open: boolean;
   onClose: () => void;
-  /** Resolves on success; the parent opens the editor. Rejects with the backend error string. */
-  onImport: (url: string) => Promise<void>;
+  /**
+   * Resolves when one import attempt ends: "created" → the card is saved and a
+   * receipt confirms it in the corner; "dup" → the duplicate dialog took over.
+   * Rejects with the backend error string.
+   */
+  onImport: (url: string) => Promise<"created" | "dup">;
 }
 
 type ImportError = "url" | "notfound" | "generic";
@@ -26,14 +30,17 @@ export function ImportDialog({ open, onClose, onImport }: ImportDialogProps) {
     window.setTimeout(() => inputRef.current?.focus(), 60);
   }, [open]);
 
+  /** Enters the next import: the create happens in the background, so the form
+   * clears on success while the window stays open for the following link. */
   const submit = useCallback(async () => {
     const v = url.trim();
     if (!v || busy) return;
     setBusy(true);
     setError(null);
     try {
-      await onImport(v);
-      // the import flow may resolve while a duplicate dialog holds the window;
+      const outcome = await onImport(v);
+      if (outcome === "created") setUrl("");
+      // the import may park on the duplicate dialog while the window stays up;
       // unblock the form so "cancel"/edit stays possible in that case
       setBusy(false);
     } catch (e) {

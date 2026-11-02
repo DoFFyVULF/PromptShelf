@@ -4,7 +4,7 @@ import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
 import { useI18n } from "../i18n";
 import { modKey } from "../lib/platform";
 import { api, assetUrl } from "../lib/api";
-import type { AppSettings, CardDetail, CivitaiImport, DuplicateHit, LoraItem, StagedImage } from "../lib/types";
+import type { AppSettings, CardDetail, DuplicateHit, LoraItem, StagedImage } from "../lib/types";
 import { Stars } from "./Stars";
 import { useToast } from "./Toasts";
 import { LoraEditor, applyLoraDraft, type LoraDraft } from "./LoraEditor";
@@ -18,29 +18,27 @@ interface EditorProps {
   onStaged: (next: StagedImage[]) => void;
   settings: AppSettings | null;
   groupId: string;
-  /** Prefill from a CivitAI import (fresh dialog, card == null). */
-  imported?: Omit<CivitaiImport, "image"> | null;
   onClose: () => void;
   onSaved: (detail: CardDetail) => void;
   /** Shown in the duplicate dialog: jump to the already-stored card. */
   onOpenExisting?: (id: string) => void;
 }
 
-export function Editor({ card, staged, onStaged, settings, groupId, imported, onClose, onSaved, onOpenExisting }: EditorProps) {
+export function Editor({ card, staged, onStaged, settings, groupId, onClose, onSaved, onOpenExisting }: EditorProps) {
   const { t } = useI18n();
   const { toast } = useToast();
 
-  const [prompt, setPrompt] = useState(card?.prompt ?? imported?.prompt ?? "");
-  const [negativePrompt, setNegativePrompt] = useState(card?.negative_prompt ?? imported?.negative_prompt ?? "");
+  const [prompt, setPrompt] = useState(card?.prompt ?? "");
+  const [negativePrompt, setNegativePrompt] = useState(card?.negative_prompt ?? "");
   const [note, setNote] = useState(card?.note ?? "");
-  const [tags, setTags] = useState<string[]>(card?.tags ?? imported?.tags ?? []);
+  const [tags, setTags] = useState<string[]>(card?.tags ?? []);
   const [tagDraft, setTagDraft] = useState("");
   const [rating, setRating] = useState(card?.rating ?? 0);
-  const [loras, setLoras] = useState<LoraItem[]>(card?.loras ?? imported?.loras ?? []);
-  const [author, setAuthor] = useState(card?.author ?? imported?.author ?? "");
-  const [checkpoint, setCheckpoint] = useState(card?.checkpoint ?? imported?.checkpoint ?? "");
+  const [loras, setLoras] = useState<LoraItem[]>(card?.loras ?? []);
+  const [author, setAuthor] = useState(card?.author ?? "");
+  const [checkpoint, setCheckpoint] = useState(card?.checkpoint ?? "");
   // "Other metadata" from an import travels with the card; edited nowhere.
-  const [meta] = useState(card?.meta ?? imported?.meta ?? []);
+  const [meta] = useState(card?.meta ?? []);
   const [loraDraft, setLoraDraft] = useState<LoraDraft | null>(null);
   const [removed, setRemoved] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
@@ -218,12 +216,10 @@ export function Editor({ card, staged, onStaged, settings, groupId, imported, on
         const fresh = await api.getCard(card.id);
         onSaved(fresh);
       } else {
-        const sourceKey = imported?.source_key ?? null;
-        // duplicate gate: warn before creating; either the CivitAI origin key
-        // (an exact "same link" match) or the normalized prompt text matches.
-        const alreadyWarned = dupProceedRef.current || Boolean(imported?.warned);
-        if (!alreadyWarned) {
-          const hits = await api.checkDuplicates({ prompt: prompt.trim(), source_key: sourceKey });
+        // duplicate gate: warn before creating (normalized prompt text match;
+        // the CivitAI flow warns on source_key upstream, before any download)
+        if (!dupProceedRef.current) {
+          const hits = await api.checkDuplicates({ prompt: prompt.trim(), source_key: null });
           if (hits.length > 0) {
             setDupHits(hits);
             setSaving(false);
@@ -242,8 +238,7 @@ export function Editor({ card, staged, onStaged, settings, groupId, imported, on
           images: staged.map((s) => s.path),
           author: author.trim() || null,
           checkpoint: checkpoint.trim() || null,
-          meta,
-          source_key: sourceKey
+          meta
         });
         onSaved(created);
       }
@@ -252,7 +247,7 @@ export function Editor({ card, staged, onStaged, settings, groupId, imported, on
       toast(msg.includes("PROMPT_REQUIRED") ? t("toast.promptRequired") : t("toast.error"), "error");
       setSaving(false);
     }
-  }, [card, groupId, loras, loraDraft, note, onSaved, prompt, negativePrompt, rating, removed, staged, t, tags, toast, author, checkpoint, meta, imported]);
+  }, [card, groupId, loras, loraDraft, note, onSaved, prompt, negativePrompt, rating, removed, staged, t, tags, toast, author, checkpoint, meta]);
 
   const existing = (card?.images ?? []).filter((i) => !removed.includes(i.id));
   const hasImages = existing.length > 0 || staged.length > 0;
@@ -541,7 +536,7 @@ export function Editor({ card, staged, onStaged, settings, groupId, imported, on
       <DuplicateDialog
         open={dupHits !== null}
         hits={dupHits ?? []}
-        proceedKey={imported ? "dup.proceed" : "dup.anyway"}
+        proceedKey="dup.anyway"
         onProceed={() => {
           setDupHits(null);
           dupProceedRef.current = true;

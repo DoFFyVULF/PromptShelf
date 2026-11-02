@@ -51,8 +51,11 @@ export const ru: Record<DictKey, string> = {
 
   "import.civitai": "Импорт из CivitAI",
   "import.civitai.title": "Импорт из CivitAI",
-  "import.civitai.hint": "Вставьте ссылку на страницу изображения на civitai.com или civitai.red",
+  "import.civitai.hint": "Вставьте ссылку на страницу изображения на civitai.com или civitai.red — карточка сохраняется сразу, а окно остаётся открытым: можно импортировать следующую без ожидания.",
   "import.civitai.placeholder": "https://civitai.com/images/…",
+  "import.receipt.ok": "Импортировано",
+  "import.receipt.undo": "Отменить импорт",
+  "import.receipt.undo.short": "Отменить",
 
   "dup.title": "Такой промпт уже есть",
   "dup.hint": "Совпадения в вашей библиотеке:",

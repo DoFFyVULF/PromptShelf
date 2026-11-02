@@ -49,8 +49,11 @@ export const en = {
 
   "import.civitai": "Import from CivitAI",
   "import.civitai.title": "Import from CivitAI",
-  "import.civitai.hint": "Paste a link to an image page on civitai.com or civitai.red",
+  "import.civitai.hint": "Paste a link to an image page on civitai.com or civitai.red — the card is saved instantly and the window stays open, so you can import the next one right away.",
   "import.civitai.placeholder": "https://civitai.com/images/…",
+  "import.receipt.ok": "Imported",
+  "import.receipt.undo": "Undo import",
+  "import.receipt.undo.short": "Undo",
 
   "dup.title": "Duplicate prompt",
   "dup.hint": "Already in your library:",
