@@ -23,7 +23,7 @@
 
 ---
 
-## 🎯 Why
+## Why
 
 Good prompts on CivitAI tend to disappear. Authors delete images or posts, clean up
 galleries, or leave the platform altogether. You save a link to come back to the prompt
@@ -35,50 +35,50 @@ negative prompt, LoRAs, parameters (seed, sampler, steps, CFG), author and tags 
 your library on disk. The other person's page no longer matters: everything is local and
 nothing deletes it.
 
-## ✨ Features
+## Features
 
-- 🗂 **Cards** — a multiline prompt, one or more images, a note, tags, a star rating, dates.
-- 🏷 **Negative prompt** — a separate field in the editor; shown under the prompt in the
+- **Cards** — a multiline prompt, one or more images, a note, tags, a star rating, dates.
+- **Negative prompt** — a separate field in the editor; shown under the prompt in the
   detail view and copied with one click.
-- 🧲 **CivitAI import** — paste a link to a CivitAI image and the app downloads it and fills
+- **CivitAI import** — paste a link to a CivitAI image and the app downloads it and fills
   the card in: prompt, negative prompt, author, checkpoint, LoRAs, generation parameters
   (seed, sampler, steps, CFG) and post tags. The popular community tags come through a
   CivitAI API key (set in settings).
-- 🖼 **Smart compression on import** — an image is downscaled to the long-side limit
+- **Smart compression on import** — an image is downscaled to the long-side limit
   (1200 px by default) and re-encoded to JPEG or WebP at a configurable quality (75% by default).
   Originals are not kept (optionally enable "keep originals" in settings). A thumbnail is
   generated as well for the fast grid.
-- 👁 **Browsing** — a thumbnail grid plus a detail view (large photo, full prompt, one-click
+- **Browsing** — a thumbnail grid plus a detail view (large photo, full prompt, one-click
   copy), arrow-key navigation, click-to-zoom fullscreen. Each card has a LoRA list with quick
   editing and delete-on-hover.
-- 🔍 **Search & filters** — full-text search across prompts, notes and tags; tag filter;
+- **Search & filters** — full-text search across prompts, notes and tags; tag filter;
   sorting by date and rating.
-- 📚 **Groups** — every card lives in exactly one group. The default group ("Home"/"Домашняя")
+- **Groups** — every card lives in exactly one group. The default group ("Home"/"Домашняя")
   cannot be deleted. The groups panel opens from a chip in the filter bar: create, rename,
   delete (cards of a deleted group return to the default one), switch by clicking, per-group
   card counters. The current group is highlighted in emerald — the only color accent in the UI.
-- ☑️ **Multi-select** — a "select" toggle in the filter bar; clicking tiles adds or removes cards.
+- **Multi-select** — a "select" toggle in the filter bar; clicking tiles adds or removes cards.
   A selection bar appears at the bottom: count, "Move to…", "Clear", "Done".
-- 🖱 **Drag & drop cards into groups** — pick up a card and the groups panel slides out
+- **Drag & drop cards into groups** — pick up a card and the groups panel slides out
   automatically. A shrunken copy of the card with its photo follows the cursor (with a count
   badge when multiple cards are selected); the tile on the shelf shrinks and dims. Every group
   becomes a target: a dashed emerald outline and an arrow on each row, the row under the cursor
   fills with solid emerald. Drop — the cards move over. Selected cards can also be moved with the
   "Move here" button in the panel.
-- 📋 **Paste from clipboard** — ⌘V / Ctrl+V pastes a screenshot or a copied image file straight
+- **Paste from clipboard** — ⌘V / Ctrl+V pastes a screenshot or a copied image file straight
   into a new card; prompt text pastes into the field as usual.
-- 📎 **Drag & drop files** — drop images into the window and a new card opens (file intake uses
+- **Drag & drop files** — drop images into the window and a new card opens (file intake uses
   HTML5 webview events, which lets it coexist with card dragging).
-- 💾 **Import/export** — the whole library exports to a single `.promptshelf` file
+- **Import/export** — the whole library exports to a single `.promptshelf` file
   (zip: SQLite + images) for backup or moving to another machine. Import replaces the current
   library.
-- 📁 **Library location** — copy the library to any folder and switch to it from settings
+- **Library location** — copy the library to any folder and switch to it from settings
   (applies after a restart; the old copy stays untouched).
-- ⬆️ **Update check** — a button in settings tells you about a new version and installs it:
+-  **Update check** — a button in settings tells you about a new version and installs it:
   download and restart, two clicks.
-- 🌐 **Interface languages** — English and Russian, with a switcher in the header.
+- **Interface languages** — English and Russian, with a switcher in the header.
 
-## 📦 Installation
+## Installation
 
 ### Ready-made builds
 
@@ -118,7 +118,7 @@ about an unknown publisher: "More info" → "Run anyway".
 npm run tauri dev
 ```
 
-## ⌨️ Keyboard shortcuts
+## Keyboard shortcuts
 
 | Keys             | Action                                              |
 | ---------------- | --------------------------------------------------- |
@@ -130,7 +130,7 @@ npm run tauri dev
 | ← / →            | Previous / next card                                 |
 | Esc              | Close groups panel → viewer → dialog/zoom            |
 
-## 🗃 Storage
+## Storage
 
 The library lives in the standard application data directory
 (the location can be changed in settings — the app copies the library to the folder
@@ -148,7 +148,7 @@ images/originals/     # optional originals
 
 Export: `.promptshelf` = ZIP with a snapshot of `library.db` + the `images` folder.
 
-## 🚀 Development
+## Development
 
 Requirements: Node 20+, Rust 1.77+ (on Windows — MSVC Build Tools).
 
@@ -170,7 +170,7 @@ cd src-tauri && cargo test --lib
 
 The design system and UI pattern descriptions live in `design-system/promptshelf/`.
 
-## 🛠 Stack
+## Stack
 
 | Layer    | Technologies                                                                                                                                       |
 | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -181,5 +181,5 @@ The design system and UI pattern descriptions live in `design-system/promptshelf
 ---
 
 <div align="center">
-  <sub>PromptShelf — keep your prompts on your own shelf 📚</sub>
+  <sub>PromptShelf — keep your prompts on your own shelf</sub>
 </div>
