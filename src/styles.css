@@ -311,6 +311,14 @@ body {
   color: var(--color-ink);
 }
 
+/* the floating back-to-top pill stays a circle under the keyboard focus
+   ring (the global :focus-visible rule would square it off) */
+.fab:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+  border-radius: 9999px;
+}
+
 :focus-visible {
   outline: 2px solid var(--color-ink);
   outline-offset: 2px;

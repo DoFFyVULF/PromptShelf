@@ -26,6 +26,7 @@ import { SettingsDialog } from "./components/SettingsDialog";
 import { GroupsPanel } from "./components/GroupsPanel";
 import { TagsDialog } from "./components/TagsDialog";
 import { ToastProvider, useToast } from "./components/Toasts";
+import { ScrollTopButton } from "./components/ScrollTopButton";
 import { CornerDownRight, ListChecks, X } from "lucide-react";
 
 function Shell() {
@@ -71,6 +72,7 @@ function Shell() {
   const [dragging, setDragging] = useState(false);
 
   // refs for stable listeners
+  const scrollRef = useRef<HTMLElement | null>(null);
   const editorOpenRef = useRef(false);
   const stagedRef = useRef<StagedImage[]>([]);
   const detailOpenRef = useRef(false);
@@ -535,8 +537,6 @@ function Shell() {
         onQuery={setQuery}
         sort={sort}
         onSort={setSort}
-        lang={lang}
-        onLang={switchLang}
         onNew={openEditorNew}
         onImportCivitai={() => setImportOpen(true)}
         onSettings={() => setSettingsOpen(true)}
@@ -560,7 +560,7 @@ function Shell() {
         onToggleSelectMode={toggleSelectMode}
       />
 
-      <main className="relative min-h-0 flex-1 overflow-y-auto">
+      <main ref={scrollRef} className="relative min-h-0 flex-1 overflow-y-auto">
         {loading && cards.length === 0 ? (
           <GridSkeleton />
         ) : loadError && cards.length === 0 ? (
@@ -600,6 +600,8 @@ function Shell() {
           />
         )}
       </main>
+
+      <ScrollTopButton containerRef={scrollRef} />
 
       <GroupsPanel
         open={groupsOpen}
@@ -696,6 +698,8 @@ function Shell() {
           open={settingsOpen}
           settings={settings}
           paths={paths}
+          lang={lang}
+          onLang={switchLang}
           onClose={() => setSettingsOpen(false)}
           onSaved={setSettings}
           onImported={onImported}

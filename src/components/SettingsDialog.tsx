@@ -5,7 +5,7 @@ import { save as saveFileDialog, open as openFileDialog, message } from "@tauri-
 import { relaunch } from "@tauri-apps/plugin-process";
 import { useI18n } from "../i18n";
 import { api } from "../lib/api";
-import type { AppSettings, LibraryPaths } from "../lib/types";
+import type { AppSettings, Lang, LibraryPaths } from "../lib/types";
 import { Dialog } from "./Dialog";
 import { useToast } from "./Toasts";
 import { UpdateDialog } from "./UpdateDialog";
@@ -14,12 +14,14 @@ interface SettingsDialogProps {
   open: boolean;
   settings: AppSettings;
   paths: LibraryPaths | null;
+  lang: Lang;
+  onLang: (l: Lang) => void;
   onClose: () => void;
   onSaved: (s: AppSettings) => void;
   onImported: () => void;
 }
 
-export function SettingsDialog({ open, settings, paths, onClose, onSaved, onImported }: SettingsDialogProps) {
+export function SettingsDialog({ open, settings, paths, lang, onLang, onClose, onSaved, onImported }: SettingsDialogProps) {
   const { t } = useI18n();
   const { toast } = useToast();
 
@@ -189,6 +191,35 @@ export function SettingsDialog({ open, settings, paths, onClose, onSaved, onImpo
       </div>
 
       <div className="max-h-[70vh] space-y-7 overflow-y-auto px-7 pt-3 pb-2">
+        <section>
+          <h3 className="t-section">{t("settings.general")}</h3>
+          <div className="mt-3">
+            <div className="grid grid-cols-[1fr_150px] items-center gap-4">
+              <div>
+                <label className="block text-[13.5px] font-medium text-ink">{t("settings.language")}</label>
+                <p className="mt-0.5 text-[11.5px] text-faint">{t("settings.language.hint")}</p>
+              </div>
+              <div className="justify-self-end">
+                <div className="flex rounded-full border border-hairline bg-card p-0.5" role="group" aria-label={t("nav.language")}>
+                  {(["en", "ru"] as const).map((l) => (
+                    <button
+                      key={l}
+                      type="button"
+                      onClick={() => onLang(l)}
+                      aria-pressed={lang === l}
+                      className={`press h-7 cursor-pointer rounded-full px-3 text-[11.5px] font-semibold tracking-wide transition-colors ${
+                        lang === l ? "bg-ink text-white" : "text-muted hover:text-ink"
+                      }`}
+                    >
+                      {l === "en" ? "EN" : "РУ"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section>
           <h3 className="t-section">{t("settings.images")}</h3>
           <div className="mt-3 space-y-4">

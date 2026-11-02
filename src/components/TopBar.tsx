@@ -8,14 +8,12 @@ interface TopBarProps {
   onQuery: (q: string) => void;
   sort: Sort;
   onSort: (s: Sort) => void;
-  lang: "en" | "ru";
-  onLang: (l: "en" | "ru") => void;
   onNew: () => void;
   onImportCivitai: () => void;
   onSettings: () => void;
 }
 
-export function TopBar({ query, onQuery, sort, onSort, lang, onLang, onNew, onImportCivitai, onSettings }: TopBarProps) {
+export function TopBar({ query, onQuery, sort, onSort, onNew, onImportCivitai, onSettings }: TopBarProps) {
   const { t } = useI18n();
 
   return (
@@ -58,22 +56,6 @@ export function TopBar({ query, onQuery, sort, onSort, lang, onLang, onNew, onIm
           <option value="rating">{t("sort.rating")}</option>
         </select>
         <ChevronDown size={13} className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-faint" />
-      </div>
-
-      <div className="flex h-9 items-center rounded-full border border-hairline bg-card p-0.5" role="group" aria-label={t("nav.language")}>
-        {(["en", "ru"] as const).map((l) => (
-          <button
-            key={l}
-            type="button"
-            onClick={() => onLang(l)}
-            aria-pressed={lang === l}
-            className={`press h-8 cursor-pointer rounded-full px-2.5 text-[11.5px] font-semibold tracking-wide transition-colors ${
-              lang === l ? "bg-ink text-white" : "text-muted hover:text-ink"
-            }`}
-          >
-            {l === "en" ? "EN" : "РУ"}
-          </button>
-        ))}
       </div>
 
       <button type="button" className="btn-icon press cursor-pointer" aria-label={t("nav.settings")} onClick={onSettings}>

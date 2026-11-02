@@ -18,6 +18,7 @@ export const en = {
 
   "nav.settings": "Settings",
   "nav.language": "Language",
+  "nav.scrollTop": "Back to top",
 
   "sort.label": "Sort",
   "sort.newest": "Newest first",
@@ -114,6 +115,9 @@ export const en = {
   "detail.deleteTitle": "Delete card",
 
   "settings.title": "Settings",
+  "settings.general": "General",
+  "settings.language": "Interface language",
+  "settings.language.hint": "Applies instantly — no restart needed.",
   "settings.images": "Image import",
   "settings.maxSide": "Max long side",
   "settings.maxSide.hint": "New imports are downscaled to fit this size",

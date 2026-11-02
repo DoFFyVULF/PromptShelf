@@ -20,6 +20,7 @@ export const ru: Record<DictKey, string> = {
 
   "nav.settings": "Настройки",
   "nav.language": "Язык",
+  "nav.scrollTop": "Наверх",
 
   "sort.label": "Сортировка",
   "sort.newest": "Сначала новые",
@@ -116,6 +117,9 @@ export const ru: Record<DictKey, string> = {
   "detail.deleteTitle": "Удалить карточку",
 
   "settings.title": "Настройки",
+  "settings.general": "Общие",
+  "settings.language": "Язык интерфейса",
+  "settings.language.hint": "Применяется сразу — без перезапуска.",
   "settings.images": "Импорт изображений",
   "settings.maxSide": "Макс. длинная сторона",
   "settings.maxSide.hint": "Новые изображения уменьшаются до этого размера",
