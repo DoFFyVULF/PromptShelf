@@ -57,16 +57,16 @@ export function ScrollTopButton({ containerRef }: ScrollTopButtonProps) {
           onClick={toTop}
           aria-label={t("nav.scrollTop")}
           title={t("nav.scrollTop")}
-          className="fab fixed right-5 bottom-5 z-[70] flex h-11 w-11 cursor-pointer items-center justify-center rounded-full bg-ink text-white shadow-panel transition-colors duration-150 hover:bg-[#2e2e33]"
+          className="fab fixed right-5 bottom-5 z-[70] flex h-11 w-11 cursor-pointer items-center justify-center rounded-full bg-ink text-on-ink shadow-panel transition-colors duration-150 hover:bg-ink-hover"
         >
           <svg viewBox="0 0 52 52" className="pointer-events-none absolute -inset-1 -rotate-90" aria-hidden>
-            <circle cx="26" cy="26" r="24" fill="none" stroke="#fff" strokeOpacity="0.22" strokeWidth="2" />
+            <circle cx="26" cy="26" r="24" fill="none" stroke="currentColor" strokeOpacity="0.22" strokeWidth="2" />
             <motion.circle
               cx="26"
               cy="26"
               r="24"
               fill="none"
-              stroke="#fff"
+              stroke="currentColor"
               strokeWidth="2.4"
               strokeLinecap="round"
               style={{ pathLength: scrollYProgress }}

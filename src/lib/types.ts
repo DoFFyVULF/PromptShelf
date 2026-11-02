@@ -1,4 +1,5 @@
 export type Lang = "en" | "ru";
+export type Theme = "system" | "light" | "dark";
 export type Sort = "newest" | "oldest" | "rating";
 
 export interface ImageInfo {
@@ -107,6 +108,7 @@ export interface AppSettings {
   originals: boolean;
   thumbs: boolean;
   lang: Lang;
+  theme: Theme;
   civitai_api_key: string | null;
 }
 
@@ -117,6 +119,7 @@ export interface SettingsPatch {
   originals?: boolean;
   thumbs?: boolean;
   lang?: Lang;
+  theme?: Theme;
   civitai_api_key?: string | null;
 }
 

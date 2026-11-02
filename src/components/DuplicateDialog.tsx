@@ -35,7 +35,7 @@ export function DuplicateDialog({ open, hits, proceedKey = "dup.anyway", onProce
             <li
               key={hit.id}
               className={`flex items-center gap-3 rounded-xl border border-hairline bg-parchment px-3 py-2 ${
-                onOpen ? "cursor-pointer transition-colors hover:border-zinc-300 hover:bg-card" : ""
+                onOpen ? "cursor-pointer transition-colors hover:border-line-hover hover:bg-card" : ""
               }`}
               {...(onOpen ? { onClick: () => onOpen(hit.id) } : {})}
             >

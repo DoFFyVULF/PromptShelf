@@ -381,7 +381,7 @@ export function Editor({ card, staged, onStaged, settings, groupId, imported, on
               <button
                 type="button"
                 onClick={chooseFiles}
-                className="flex h-[96px] w-[96px] cursor-pointer flex-col items-center justify-center gap-1.5 rounded-tile border-2 border-dashed border-zinc-300 text-faint transition-colors hover:border-zinc-400 hover:text-muted"
+                className="flex h-[96px] w-[96px] cursor-pointer flex-col items-center justify-center gap-1.5 rounded-tile border-2 border-dashed border-line-hover text-faint transition-colors hover:border-line-active hover:text-muted"
               >
                 {importing > 0 ? <Loader2 size={19} className="spin" /> : <ImagePlus size={19} strokeWidth={1.6} />}
                 <span className="px-1.5 text-center text-[10px] leading-tight">
@@ -485,7 +485,7 @@ export function Editor({ card, staged, onStaged, settings, groupId, imported, on
             <label className="t-section block" htmlFor="editor-tag-input">
               {t("editor.tags")}
             </label>
-            <div className="mt-2 flex flex-wrap items-center gap-1.5 rounded-xl border border-hairline bg-card px-2.5 py-2 transition-colors focus-within:border-zinc-400 focus-within:shadow-[0_0_0_3px_rgb(24_24_27/0.06)]">
+            <div className="mt-2 flex flex-wrap items-center gap-1.5 rounded-xl border border-hairline bg-card px-2.5 py-2 transition-colors focus-within:border-line-active focus-within:shadow-focus">
               {tags.map((tag) => (
                 <span
                   key={tag}

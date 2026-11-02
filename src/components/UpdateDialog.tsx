@@ -67,15 +67,15 @@ export function UpdateDialog({ open, onClose }: UpdateDialogProps) {
 
   const icon =
     phase === "latest" ? (
-      <span className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600">
+      <span className="flex h-14 w-14 items-center justify-center rounded-full bg-leaf-icon/10 text-leaf-icon">
         <CheckCircle2 size={26} strokeWidth={1.7} />
       </span>
     ) : phase === "available" ? (
-      <span className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-500/10 text-blue-600">
+      <span className="flex h-14 w-14 items-center justify-center rounded-full bg-action/10 text-action">
         <Download size={24} strokeWidth={1.8} />
       </span>
     ) : phase === "error" ? (
-      <span className="flex h-14 w-14 items-center justify-center rounded-full bg-red-500/10 text-red-600">
+      <span className="flex h-14 w-14 items-center justify-center rounded-full bg-destructive/10 text-destructive">
         <AlertCircle size={26} strokeWidth={1.7} />
       </span>
     ) : (

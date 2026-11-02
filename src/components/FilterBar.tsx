@@ -51,7 +51,7 @@ export function FilterBar({
         onClick={onClear}
         className={`press h-7 shrink-0 cursor-pointer rounded-full px-3 text-[12.5px] font-medium transition-colors ${
           !filtering
-            ? "bg-ink text-white"
+            ? "bg-ink text-on-ink"
             : "border border-hairline bg-card text-body hover:bg-parchment"
         }`}
       >
@@ -65,14 +65,14 @@ export function FilterBar({
         title={t("tags.title")}
         className={`press flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-full px-3 text-[12.5px] font-medium transition-colors ${
           hasTagsFilter
-            ? "bg-ink text-white"
+            ? "bg-ink text-on-ink"
             : "border border-hairline bg-card text-body hover:bg-parchment"
         }`}
       >
         <Tag size={12.5} className={hasTagsFilter ? "opacity-80" : "text-faint"} />
         <span>{t("tags.title")}</span>
         {hasTagsFilter && (
-          <span className="flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-white/20 px-1 text-[10px] font-semibold tabular-nums">
+          <span className="flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-on-ink/20 px-1 text-[10px] font-semibold tabular-nums">
             {selected.length}
           </span>
         )}
@@ -96,7 +96,7 @@ export function FilterBar({
         aria-pressed={selectMode}
         title={t("select.select")}
         className={`press flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors ${
-          selectMode ? "bg-ink text-white" : "border border-hairline bg-card text-muted hover:bg-parchment hover:text-ink"
+          selectMode ? "bg-ink text-on-ink" : "border border-hairline bg-card text-muted hover:bg-parchment hover:text-ink"
         }`}
       >
         <ListChecks size={13.5} />

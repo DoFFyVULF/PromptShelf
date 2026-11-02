@@ -35,11 +35,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         {items.map((t) => (
           <div
             key={t.id}
-            className="anim-toast pointer-events-auto flex items-center gap-2 rounded-full bg-ink py-2.5 pr-4 pl-3.5 text-[13px] font-medium text-white shadow-[0_12px_40px_-8px_rgb(0_0_0/0.45)]"
+            className="anim-toast pointer-events-auto flex items-center gap-2 rounded-full bg-ink py-2.5 pr-4 pl-3.5 text-[13px] font-medium text-on-ink shadow-[0_12px_40px_-8px_rgb(0_0_0/0.45)]"
           >
-            {t.kind === "success" && <CheckCircle2 size={15} className="text-zinc-300" />}
-            {t.kind === "error" && <AlertCircle size={15} className="text-red-300" />}
-            {t.kind === "info" && <Info size={15} className="text-zinc-300" />}
+            {t.kind === "success" && <CheckCircle2 size={15} className="text-on-ink/65" />}
+            {t.kind === "error" && <AlertCircle size={15} className="text-destructive" />}
+            {t.kind === "info" && <Info size={15} className="text-on-ink/65" />}
             <span className="max-w-[420px] truncate">{t.text}</span>
           </div>
         ))}

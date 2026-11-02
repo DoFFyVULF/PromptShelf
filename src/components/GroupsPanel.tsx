@@ -173,12 +173,12 @@ export function GroupsPanel({
     <div
       data-groups-panel
       className={`anim-panel fixed top-14 right-3 z-[75] flex max-h-[calc(100vh-72px)] w-[320px] flex-col overflow-hidden rounded-panel border border-hairline bg-card shadow-panel transition-shadow duration-200 ${
-        dragActive ? "ring-2 ring-emerald-200/80" : ""
+        dragActive ? "ring-2 ring-leaf-edge/80" : ""
       }`}
     >
       <div className="flex items-center justify-between px-4 pt-3.5 pb-2">
         {dragActive ? (
-          <span className="anim-fade min-w-0 truncate text-[13px] font-semibold text-emerald-700">
+          <span className="anim-fade min-w-0 truncate text-[13px] font-semibold text-leaf">
             {t("groups.dropHint")}
           </span>
         ) : (
@@ -190,9 +190,9 @@ export function GroupsPanel({
       </div>
 
       {selection.length > 0 && (
-        <div className="mx-3 mb-2 flex items-center gap-2 rounded-[10px] bg-emerald-50 px-3 py-2 text-[11.5px] leading-snug text-emerald-800">
+        <div className="mx-3 mb-2 flex items-center gap-2 rounded-[10px] bg-leaf-soft px-3 py-2 text-[11.5px] leading-snug text-leaf">
           <span className="font-semibold whitespace-nowrap">{t("groups.selected", { n: selection.length })}</span>
-          <span className="min-w-0 truncate text-emerald-700/80">{t("groups.moveTip")}</span>
+          <span className="min-w-0 truncate text-leaf/80">{t("groups.moveTip")}</span>
         </div>
       )}
 
@@ -240,22 +240,22 @@ export function GroupsPanel({
                 dragActive
                   ? current
                     ? dragOverId === g.id
-                      ? "border-emerald-500 bg-emerald-100 text-emerald-900"
-                      : "border-dashed border-emerald-300/80 bg-emerald-50/70 text-emerald-800"
+                      ? "border-leaf-icon bg-leaf-target text-leaf-strong"
+                      : "border-dashed border-leaf-edge/80 bg-leaf-soft/70 text-leaf"
                     : dragOverId === g.id
-                      ? "border-emerald-500 bg-emerald-100 text-emerald-900"
-                      : "border-dashed border-emerald-300/70 bg-emerald-50/50 text-emerald-900/80"
+                      ? "border-leaf-icon bg-leaf-target text-leaf-strong"
+                      : "border-dashed border-leaf-edge/70 bg-leaf-soft/50 text-leaf/80"
                   : current
-                    ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                    ? "border-leaf-edge bg-leaf-soft text-leaf"
                     : moveActive
-                      ? "border-transparent text-body hover:border-emerald-200 hover:bg-emerald-50/60"
+                      ? "border-transparent text-body hover:border-leaf-edge hover:bg-leaf-soft/60"
                       : "border-transparent text-body hover:bg-parchment"
               }`}
             >
               <span
                 aria-hidden
                 className={`flex h-6 w-6 shrink-0 items-center justify-center ${
-                  current ? "text-emerald-600" : "text-zinc-400"
+                  current ? "text-leaf-icon" : "text-faint"
                 }`}
               >
                 {g.is_default ? <Home size={14.5} /> : <span className="h-2 w-2 rounded-full bg-current" />}
@@ -280,24 +280,24 @@ export function GroupsPanel({
                   onBlur={() => void commitRename(g.id)}
                   maxLength={48}
                   spellCheck={false}
-                  className="min-w-0 flex-1 rounded-md border border-emerald-300 bg-white px-2 py-1 text-[13px] text-ink outline-none"
+                  className="min-w-0 flex-1 rounded-md border border-leaf-edge bg-card px-2 py-1 text-[13px] text-ink outline-none"
                 />
               ) : (
-                <span className={`min-w-0 flex-1 truncate text-[13.5px] font-medium ${current ? "text-emerald-800" : ""}`}>
+                <span className={`min-w-0 flex-1 truncate text-[13.5px] font-medium ${current ? "text-leaf" : ""}`}>
                   {g.name}
                 </span>
               )}
 
               {!editingId && (
                 <>
-                  <span className={`shrink-0 text-[11px] tabular-nums ${current ? "text-emerald-600/80" : "text-faint"}`}>
+                  <span className={`shrink-0 text-[11px] tabular-nums ${current ? "text-leaf-icon/80" : "text-faint"}`}>
                     {g.count}
                   </span>
 
                   {dragActive && (
                     <CornerDownRight
                       size={13}
-                      className={`shrink-0 text-emerald-500 transition-transform duration-150 ${
+                      className={`shrink-0 text-leaf-icon transition-transform duration-150 ${
                         dragOverId === g.id ? "scale-125 opacity-100" : "opacity-55"
                       }`}
                     />
@@ -312,7 +312,7 @@ export function GroupsPanel({
                         e.stopPropagation();
                         moveHere(g, selection);
                       }}
-                      className="press flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-emerald-600 transition-colors hover:bg-white/80"
+                      className="press flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-leaf-icon transition-colors hover:bg-parchment"
                     >
                       <CornerDownRight size={13} />
                     </button>
@@ -331,7 +331,7 @@ export function GroupsPanel({
                           setEditName(g.name);
                           setEditingId(g.id);
                         }}
-                        className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-md text-muted transition-colors hover:bg-white/80 hover:text-ink"
+                        className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-md text-muted transition-colors hover:bg-parchment hover:text-ink"
                       >
                         <Pencil size={12} />
                       </button>
@@ -345,8 +345,8 @@ export function GroupsPanel({
                         }}
                         className={`flex h-6 w-6 cursor-pointer items-center justify-center rounded-md transition-colors ${
                           armDelete === g.id
-                            ? "bg-red-600 text-white"
-                            : "text-muted hover:bg-white/80 hover:text-destructive"
+                            ? "bg-destructive text-on-ink"
+                            : "text-muted hover:bg-parchment hover:text-destructive"
                         }`}
                       >
                         <Trash2 size={12} />

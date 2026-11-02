@@ -62,7 +62,7 @@ export function TagsDialog({ open, onClose, tags, selected, onToggle, onClear }:
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={t("search.placeholder")}
-                className="h-9 w-full rounded-[10px] border border-hairline bg-card pl-10 pr-3 text-[13.5px] transition-colors placeholder:text-faint hover:border-zinc-300 focus:border-zinc-400 focus:outline-none focus:shadow-[0_0_0_3px_rgb(24_24_27/0.06)]"
+                className="h-9 w-full rounded-[10px] border border-hairline bg-card pl-10 pr-3 text-[13.5px] transition-colors placeholder:text-faint hover:border-line-hover focus:border-line-active focus:outline-none focus:shadow-focus"
                 autoFocus
               />
             </div>
@@ -86,7 +86,7 @@ export function TagsDialog({ open, onClose, tags, selected, onToggle, onClear }:
                   key={tag}
                   type="button"
                   onClick={() => onToggle(tag)}
-                  className="press flex items-center gap-1 rounded-full bg-ink px-2.5 py-1 text-[11.5px] font-medium text-white transition-colors hover:opacity-85"
+                  className="press flex items-center gap-1 rounded-full bg-ink px-2.5 py-1 text-[11.5px] font-medium text-on-ink transition-colors hover:opacity-85"
                 >
                   <span className="max-w-[140px] truncate">{tag}</span>
                   <X size={11.5} className="shrink-0 opacity-70" />
@@ -115,7 +115,7 @@ export function TagsDialog({ open, onClose, tags, selected, onToggle, onClear }:
                       aria-pressed={active}
                       className={`press flex w-full items-center justify-between rounded-[10px] border px-2.5 py-2 text-[12.5px] transition-colors ${
                         active
-                          ? "border-transparent bg-ink text-white"
+                          ? "border-transparent bg-ink text-on-ink"
                           : "border border-hairline bg-card text-body hover:bg-parchment"
                       }`}
                     >

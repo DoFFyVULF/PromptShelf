@@ -95,7 +95,7 @@ export function LoraEditor({ loras, onChange, draft, onDraft, t }: LoraEditorPro
           title={t("editor.loras.add")}
           onClick={startAdd}
           disabled={loras.length >= MAX_LORAS}
-          className="press flex h-6.5 w-6.5 cursor-pointer items-center justify-center rounded-full border border-hairline bg-card text-muted transition-colors hover:border-zinc-400 hover:text-ink disabled:cursor-default disabled:opacity-35 disabled:hover:border-hairline disabled:hover:text-muted"
+          className="press flex h-6.5 w-6.5 cursor-pointer items-center justify-center rounded-full border border-hairline bg-card text-muted transition-colors hover:border-line-active hover:text-ink disabled:cursor-default disabled:opacity-35 disabled:hover:border-hairline disabled:hover:text-muted"
         >
           <Plus size={13.5} />
         </button>
@@ -118,7 +118,7 @@ export function LoraEditor({ loras, onChange, draft, onDraft, t }: LoraEditorPro
               />
               <span className="min-w-0 flex-1 truncate text-[13px] text-body">{lora.name}</span>
               {lora.value && (
-                <span className="relative z-10 ml-2 shrink-0 rounded-md bg-zinc-100 px-2 py-1 text-[11.5px] leading-none text-zinc-500 tabular-nums">
+                <span className="relative z-10 ml-2 shrink-0 rounded-md bg-parchment px-2 py-1 text-[11.5px] leading-none text-muted tabular-nums">
                   {lora.value}
                 </span>
               )}
@@ -128,7 +128,7 @@ export function LoraEditor({ loras, onChange, draft, onDraft, t }: LoraEditorPro
                   type="button"
                   aria-label={t("action.edit")}
                   onClick={() => startEdit(i)}
-                  className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-md text-muted transition-colors hover:bg-white/85 hover:text-ink"
+                  className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-md text-muted transition-colors hover:bg-parchment hover:text-ink"
                 >
                   <Pencil size={12.5} />
                 </button>
@@ -136,7 +136,7 @@ export function LoraEditor({ loras, onChange, draft, onDraft, t }: LoraEditorPro
                   type="button"
                   aria-label={t("action.delete")}
                   onClick={() => remove(i)}
-                  className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-md text-destructive transition-colors hover:bg-white/85"
+                  className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-md text-destructive transition-colors hover:bg-parchment"
                 >
                   <Trash2 size={12.5} />
                 </button>
@@ -174,7 +174,7 @@ function LoraDraftRow({
 }) {
   return (
     <div
-      className="flex h-9 items-center gap-1.5 rounded-[10px] border border-ink/50 bg-card pr-1 pl-1.5 shadow-[0_0_0_3px_rgb(24_24_27/0.05)]"
+      className="flex h-9 items-center gap-1.5 rounded-[10px] border border-ink/50 bg-card pr-1 pl-1.5 shadow-focus"
       onBlur={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget as Node | null)) onCommit();
       }}

@@ -124,6 +124,11 @@ export const ru: Record<DictKey, string> = {
 
   "settings.title": "Настройки",
   "settings.general": "Общие",
+  "settings.theme": "Оформление",
+  "settings.theme.hint": "Применяется сразу — без перезапуска.",
+  "settings.theme.light": "Светлая",
+  "settings.theme.dark": "Тёмная",
+  "settings.theme.system": "Системная",
   "settings.language": "Язык интерфейса",
   "settings.language.hint": "Применяется сразу — без перезапуска.",
   "settings.images": "Импорт изображений",

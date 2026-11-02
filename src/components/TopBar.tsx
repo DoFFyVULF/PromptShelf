@@ -33,7 +33,7 @@ export function TopBar({ query, onQuery, sort, onSort, onNew, onImportCivitai, o
           onChange={(e) => onQuery(e.target.value)}
           placeholder={t("search.placeholder")}
           spellCheck={false}
-          className="h-9 w-full rounded-full border border-hairline bg-card pr-10 pl-9.5 text-[13.5px] transition-colors placeholder:text-faint hover:border-zinc-300 focus:border-zinc-400 focus:outline-none"
+          className="h-9 w-full rounded-full border border-hairline bg-card pr-10 pl-9.5 text-[13.5px] transition-colors placeholder:text-faint hover:border-line-hover focus:border-line-active focus:outline-none"
         />
         {!query && (
           <kbd className="kbd pointer-events-none absolute top-1/2 right-2.5 hidden -translate-y-1/2 group-focus-within:hidden sm:flex">
@@ -49,7 +49,7 @@ export function TopBar({ query, onQuery, sort, onSort, onNew, onImportCivitai, o
           aria-label={t("sort.label")}
           value={sort}
           onChange={(e) => onSort(e.target.value as Sort)}
-          className="h-9 cursor-pointer appearance-none rounded-full border border-hairline bg-card pr-8 pl-3.5 text-[13px] font-medium text-body transition-colors hover:border-zinc-300"
+          className="h-9 cursor-pointer appearance-none rounded-full border border-hairline bg-card pr-8 pl-3.5 text-[13px] font-medium text-body transition-colors hover:border-line-hover"
         >
           <option value="newest">{t("sort.newest")}</option>
           <option value="oldest">{t("sort.oldest")}</option>

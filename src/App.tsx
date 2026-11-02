@@ -14,7 +14,8 @@ import type {
   ListFilter,
   Sort,
   StagedImage,
-  TagCount
+  TagCount,
+  Theme
 } from "./lib/types";
 import { TopBar } from "./components/TopBar";
 import { FilterBar } from "./components/FilterBar";
@@ -30,6 +31,7 @@ import { ToastProvider, useToast } from "./components/Toasts";
 import { ScrollTopButton } from "./components/ScrollTopButton";
 import { DuplicateDialog } from "./components/DuplicateDialog";
 import { CornerDownRight, ListChecks, X } from "lucide-react";
+import { applyTheme, onSystemThemeChange, themeFromStorage } from "./lib/theme";
 
 function Shell() {
   const { t, lang, setLang } = useI18n();
@@ -46,6 +48,18 @@ function Shell() {
   const [debouncedQ, setDebouncedQ] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [sort, setSort] = useState<Sort>("newest");
+
+  const [theme, setTheme] = useState<Theme>(themeFromStorage);
+
+  useEffect(() => {
+    applyTheme(theme);
+    window.localStorage.setItem("ps-theme", theme);
+  }, [theme]);
+
+  useEffect(() => {
+    if (theme !== "system") return;
+    return onSystemThemeChange(() => applyTheme("system"));
+  }, [theme]);
 
   // ---------------------------------------------------------------- groups
 
@@ -121,6 +135,8 @@ function Shell() {
       setLibraryDir(p.data_dir);
       setLang(s.lang);
       window.localStorage.setItem("ps-lang", s.lang);
+      setTheme(s.theme);
+      window.localStorage.setItem("ps-theme", s.theme);
     } catch {
       setLoadError(true);
     }
@@ -556,6 +572,15 @@ function Shell() {
     [setLang]
   );
 
+  const switchTheme = useCallback(
+    (v: Theme) => {
+      setTheme(v);
+      window.localStorage.setItem("ps-theme", v);
+      void api.setSettings({ theme: v }).then((s) => setSettings(s)).catch(() => undefined);
+    },
+    [setTheme]
+  );
+
   // ---------------------------------------------------------------- render
 
   const filterEmpty = !anyFilter && cards.length === 0 && !loading && !loadError;
@@ -660,18 +685,18 @@ function Shell() {
       />
 
       {selectMode && (
-        <div className="anim-panel fixed bottom-5 left-1/2 z-[80] flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-ink py-2 pr-2 pl-5 text-white shadow-panel">
+        <div className="anim-panel fixed bottom-5 left-1/2 z-[80] flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-ink py-2 pr-2 pl-5 text-on-ink shadow-panel">
           <span className="flex items-center gap-2 text-[13px] font-medium">
             <ListChecks size={14.5} className="opacity-80" />
             {t("groups.selected", { n: selection.length })}
           </span>
-          <span className="mx-1 h-4 w-px bg-white/20" aria-hidden />
+          <span className="mx-1 h-4 w-px bg-on-ink/20" aria-hidden />
           <button
             type="button"
             data-groups-trigger
             onClick={() => setGroupsOpen(true)}
             disabled={selection.length === 0}
-            className="press flex h-8 cursor-pointer items-center gap-1.5 rounded-full bg-white/15 px-3.5 text-[12.5px] font-semibold transition-colors hover:bg-white/25 disabled:cursor-default disabled:opacity-40 disabled:hover:bg-white/15"
+            className="press flex h-8 cursor-pointer items-center gap-1.5 rounded-full bg-on-ink/15 px-3.5 text-[12.5px] font-semibold transition-colors hover:bg-on-ink/25 disabled:cursor-default disabled:opacity-40 disabled:hover:bg-on-ink/15"
           >
             <CornerDownRight size={13.5} />
             {t("select.move")}
@@ -679,7 +704,7 @@ function Shell() {
           <button
             type="button"
             onClick={() => setSelection([])}
-            className="press flex h-8 cursor-pointer items-center rounded-full px-3 text-[12.5px] font-medium text-white/75 transition-colors hover:text-white"
+            className="press flex h-8 cursor-pointer items-center rounded-full px-3 text-[12.5px] font-medium text-on-ink/75 transition-colors hover:text-on-ink"
           >
             {t("select.clear")}
           </button>
@@ -689,7 +714,7 @@ function Shell() {
               setSelection([]);
               setSelectMode(false);
             }}
-            className="press flex h-8 cursor-pointer items-center gap-1 rounded-full bg-white px-3.5 text-[12.5px] font-semibold text-ink transition-colors hover:bg-zinc-200"
+            className="press flex h-8 cursor-pointer items-center gap-1 rounded-full bg-on-ink px-3.5 text-[12.5px] font-semibold text-ink transition-colors hover:bg-on-ink/80"
           >
             <X size={13} />
             {t("select.done")}
@@ -734,6 +759,8 @@ function Shell() {
           paths={paths}
           lang={lang}
           onLang={switchLang}
+          theme={theme}
+          onTheme={switchTheme}
           onClose={() => setSettingsOpen(false)}
           onSaved={setSettings}
           onImported={onImported}
@@ -772,7 +799,7 @@ function Shell() {
 
       {dragging && (
         <div className="anim-fade pointer-events-none fixed inset-0 z-[150] flex items-center justify-center bg-canvas/70 backdrop-blur-sm">
-          <div className="flex items-center gap-3 rounded-panel border-2 border-dashed border-zinc-400 bg-card px-8 py-7 shadow-panel">
+          <div className="flex items-center gap-3 rounded-panel border-2 border-dashed border-line-active bg-card px-8 py-7 shadow-panel">
             <ImageDown size={26} strokeWidth={1.4} className="text-ink" />
             <div>
               <p className="t-display text-[16px] text-ink">{t("editor.images")}</p>

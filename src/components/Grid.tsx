@@ -83,6 +83,14 @@ function CardTile({
     )}px;width:${cw}px;height:${ch}px;pointer-events:none;z-index:-1;`;
     const ctx = canvas.getContext("2d");
     if (ctx) {
+      // the ghost is painted from the live theme tokens so it matches the
+      // card in both light and dark mode
+      const cs = getComputedStyle(document.documentElement);
+      const token = (name: string, fallback: string) => cs.getPropertyValue(name).trim() || fallback;
+      const cardBg = token("--color-card", "#ffffff");
+      const imgBg = token("--color-parchment", "#f4f4f5");
+      const footText = token("--color-body", "#3f3f46");
+      const tileEdge = token("--color-hairline", "#e4e4e7");
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.translate(m, m);
       ctx.scale(S, S);
@@ -105,11 +113,11 @@ function CardTile({
       ctx.shadowColor = "rgba(23,23,28,0.32)";
       ctx.shadowBlur = 20 * dpr;
       ctx.shadowOffsetY = 9 * dpr;
-      ctx.fillStyle = "#ffffff";
+      ctx.fillStyle = cardBg;
       path(0, 0, W, H, 10, 10, 10, 10);
       ctx.fill();
       ctx.restore();
-      ctx.strokeStyle = "rgba(24,24,27,0.14)";
+      ctx.strokeStyle = tileEdge;
       ctx.lineWidth = 1;
       path(0.5, 0.5, W - 1, H - 1, 10, 10, 10, 10);
       ctx.stroke();
@@ -134,9 +142,9 @@ function CardTile({
         }
         ctx.drawImage(img, sx, sy, sw, sh, pad, pad, iw, bh);
       } else {
-        ctx.fillStyle = "#f4f4f5";
+        ctx.fillStyle = imgBg;
         ctx.fillRect(pad, pad, iw, bh);
-        ctx.fillStyle = "#a1a1aa";
+        ctx.fillStyle = token("--color-faint", "#a1a1aa");
         ctx.font = "500 13px system-ui, sans-serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
@@ -147,7 +155,7 @@ function CardTile({
       // footer: truncated prompt, like the tile's first line
       const p = card.prompt.trim();
       if (p) {
-        ctx.fillStyle = "#3f3f46";
+        ctx.fillStyle = footText;
         ctx.font = "500 12.5px system-ui, sans-serif";
         ctx.textBaseline = "middle";
         let txt = p;
@@ -196,9 +204,9 @@ function CardTile({
 
   return (
     <article
-      className={`anim-tile group relative flex cursor-pointer flex-col overflow-hidden rounded-card border bg-card transition-[border-color,transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-zinc-300 hover:shadow-[0_10px_30px_-12px_rgb(0_0_0/0.12)] ${
+      className={`anim-tile group relative flex cursor-pointer flex-col overflow-hidden rounded-card border bg-card transition-[border-color,transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-line-hover hover:shadow-tile-hover ${
         dragging
-          ? "scale-[0.9] border-emerald-300/80 shadow-none"
+          ? "scale-[0.9] border-leaf-edge/80 shadow-none"
           : "border-hairline"
       }`}
       style={{ animationDelay: `${Math.min(delay, 320)}ms` }}

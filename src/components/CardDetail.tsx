@@ -377,7 +377,7 @@ export function CardDetail({ card, hasPrev, hasNext, onPrev, onNext, onClose, on
               <div
                 key={img.id}
                 className={`group relative h-14 w-20 shrink-0 overflow-hidden rounded-[9px] border-2 transition-colors ${
-                  i === mainIdx ? "border-ink" : "border-transparent hover:border-zinc-300"
+                  i === mainIdx ? "border-ink" : "border-transparent hover:border-line-hover"
                 }`}
               >
                 <img
@@ -400,7 +400,7 @@ export function CardDetail({ card, hasPrev, hasNext, onPrev, onNext, onClose, on
                     }
                   }}
                   className={`absolute top-0.5 right-0.5 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full backdrop-blur transition-all ${
-                    armImage === img.id ? "bg-red-600 text-white" : "bg-black/50 text-white opacity-0 group-hover:opacity-100"
+                    armImage === img.id ? "bg-destructive text-on-ink" : "bg-black/50 text-white opacity-0 group-hover:opacity-100"
                   }`}
                 >
                   {armImage === img.id ? <Check size={11} /> : <X size={11} />}
@@ -414,7 +414,7 @@ export function CardDetail({ card, hasPrev, hasNext, onPrev, onNext, onClose, on
                       setCover(img);
                     }}
                     className={`absolute bottom-0.5 left-0.5 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full backdrop-blur transition-opacity ${
-                      mainIdx === i ? "bg-ink/85 text-white" : "bg-black/50 text-white opacity-0 group-hover:opacity-100"
+                      mainIdx === i ? "bg-ink/85 text-on-ink" : "bg-black/50 text-white opacity-0 group-hover:opacity-100"
                     }`}
                   >
                     <Star size={10} className="fill-current" />
@@ -429,7 +429,7 @@ export function CardDetail({ card, hasPrev, hasNext, onPrev, onNext, onClose, on
               title={t("editor.add")}
               onClick={addImages}
               disabled={adding > 0}
-              className="press flex h-14 w-14 shrink-0 cursor-pointer items-center justify-center rounded-[9px] border-2 border-dashed border-zinc-300 text-faint transition-colors hover:border-zinc-400 hover:text-muted disabled:cursor-default disabled:opacity-50"
+              className="press flex h-14 w-14 shrink-0 cursor-pointer items-center justify-center rounded-[9px] border-2 border-dashed border-line-hover text-faint transition-colors hover:border-line-active hover:text-muted disabled:cursor-default disabled:opacity-50"
             >
               {adding > 0 ? <Loader2 size={15} className="spin" /> : <Plus size={15} strokeWidth={1.8} />}
             </button>
@@ -538,7 +538,7 @@ export function CardDetail({ card, hasPrev, hasNext, onPrev, onNext, onClose, on
                   <label className="t-section block" htmlFor="detail-tag-input">
                     {t("editor.tags")}
                   </label>
-                  <div className="mt-2 flex flex-wrap items-center gap-1.5 rounded-xl border border-hairline bg-card px-2.5 py-2 transition-colors focus-within:border-zinc-400 focus-within:shadow-[0_0_0_3px_rgb(24_24_27/0.06)]">
+                  <div className="mt-2 flex flex-wrap items-center gap-1.5 rounded-xl border border-hairline bg-card px-2.5 py-2 transition-colors focus-within:border-line-active focus-within:shadow-focus">
                     {tags.map((tag) => (
                       <span
                         key={tag}
@@ -586,7 +586,7 @@ export function CardDetail({ card, hasPrev, hasNext, onPrev, onNext, onClose, on
                       aria-label={t("action.copy")}
                       title={t("action.copy")}
                       onClick={copyPrompt}
-                      className="press -mr-1 flex h-6.5 w-6.5 cursor-pointer items-center justify-center rounded-md text-faint opacity-0 transition-opacity duration-150 group-hover/prompt:opacity-100 hover:bg-zinc-100 hover:text-ink"
+                      className="press -mr-1 flex h-6.5 w-6.5 cursor-pointer items-center justify-center rounded-md text-faint opacity-0 transition-opacity duration-150 group-hover/prompt:opacity-100 hover:bg-parchment hover:text-ink"
                     >
                       {copied ? <Check size={12.5} /> : <Copy size={12.5} />}
                     </button>
@@ -605,7 +605,7 @@ export function CardDetail({ card, hasPrev, hasNext, onPrev, onNext, onClose, on
                         aria-label={t("action.copy")}
                         title={t("action.copy")}
                         onClick={copyNegative}
-                        className="press -mr-1 flex h-6.5 w-6.5 cursor-pointer items-center justify-center rounded-md text-faint opacity-0 transition-opacity duration-150 group-hover/negative:opacity-100 hover:bg-zinc-100 hover:text-ink"
+                        className="press -mr-1 flex h-6.5 w-6.5 cursor-pointer items-center justify-center rounded-md text-faint opacity-0 transition-opacity duration-150 group-hover/negative:opacity-100 hover:bg-parchment hover:text-ink"
                       >
                         {copiedNeg ? <Check size={12.5} /> : <Copy size={12.5} />}
                       </button>
@@ -626,10 +626,10 @@ export function CardDetail({ card, hasPrev, hasNext, onPrev, onNext, onClose, on
                           type="button"
                           onClick={() => copyLora(lora)}
                           title={`<lora:${lora.name}:${lora.value || "1"}>`}
-                          className="press flex cursor-pointer items-center gap-2 rounded-full border border-hairline bg-card py-1 pl-3 pr-1.5 text-[12px] text-body transition-colors hover:border-zinc-300"
+                          className="press flex cursor-pointer items-center gap-2 rounded-full border border-hairline bg-card py-1 pl-3 pr-1.5 text-[12px] text-body transition-colors hover:border-line-hover"
                         >
                           <span className="max-w-[190px] truncate">{lora.name}</span>
-                          <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] leading-tight text-zinc-500 tabular-nums">
+                          <span className="rounded-full bg-parchment px-2 py-0.5 text-[11px] leading-tight text-muted tabular-nums">
                             {lora.value || "1"}
                           </span>
                         </button>
@@ -705,7 +705,7 @@ export function CardDetail({ card, hasPrev, hasNext, onPrev, onNext, onClose, on
                 <button type="button" className="btn-primary press min-w-0 cursor-pointer flex-1" onClick={copyPrompt}>
                   {copied ? <Check size={15} /> : <Copy size={14.5} />}
                   <span className="truncate">{copied ? t("toast.copied") : t("action.copy")}</span>
-                  <kbd className="kbd hidden border-zinc-600 bg-transparent text-zinc-400 xl:flex">{modKey}C</kbd>
+                  <kbd className="kbd hidden border-on-ink/30 bg-transparent text-on-ink/70 xl:flex">{modKey}C</kbd>
                 </button>
                 <button type="button" className="btn-ghost press cursor-pointer" onClick={startEdit}>
                   <Pencil size={14.5} />
@@ -718,8 +718,8 @@ export function CardDetail({ card, hasPrev, hasNext, onPrev, onNext, onClose, on
                   onClick={removeCard}
                   className={`press flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border transition-colors ${
                     confirmDelete
-                      ? "border-red-200 bg-red-600 text-white"
-                      : "border-hairline bg-card text-muted hover:bg-red-50 hover:text-destructive"
+                      ? "border-destructive/30 bg-destructive text-on-ink"
+                      : "border-hairline bg-card text-muted hover:bg-destructive-soft hover:text-destructive"
                   }`}
                 >
                   <Trash2 size={15} />

@@ -57,8 +57,24 @@
   --color-card: #ffffff;
   --color-hairline: #e4e4e7;
   --color-line-soft: #f0f0f1;
+  /* text on a `bg-ink` surface (inverts with ink) */
+  --color-on-ink: #ffffff;
+  --color-ink-hover: #2e2e33;
+  --color-line-hover: #d4d4d8;
+  --color-line-active: #a1a1aa;
+  /* Apple Action Blue (light) / Sky Link Blue (dark) */
+  --color-action: #0066cc;
+  /* emerald accent family (groups / selection) */
+  --color-leaf: #065f46;
+  --color-leaf-strong: #064e3b;
+  --color-leaf-icon: #059669;
+  --color-leaf-soft: #ecfdf5;
+  --color-leaf-edge: #a7f3d0;
+  --color-leaf-target: #d1fae5;
   --color-destructive: #dc2626;
   --color-destructive-soft: #fef2f2;
+  --color-scroll: #d4d4d8;
+  --color-scroll-hover: #a1a1aa;
 
   --radius-tile: 12px;
   --radius-card: 18px;
@@ -67,6 +83,8 @@
   --shadow-panel: 0 32px 80px -16px rgb(0 0 0 / 0.28), 0 0 0 1px rgb(0 0 0 / 0.07);
   --shadow-product: 3px 5px 30px rgb(0 0 0 / 0.22);
   --shadow-chip: 0 1px 2px rgb(0 0 0 / 0.06);
+  --shadow-focus: 0 0 0 3px rgb(24 24 27 / 0.07);
+  --shadow-tile-hover: 0 10px 30px -12px rgb(0 0 0 / 0.14);
 
   --ease-apple: cubic-bezier(0.32, 0.72, 0, 1);
   /* overshoot curve for the CivitAI hover reveal */
@@ -94,28 +112,76 @@ body {
   overflow: hidden;
 }
 
+:root {
+  color-scheme: light;
+}
+
 ::selection {
   background: rgb(24 24 27 / 0.14);
 }
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: #d4d4d8 transparent;
+  scrollbar-color: var(--color-scroll) transparent;
 }
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #d4d4d8;
+  background: var(--color-scroll);
   border-radius: 8px;
   border: 3px solid transparent;
   background-clip: content-box;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #a1a1aa;
+  background: var(--color-scroll-hover);
   background-clip: content-box;
   border: 3px solid transparent;
+}
+
+/* ------------------------------------------------------------------ dark */
+
+/* Apple's dark tiles: cards #272729 on a near-black shell, soft fills one
+   step lighter (#2d2d30 — inverted elevation), text scales #f5f5f7→#85858b,
+   Sky Link Blue as the interactive blue on dark surfaces. */
+.dark {
+  color-scheme: dark;
+
+  --color-ink: #f5f5f7;
+  --color-body: #cbcbd0;
+  --color-muted: #a2a2a8;
+  --color-faint: #85858b;
+  --color-canvas: #19191b;
+  --color-parchment: #2d2d30;
+  --color-card: #272729;
+  --color-hairline: #3a3a3e;
+  --color-line-soft: #313134;
+  --color-on-ink: #1d1d1f;
+  --color-ink-hover: #ffffff;
+  --color-line-hover: #4a4a4f;
+  --color-line-active: #606066;
+  --color-action: #2997ff;
+  --color-leaf: #6ee7b7;
+  --color-leaf-strong: #a7f3d0;
+  --color-leaf-icon: #34d399;
+  --color-leaf-soft: #16281f;
+  --color-leaf-edge: #2b4a39;
+  --color-leaf-target: #1d3327;
+  --color-destructive: #ff453a;
+  --color-destructive-soft: #351a17;
+  --color-scroll: #46464b;
+  --color-scroll-hover: #5d5d63;
+
+  --shadow-panel: 0 32px 80px -16px rgb(0 0 0 / 0.62), 0 0 0 1px rgb(255 255 255 / 0.07);
+  --shadow-product: 3px 5px 30px rgb(0 0 0 / 0.5);
+  --shadow-chip: 0 1px 2px rgb(0 0 0 / 0.6);
+  --shadow-focus: 0 0 0 3px rgb(245 245 247 / 0.1);
+  --shadow-tile-hover: 0 10px 30px -12px rgb(0 0 0 / 0.5);
+}
+
+.dark ::selection {
+  background: rgb(245 245 247 / 0.22);
 }
 
 /* ------------------------------------------------------------------ type */
@@ -242,7 +308,7 @@ body {
   padding: 0 16px;
   border-radius: 9999px;
   background: var(--color-ink);
-  color: #fff;
+  color: var(--color-on-ink);
   font-size: 13.5px;
   font-weight: 500;
   letter-spacing: -0.006em;
@@ -251,7 +317,7 @@ body {
   white-space: nowrap;
 }
 .btn-primary:hover {
-  background: #2e2e33;
+  background: var(--color-ink-hover);
 }
 
 .btn-ghost {
@@ -291,7 +357,7 @@ body {
 }
 .btn-danger-ghost:hover {
   background: var(--color-destructive-soft);
-  border-color: #fecaca;
+  border-color: color-mix(in srgb, var(--color-destructive) 35%, transparent);
 }
 
 .btn-icon {
@@ -312,9 +378,10 @@ body {
 }
 
 /* the floating back-to-top pill stays a circle under the keyboard focus
-   ring (the global :focus-visible rule would square it off) */
+   ring (the global :focus-visible rule would square it off); the ring reads
+   against the page, so it takes the canvas color */
 .fab:focus-visible {
-  outline: 2px solid #fff;
+  outline: 2px solid var(--color-canvas);
   outline-offset: 3px;
   border-radius: 9999px;
 }
@@ -348,8 +415,8 @@ select {
 }
 .field:focus {
   outline: none;
-  border-color: #a1a1aa;
-  box-shadow: 0 0 0 3px rgb(24 24 27 / 0.06);
+  border-color: var(--color-line-active);
+  box-shadow: var(--shadow-focus);
 }
 
 select.field {
@@ -390,7 +457,7 @@ kbd.kbd {
   height: 18px;
   border-radius: 999px;
   background: var(--color-ink);
-  border: 3px solid #fff;
+  border: 3px solid var(--color-card);
   box-shadow: 0 1px 4px rgb(0 0 0 / 0.25);
 }
 .range::-moz-range-thumb {
@@ -398,7 +465,7 @@ kbd.kbd {
   height: 14px;
   border-radius: 999px;
   background: var(--color-ink);
-  border: 3px solid #fff;
+  border: 3px solid var(--color-card);
   box-shadow: 0 1px 4px rgb(0 0 0 / 0.25);
 }
 

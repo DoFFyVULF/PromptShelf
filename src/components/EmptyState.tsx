@@ -4,11 +4,11 @@ import { modKey } from "../lib/platform";
 
 function ShelfGlyph() {
   return (
-    <svg width="88" height="72" viewBox="0 0 88 72" fill="none" aria-hidden>
-      <rect x="18" y="10" width="13" height="46" rx="3.5" fill="#E4E4E7" />
-      <rect x="35" y="2" width="13" height="54" rx="3.5" fill="#A1A1AA" />
-      <rect x="52" y="14" width="13" height="42" rx="3.5" fill="#E4E4E7" />
-      <rect x="12" y="60" width="60" height="5" rx="2.5" fill="#D4D4D8" />
+    <svg width="88" height="72" viewBox="0 0 88 72" fill="none" aria-hidden className="text-faint">
+      <rect x="18" y="10" width="13" height="46" rx="3.5" className="fill-line-hover" />
+      <rect x="35" y="2" width="13" height="54" rx="3.5" className="fill-faint opacity-80" />
+      <rect x="52" y="14" width="13" height="42" rx="3.5" className="fill-line-hover" />
+      <rect x="12" y="60" width="60" height="5" rx="2.5" className="fill-line-hover opacity-70" />
     </svg>
   );
 }

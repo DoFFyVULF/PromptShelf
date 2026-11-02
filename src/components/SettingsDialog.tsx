@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getVersion } from "@tauri-apps/api/app";
-import { Download, Upload, FolderOpen, Loader2, Eye, EyeOff, Pencil, FolderUp, RefreshCw } from "lucide-react";
+import { Download, Upload, FolderOpen, Loader2, Eye, EyeOff, Pencil, FolderUp, RefreshCw, Sun, Moon, Monitor } from "lucide-react";
 import { save as saveFileDialog, open as openFileDialog, message } from "@tauri-apps/plugin-dialog";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { useI18n } from "../i18n";
 import { api } from "../lib/api";
-import type { AppSettings, Lang, LibraryPaths } from "../lib/types";
+import type { AppSettings, Lang, LibraryPaths, Theme } from "../lib/types";
 import { Dialog } from "./Dialog";
 import { useToast } from "./Toasts";
 import { UpdateDialog } from "./UpdateDialog";
@@ -16,12 +16,14 @@ interface SettingsDialogProps {
   paths: LibraryPaths | null;
   lang: Lang;
   onLang: (l: Lang) => void;
+  theme: Theme;
+  onTheme: (t: Theme) => void;
   onClose: () => void;
   onSaved: (s: AppSettings) => void;
   onImported: () => void;
 }
 
-export function SettingsDialog({ open, settings, paths, lang, onLang, onClose, onSaved, onImported }: SettingsDialogProps) {
+export function SettingsDialog({ open, settings, paths, lang, onLang, theme, onTheme, onClose, onSaved, onImported }: SettingsDialogProps) {
   const { t } = useI18n();
   const { toast } = useToast();
 
@@ -59,6 +61,7 @@ export function SettingsDialog({ open, settings, paths, lang, onLang, onClose, o
           format: next.format,
           originals: next.originals,
           thumbs: next.thumbs,
+          theme: next.theme,
           civitai_api_key: next.civitai_api_key ?? ""
         });
         onSaved(s);
@@ -193,7 +196,38 @@ export function SettingsDialog({ open, settings, paths, lang, onLang, onClose, o
       <div className="max-h-[70vh] space-y-7 overflow-y-auto px-7 pt-3 pb-2">
         <section>
           <h3 className="t-section">{t("settings.general")}</h3>
-          <div className="mt-3">
+          <div className="mt-3 space-y-4">
+            <div className="grid grid-cols-[1fr_150px] items-center gap-4">
+              <div>
+                <label className="block text-[13.5px] font-medium text-ink">{t("settings.theme")}</label>
+                <p className="mt-0.5 text-[11.5px] text-faint">{t("settings.theme.hint")}</p>
+              </div>
+              <div className="justify-self-end">
+                <div className="flex rounded-full border border-hairline bg-card p-0.5" role="group" aria-label={t("settings.theme")}>
+                  {(["light", "dark", "system"] as const).map((v) => {
+                    const active = theme === v;
+                    return (
+                      <button
+                        key={v}
+                        type="button"
+                        onClick={() => onTheme(v)}
+                        aria-pressed={active}
+                        aria-label={t(`settings.theme.${v}`)}
+                        title={t(`settings.theme.${v}`)}
+                        className={`press flex h-7 w-9 cursor-pointer items-center justify-center rounded-full transition-colors ${
+                          active ? "bg-ink text-on-ink" : "text-muted hover:text-ink"
+                        }`}
+                      >
+                        {v === "light" && <Sun size={14} strokeWidth={2} />}
+                        {v === "dark" && <Moon size={14} strokeWidth={2} />}
+                        {v === "system" && <Monitor size={14} strokeWidth={2} />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
             <div className="grid grid-cols-[1fr_150px] items-center gap-4">
               <div>
                 <label className="block text-[13.5px] font-medium text-ink">{t("settings.language")}</label>
@@ -208,7 +242,7 @@ export function SettingsDialog({ open, settings, paths, lang, onLang, onClose, o
                       onClick={() => onLang(l)}
                       aria-pressed={lang === l}
                       className={`press h-7 cursor-pointer rounded-full px-3 text-[11.5px] font-semibold tracking-wide transition-colors ${
-                        lang === l ? "bg-ink text-white" : "text-muted hover:text-ink"
+                        lang === l ? "bg-ink text-on-ink" : "text-muted hover:text-ink"
                       }`}
                     >
                       {l === "en" ? "EN" : "РУ"}
@@ -269,7 +303,7 @@ export function SettingsDialog({ open, settings, paths, lang, onLang, onClose, o
                       onClick={() => update({ format: f })}
                       aria-pressed={draft.format === f}
                       className={`press h-7 cursor-pointer rounded-full px-3 text-[11.5px] font-semibold transition-colors ${
-                        draft.format === f ? "bg-ink text-white" : "text-muted hover:text-ink"
+                        draft.format === f ? "bg-ink text-on-ink" : "text-muted hover:text-ink"
                       }`}
                     >
                       {f.toUpperCase()}
@@ -279,12 +313,12 @@ export function SettingsDialog({ open, settings, paths, lang, onLang, onClose, o
               </div>
             </div>
 
-            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-hairline bg-card px-4 py-3 transition-colors hover:border-zinc-300">
+            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-hairline bg-card px-4 py-3 transition-colors hover:border-line-hover">
               <input
                 type="checkbox"
                 checked={draft.originals}
                 onChange={(e) => update({ originals: e.target.checked })}
-                className="mt-0.5 h-4 w-4 cursor-pointer accent-[#18181b]"
+                className="mt-0.5 h-4 w-4 cursor-pointer accent-ink"
               />
               <span>
                 <span className="block text-[13.5px] font-medium text-ink">{t("settings.originals")}</span>
@@ -292,12 +326,12 @@ export function SettingsDialog({ open, settings, paths, lang, onLang, onClose, o
               </span>
             </label>
 
-            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-hairline bg-card px-4 py-3 transition-colors hover:border-zinc-300">
+            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-hairline bg-card px-4 py-3 transition-colors hover:border-line-hover">
               <input
                 type="checkbox"
                 checked={!draft.thumbs}
                 onChange={(e) => update({ thumbs: !e.target.checked })}
-                className="mt-0.5 h-4 w-4 cursor-pointer accent-[#18181b]"
+                className="mt-0.5 h-4 w-4 cursor-pointer accent-ink"
               />
               <span>
                 <span className="block text-[13.5px] font-medium text-ink">{t("settings.thumbs")}</span>

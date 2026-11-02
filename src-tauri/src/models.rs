@@ -162,6 +162,8 @@ pub struct AppSettings {
     /// false → skip the separate thumbnail file; the compressed image is reused as preview.
     pub thumbs: bool,
     pub lang: String,
+    /// UI appearance: "system" (follow macOS), "light" or "dark".
+    pub theme: String,
     /// CivitAI API key for gated/region-filtered image fetches ("" → none).
     pub civitai_api_key: String,
 }
@@ -174,7 +176,13 @@ pub struct SettingsPatch {
     pub originals: Option<bool>,
     pub thumbs: Option<bool>,
     pub lang: Option<String>,
+    pub theme: Option<String>,
     pub civitai_api_key: Option<String>,
+}
+
+/// Valid values for the persisted `theme` setting.
+pub fn is_valid_theme(v: &str) -> bool {
+    v == "system" || v == "light" || v == "dark"
 }
 
 #[derive(Serialize)]
@@ -246,6 +254,7 @@ pub fn app_settings_default() -> AppSettings {
         originals: false,
         thumbs: true,
         lang: "en".to_string(),
+        theme: "system".to_string(),
         civitai_api_key: String::new(),
     }
 }

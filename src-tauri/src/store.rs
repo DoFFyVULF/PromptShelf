@@ -184,6 +184,11 @@ pub fn read_settings(conn: &Connection) -> Result<AppSettings, String> {
                     s.lang = v;
                 }
             }
+            "theme" => {
+                if crate::models::is_valid_theme(&v) {
+                    s.theme = v;
+                }
+            }
             "civitai_api_key" => s.civitai_api_key = v,
             _ => {}
         }
@@ -233,6 +238,11 @@ pub fn set_settings(
     if let Some(v) = patch.lang {
         if v == "en" || v == "ru" {
             put_setting(&conn, "lang", &v)?;
+        }
+    }
+    if let Some(v) = patch.theme {
+        if crate::models::is_valid_theme(&v) {
+            put_setting(&conn, "theme", &v)?;
         }
     }
     if let Some(v) = patch.civitai_api_key {

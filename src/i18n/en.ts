@@ -122,6 +122,11 @@ export const en = {
 
   "settings.title": "Settings",
   "settings.general": "General",
+  "settings.theme": "Appearance",
+  "settings.theme.hint": "Applies instantly — no restart needed.",
+  "settings.theme.light": "Light",
+  "settings.theme.dark": "Dark",
+  "settings.theme.system": "System",
   "settings.language": "Interface language",
   "settings.language.hint": "Applies instantly — no restart needed.",
   "settings.images": "Image import",
