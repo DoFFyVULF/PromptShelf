@@ -8,6 +8,8 @@ import { api } from "../lib/api";
 import type { AppSettings, Lang, LibraryPaths, Theme } from "../lib/types";
 import { Dialog } from "./Dialog";
 import { useToast } from "./Toasts";
+import { SegmentedControl } from "./SegmentedControl";
+import { RollingNumber } from "./RollingNumber";
 import { UpdateDialog } from "./UpdateDialog";
 
 interface SettingsDialogProps {
@@ -203,28 +205,37 @@ export function SettingsDialog({ open, settings, paths, lang, onLang, theme, onT
                 <p className="mt-0.5 text-[11.5px] text-faint">{t("settings.theme.hint")}</p>
               </div>
               <div className="justify-self-end">
-                <div className="flex rounded-full border border-hairline bg-card p-0.5" role="group" aria-label={t("settings.theme")}>
-                  {(["light", "dark", "system"] as const).map((v) => {
-                    const active = theme === v;
-                    return (
-                      <button
-                        key={v}
-                        type="button"
-                        onClick={() => onTheme(v)}
-                        aria-pressed={active}
-                        aria-label={t(`settings.theme.${v}`)}
-                        title={t(`settings.theme.${v}`)}
-                        className={`press flex h-7 w-9 cursor-pointer items-center justify-center rounded-full transition-colors ${
-                          active ? "bg-ink text-on-ink" : "text-muted hover:text-ink"
-                        }`}
-                      >
-                        {v === "light" && <Sun size={14} strokeWidth={2} />}
-                        {v === "dark" && <Moon size={14} strokeWidth={2} />}
-                        {v === "system" && <Monitor size={14} strokeWidth={2} />}
-                      </button>
-                    );
-                  })}
-                </div>
+                <SegmentedControl
+                  id="theme"
+                  ariaLabel={t("settings.theme")}
+                  value={theme}
+                  onChange={(v) => onTheme(v as Theme)}
+                  options={[
+                    {
+                      value: "light",
+                      label: t("settings.theme.light"),
+                      className: "w-9",
+                      // the sun rolls back up, like a sunrise
+                      enter: { rotate: -120, scale: 0.55, opacity: 0 },
+                      content: <Sun size={14} strokeWidth={2} />
+                    },
+                    {
+                      value: "dark",
+                      label: t("settings.theme.dark"),
+                      className: "w-9",
+                      // the moon rolls in the opposite direction
+                      enter: { rotate: 120, scale: 0.55, opacity: 0 },
+                      content: <Moon size={14} strokeWidth={2} />
+                    },
+                    {
+                      value: "system",
+                      label: t("settings.theme.system"),
+                      className: "w-9",
+                      enter: { y: 9, scale: 0.55, opacity: 0 },
+                      content: <Monitor size={14} strokeWidth={2} />
+                    }
+                  ]}
+                />
               </div>
             </div>
 
@@ -234,21 +245,21 @@ export function SettingsDialog({ open, settings, paths, lang, onLang, theme, onT
                 <p className="mt-0.5 text-[11.5px] text-faint">{t("settings.language.hint")}</p>
               </div>
               <div className="justify-self-end">
-                <div className="flex rounded-full border border-hairline bg-card p-0.5" role="group" aria-label={t("nav.language")}>
-                  {(["en", "ru"] as const).map((l) => (
-                    <button
-                      key={l}
-                      type="button"
-                      onClick={() => onLang(l)}
-                      aria-pressed={lang === l}
-                      className={`press h-7 cursor-pointer rounded-full px-3 text-[11.5px] font-semibold tracking-wide transition-colors ${
-                        lang === l ? "bg-ink text-on-ink" : "text-muted hover:text-ink"
-                      }`}
-                    >
-                      {l === "en" ? "EN" : "РУ"}
-                    </button>
-                  ))}
-                </div>
+                <SegmentedControl
+                  id="lang"
+                  ariaLabel={t("nav.language")}
+                  value={lang}
+                  onChange={(v) => onLang(v as Lang)}
+                  options={(["en", "ru"] as const).map((l) => ({
+                    value: l,
+                    label: l.toUpperCase(),
+                    // the letters flip over, like a split-flap departures board
+                    enter: { rotateX: -82, y: 2, scale: 0.9, opacity: 0, transformPerspective: 420 },
+                    content: (
+                      <span className="text-[11.5px] font-semibold tracking-wide">{l === "en" ? "EN" : "РУ"}</span>
+                    )
+                  }))}
+                />
               </div>
             </div>
           </div>
@@ -279,7 +290,9 @@ export function SettingsDialog({ open, settings, paths, lang, onLang, theme, onT
               <div>
                 <label className="block text-[13.5px] font-medium text-ink">
                   {t("settings.quality")}
-                  <span className="ml-2 text-[12px] font-normal text-faint">{draft.quality}%</span>
+                  <span className="ml-2 text-[12px] font-normal text-faint">
+                    <RollingNumber value={draft.quality} />
+                  </span>
                 </label>
                 <input
                   type="range"
@@ -295,21 +308,21 @@ export function SettingsDialog({ open, settings, paths, lang, onLang, theme, onT
                 />
               </div>
               <div className="justify-self-end">
-                <div className="flex rounded-full border border-hairline bg-card p-0.5">
-                  {(["jpeg", "webp"] as const).map((f) => (
-                    <button
-                      key={f}
-                      type="button"
-                      onClick={() => update({ format: f })}
-                      aria-pressed={draft.format === f}
-                      className={`press h-7 cursor-pointer rounded-full px-3 text-[11.5px] font-semibold transition-colors ${
-                        draft.format === f ? "bg-ink text-on-ink" : "text-muted hover:text-ink"
-                      }`}
-                    >
-                      {f.toUpperCase()}
-                    </button>
-                  ))}
-                </div>
+                <SegmentedControl
+                  id="format"
+                  ariaLabel={t("settings.quality")}
+                  value={draft.format}
+                  onChange={(v) => update({ format: v as AppSettings["format"] })}
+                  options={(["jpeg", "webp"] as const).map((f) => ({
+                    value: f,
+                    label: f.toUpperCase(),
+                    // a quick pop, like a camera shutter picking its film
+                    enter: { scale: 0.45, opacity: 0 },
+                    content: (
+                      <span className="text-[11.5px] font-semibold tracking-wide">{f.toUpperCase()}</span>
+                    )
+                  }))}
+                />
               </div>
             </div>
 
