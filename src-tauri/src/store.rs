@@ -1,3 +1,4 @@
+use crate::dedup;
 use crate::models::{app_settings_default, es, AppSettings, SettingsPatch};
 use rusqlite::{Connection, OptionalExtension};
 use std::path::Path;
@@ -16,7 +17,9 @@ CREATE TABLE IF NOT EXISTS cards (
     group_id TEXT,
     author TEXT,
     checkpoint TEXT,
-    meta_json TEXT NOT NULL DEFAULT '[]'
+    meta_json TEXT NOT NULL DEFAULT '[]',
+    source_key TEXT,
+    text_hash TEXT
 );
 CREATE TABLE IF NOT EXISTS groups (
     id TEXT PRIMARY KEY,
@@ -69,8 +72,13 @@ pub fn init_schema(conn: &Connection) -> Result<(), String> {
     conn.execute_batch(SCHEMA).map_err(es)?;
     ensure_columns(conn)?;
     // after ensure_columns: the index needs the migrated column to exist
-    conn.execute_batch("CREATE INDEX IF NOT EXISTS idx_cards_group ON cards(group_id);")
-        .map_err(es)?;
+    dedup::backfill_once(conn);
+    conn.execute_batch(
+        "CREATE INDEX IF NOT EXISTS idx_cards_group ON cards(group_id);
+         CREATE INDEX IF NOT EXISTS idx_cards_source_key ON cards(source_key) WHERE source_key IS NOT NULL;
+         CREATE INDEX IF NOT EXISTS idx_cards_text_hash ON cards(text_hash) WHERE text_hash IS NOT NULL;",
+    )
+    .map_err(es)?;
     default_group_id(conn).map(|_| ())
 }
 
@@ -108,6 +116,12 @@ fn ensure_columns(conn: &Connection) -> Result<(), String> {
     if !names.iter().any(|n| n == "meta_json") {
         conn.execute("ALTER TABLE cards ADD COLUMN meta_json TEXT NOT NULL DEFAULT '[]'", [])
             .map_err(es)?;
+    }
+    if !names.iter().any(|n| n == "source_key") {
+        conn.execute("ALTER TABLE cards ADD COLUMN source_key TEXT", []).map_err(es)?;
+    }
+    if !names.iter().any(|n| n == "text_hash") {
+        conn.execute("ALTER TABLE cards ADD COLUMN text_hash TEXT", []).map_err(es)?;
     }
     Ok(())
 }

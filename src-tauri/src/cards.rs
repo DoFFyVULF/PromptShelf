@@ -1,3 +1,4 @@
+use crate::dedup;
 use crate::images::{self, ImportSettings};
 use crate::models::{
     es, CardDetail, CardSummary, GroupInfo, ImageInfo, ListFilter, Lora, MoveCardsInput, NewCardInput, NewGroupInput,
@@ -402,6 +403,8 @@ pub fn create_card_inner(dir: &Path, input: NewCardInput) -> Result<CardDetail, 
     let author = input.author.as_deref().map(str::trim).filter(|s| !s.is_empty()).map(|s| s.to_string());
     let checkpoint = input.checkpoint.as_deref().map(str::trim).filter(|s| !s.is_empty()).map(|s| s.to_string());
     let meta = meta_json(&input.meta);
+    let source_key = input.source_key.as_deref().map(str::trim).filter(|s| !s.is_empty()).map(|s| s.to_string());
+    let text_hash = dedup::text_fingerprint(&prompt);
 
     let group_id = match input.group_id.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
         Some(g) => {
@@ -416,9 +419,9 @@ pub fn create_card_inner(dir: &Path, input: NewCardInput) -> Result<CardDetail, 
     };
 
     conn.execute(
-        "INSERT INTO cards(id, prompt, negative_prompt, note, rating, created_at, updated_at, loras, group_id, author, checkpoint, meta_json)
-         VALUES(?1,?2,?3,?4,?5,?6,?6,?7,?8,?9,?10,?11)",
-        params![id, prompt, negative_prompt, note, rating, ts, loras, group_id, author, checkpoint, meta],
+        "INSERT INTO cards(id, prompt, negative_prompt, note, rating, created_at, updated_at, loras, group_id, author, checkpoint, meta_json, source_key, text_hash)
+         VALUES(?1,?2,?3,?4,?5,?6,?6,?7,?8,?9,?10,?11,?12,?13)",
+        params![id, prompt, negative_prompt, note, rating, ts, loras, group_id, author, checkpoint, meta, source_key, text_hash],
     )
     .map_err(es)?;
 
@@ -462,10 +465,12 @@ pub fn update_card_inner(dir: &Path, input: UpdateCardInput) -> Result<(), Strin
     let checkpoint = input.checkpoint.as_deref().map(str::trim).filter(|s| !s.is_empty()).map(|s| s.to_string());
     let meta = meta_json(&input.meta);
     let negative_prompt = input.negative_prompt.trim().to_string();
+    // re-fingerprint on edit; the origin key stays as it was set on create
+    let text_hash = dedup::text_fingerprint(&prompt);
 
     conn.execute(
-        "UPDATE cards SET prompt = ?1, negative_prompt = ?2, note = ?3, rating = ?4, loras = ?5, author = ?6, checkpoint = ?7, meta_json = ?8, updated_at = ?9 WHERE id = ?10",
-        params![prompt, negative_prompt, note, rating, loras, author, checkpoint, meta, now(), input.id],
+        "UPDATE cards SET prompt = ?1, negative_prompt = ?2, note = ?3, rating = ?4, loras = ?5, author = ?6, checkpoint = ?7, meta_json = ?8, text_hash = ?9, updated_at = ?10 WHERE id = ?11",
+        params![prompt, negative_prompt, note, rating, loras, author, checkpoint, meta, text_hash, now(), input.id],
     )
     .map_err(es)?;
 

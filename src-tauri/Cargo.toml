@@ -28,6 +28,8 @@ zip = { version = "2", default-features = false, features = ["deflate"] }
 kamadak-exif = "0.6"
 base64 = "0.22"
 ureq = { version = "2", features = ["gzip"] }
+sha2 = "0.10"
+unicode-normalization = "0.1"
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
 

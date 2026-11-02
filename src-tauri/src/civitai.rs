@@ -387,6 +387,9 @@ fn votable_tags(agent: &ureq::Agent, api_key: Option<&str>, image_id: &str) -> V
 
 fn run(data_dir: &std::path::Path, url: &str) -> Result<CivitaiImport, String> {
     let (kind, id) = parse_link(url)?;
+    // exact duplicate origin: re-importing the same link later is detected
+    // before the image is even downloaded
+    let source_key = crate::dedup::civitai_key(kind, &id);
     let agent = agent();
     let api_key: String = crate::store::open(data_dir)
         .and_then(|c| crate::store::read_settings(&c))
@@ -523,6 +526,7 @@ fn run(data_dir: &std::path::Path, url: &str) -> Result<CivitaiImport, String> {
         loras,
         tags,
         meta: meta_rows,
+        source_key: Some(source_key),
     })
 }
 
@@ -547,6 +551,14 @@ pub async fn civitai_import(
         Ok(res) => res,
         Err(e) => Err(format!("CIVITAI_NETWORK: {}", es(e))),
     }
+}
+
+/// Parse-only duplicate pre-check: turns a pasted CivitAI link into its
+/// origin key without any network traffic. Returns None for non-CivitAI
+/// links, which simply opt out of duplicate detection.
+#[tauri::command]
+pub fn civitai_source_key(url: String) -> Option<String> {
+    parse_link(&url).map(|(kind, id)| crate::dedup::civitai_key(kind, &id)).ok()
 }
 
 #[cfg(test)]

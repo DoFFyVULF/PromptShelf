@@ -52,6 +52,7 @@ fn test_card_crud_cover_and_loras() {
         author: None,
         checkpoint: None,
         meta: vec![],
+        source_key: None,
     };
 
     let detail = create_card_inner(&dir, input).unwrap();
@@ -219,6 +220,7 @@ fn test_add_image_sets_cover_and_sort() {    let dir = tmp_dir("addimg");
             author: None,
             checkpoint: None,
             meta: vec![],
+            source_key: None,
         },
     )
     .unwrap();
@@ -286,6 +288,7 @@ fn test_groups_crud_move_and_default() {
             author: None,
             checkpoint: None,
             meta: vec![],
+            source_key: None,
         },
     )
     .unwrap();

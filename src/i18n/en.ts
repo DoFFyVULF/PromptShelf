@@ -51,6 +51,12 @@ export const en = {
   "import.civitai.title": "Import from CivitAI",
   "import.civitai.hint": "Paste a link to an image page on civitai.com or civitai.red",
   "import.civitai.placeholder": "https://civitai.com/images/…",
+
+  "dup.title": "Duplicate prompt",
+  "dup.hint": "Already in your library:",
+  "dup.open": "Open existing",
+  "dup.anyway": "Add anyway",
+  "dup.proceed": "Import anyway",
   "import.civitai.go": "Import",
   "import.civitai.busy": "Fetching from CivitAI…",
   "import.civitai.errorUrl": "That doesn't look like a CivitAI image link",

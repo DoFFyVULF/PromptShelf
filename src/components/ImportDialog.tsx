@@ -33,6 +33,9 @@ export function ImportDialog({ open, onClose, onImport }: ImportDialogProps) {
     setError(null);
     try {
       await onImport(v);
+      // the import flow may resolve while a duplicate dialog holds the window;
+      // unblock the form so "cancel"/edit stays possible in that case
+      setBusy(false);
     } catch (e) {
       const msg = String(e);
       setError(

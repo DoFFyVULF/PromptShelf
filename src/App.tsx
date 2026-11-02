@@ -7,6 +7,7 @@ import type {
   CardDetail as CardDetailData,
   CardSummary,
   CivitaiImport,
+  DuplicateHit,
   GroupInfo,
   Lang,
   LibraryPaths,
@@ -27,6 +28,7 @@ import { GroupsPanel } from "./components/GroupsPanel";
 import { TagsDialog } from "./components/TagsDialog";
 import { ToastProvider, useToast } from "./components/Toasts";
 import { ScrollTopButton } from "./components/ScrollTopButton";
+import { DuplicateDialog } from "./components/DuplicateDialog";
 import { CornerDownRight, ListChecks, X } from "lucide-react";
 
 function Shell() {
@@ -65,6 +67,11 @@ function Shell() {
   const [staged, setStaged] = useState<StagedImage[]>([]);
 
   const [importOpen, setImportOpen] = useState(false);
+  // duplicate warning state for the CivitAI import flow; pendingDupUrl keeps
+  // the link that was interrupted by the dialog so "continue" can resume it
+  const [dupHits, setDupHits] = useState<DuplicateHit[] | null>(null);
+  const pendingDupUrl = useRef<string | null>(null);
+  const dupBypassRef = useRef(false);
   // prefill for the editor after a CivitAI fetch (prompt/author/…)
   const [civImport, setCivImport] = useState<Omit<CivitaiImport, "image"> | null>(null);
 
@@ -320,13 +327,18 @@ function Shell() {
     }
   }, []);
 
-  // CivitAI import flow: fetch in the backend, stage the downloaded photo
-  // like a paste, then prefill the editor with prompt/author/LoRAs/tags/meta.
-  const runCivitaiImport = useCallback(async (url: string) => {
+  // CivitAI import flow: the link is resolved to its origin key first and
+  // checked against the library BEFORE anything is downloaded; the fetch,
+  // staging like a paste, and the editor prefill follow (prompt/author/…).
+  const startCivitaiImport = useCallback(async (url: string) => {
     const res = await api.civitaiImport(url);
     const entry = { path: res.image.temp_path, preview: res.image.preview };
     setStaged([entry]);
     stagedRef.current = [entry];
+    // warned: the user already approved adding this duplicate upstream, so the
+    // editor skips its own duplicate gate for this card
+    const warned = dupBypassRef.current || undefined;
+    dupBypassRef.current = false;
     setCivImport({
       prompt: res.prompt,
       negative_prompt: res.negative_prompt,
@@ -334,12 +346,30 @@ function Shell() {
       checkpoint: res.checkpoint,
       loras: res.loras,
       tags: res.tags,
-      meta: res.meta
+      meta: res.meta,
+      source_key: res.source_key,
+      warned
     });
     setImportOpen(false);
     setEditorCard(null);
     setEditorOpen(true);
   }, []);
+
+  const runCivitaiImport = useCallback(
+    async (url: string) => {
+      const sk = await api.civitaiSourceKey(url).catch(() => null);
+      if (sk) {
+        const hits = await api.checkDuplicates({ source_key: sk });
+        if (hits.length > 0) {
+          pendingDupUrl.current = url;
+          setDupHits(hits);
+          return;
+        }
+      }
+      await startCivitaiImport(url);
+    },
+    [startCivitaiImport]
+  );
 
   const pasteGlobally = useCallback(async () => {    try {
       const res = await api.pasteImageFromClipboard();
@@ -690,6 +720,10 @@ function Shell() {
           imported={civImport}
           onClose={closeEditor}
           onSaved={(d) => void onEditorSaved(d)}
+          onOpenExisting={(id) => {
+            closeEditor();
+            setDetailId(id);
+          }}
         />
       )}
 
@@ -710,6 +744,30 @@ function Shell() {
         open={importOpen}
         onClose={() => setImportOpen(false)}
         onImport={runCivitaiImport}
+      />
+      <DuplicateDialog
+        open={dupHits !== null}
+        hits={dupHits ?? []}
+        proceedKey="dup.proceed"
+        onProceed={() => {
+          const url = pendingDupUrl.current;
+          setDupHits(null);
+          pendingDupUrl.current = null;
+          if (url) {
+            dupBypassRef.current = true;
+            void startCivitaiImport(url).catch(() => undefined);
+          }
+        }}
+        onOpen={(id) => {
+          setDupHits(null);
+          pendingDupUrl.current = null;
+          setImportOpen(false);
+          setDetailId(id);
+        }}
+        onClose={() => {
+          setDupHits(null);
+          pendingDupUrl.current = null;
+        }}
       />
 
       {dragging && (

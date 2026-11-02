@@ -4,10 +4,11 @@ import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
 import { useI18n } from "../i18n";
 import { modKey } from "../lib/platform";
 import { api, assetUrl } from "../lib/api";
-import type { AppSettings, CardDetail, CivitaiImport, LoraItem, StagedImage } from "../lib/types";
+import type { AppSettings, CardDetail, CivitaiImport, DuplicateHit, LoraItem, StagedImage } from "../lib/types";
 import { Stars } from "./Stars";
 import { useToast } from "./Toasts";
 import { LoraEditor, applyLoraDraft, type LoraDraft } from "./LoraEditor";
+import { DuplicateDialog } from "./DuplicateDialog";
 
 export const IMAGE_EXTS = ["png", "jpg", "jpeg", "webp", "gif", "bmp", "tif", "tiff"];
 
@@ -21,9 +22,11 @@ interface EditorProps {
   imported?: Omit<CivitaiImport, "image"> | null;
   onClose: () => void;
   onSaved: (detail: CardDetail) => void;
+  /** Shown in the duplicate dialog: jump to the already-stored card. */
+  onOpenExisting?: (id: string) => void;
 }
 
-export function Editor({ card, staged, onStaged, settings, groupId, imported, onClose, onSaved }: EditorProps) {
+export function Editor({ card, staged, onStaged, settings, groupId, imported, onClose, onSaved, onOpenExisting }: EditorProps) {
   const { t } = useI18n();
   const { toast } = useToast();
 
@@ -43,6 +46,9 @@ export function Editor({ card, staged, onStaged, settings, groupId, imported, on
   const [saving, setSaving] = useState(false);
   const [importing, setImporting] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  // duplicate warning for the new-card flow (`null` = dialog hidden)
+  const [dupHits, setDupHits] = useState<DuplicateHit[] | null>(null);
+  const dupProceedRef = useRef(false);
 
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const busyRef = useRef(false);
@@ -212,6 +218,19 @@ export function Editor({ card, staged, onStaged, settings, groupId, imported, on
         const fresh = await api.getCard(card.id);
         onSaved(fresh);
       } else {
+        const sourceKey = imported?.source_key ?? null;
+        // duplicate gate: warn before creating; either the CivitAI origin key
+        // (an exact "same link" match) or the normalized prompt text matches.
+        const alreadyWarned = dupProceedRef.current || Boolean(imported?.warned);
+        if (!alreadyWarned) {
+          const hits = await api.checkDuplicates({ prompt: prompt.trim(), source_key: sourceKey });
+          if (hits.length > 0) {
+            setDupHits(hits);
+            setSaving(false);
+            return;
+          }
+        }
+        dupProceedRef.current = false;
         const created = await api.createCard({
           prompt: prompt.trim(),
           negative_prompt: negativePrompt.trim(),
@@ -223,7 +242,8 @@ export function Editor({ card, staged, onStaged, settings, groupId, imported, on
           images: staged.map((s) => s.path),
           author: author.trim() || null,
           checkpoint: checkpoint.trim() || null,
-          meta
+          meta,
+          source_key: sourceKey
         });
         onSaved(created);
       }
@@ -232,7 +252,7 @@ export function Editor({ card, staged, onStaged, settings, groupId, imported, on
       toast(msg.includes("PROMPT_REQUIRED") ? t("toast.promptRequired") : t("toast.error"), "error");
       setSaving(false);
     }
-  }, [card, groupId, loras, loraDraft, note, onSaved, prompt, negativePrompt, rating, removed, staged, t, tags, toast, author, checkpoint, meta]);
+  }, [card, groupId, loras, loraDraft, note, onSaved, prompt, negativePrompt, rating, removed, staged, t, tags, toast, author, checkpoint, meta, imported]);
 
   const existing = (card?.images ?? []).filter((i) => !removed.includes(i.id));
   const hasImages = existing.length > 0 || staged.length > 0;
@@ -517,6 +537,19 @@ export function Editor({ card, staged, onStaged, settings, groupId, imported, on
           </div>
         </div>
       </div>
+
+      <DuplicateDialog
+        open={dupHits !== null}
+        hits={dupHits ?? []}
+        proceedKey={imported ? "dup.proceed" : "dup.anyway"}
+        onProceed={() => {
+          setDupHits(null);
+          dupProceedRef.current = true;
+          void save();
+        }}
+        onOpen={onOpenExisting ? (id) => onOpenExisting(id) : undefined}
+        onClose={() => setDupHits(null)}
+      />
     </div>
   );
 }

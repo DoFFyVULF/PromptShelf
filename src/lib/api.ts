@@ -4,6 +4,7 @@ import type {
   CardDetail,
   CardSummary,
   CivitaiImport,
+  DuplicateHit,
   GroupInfo,
   LibraryPaths,
   ListFilter,
@@ -56,6 +57,9 @@ export const api = {
   saveTempImage: (bytes: Uint8Array) => invoke<PasteImageResult | null>("save_temp_image", { bytes: Array.from(bytes) }),
   importDroppedFile: (name: string, base64: string) => invoke<PasteImageResult>("import_dropped_file", { input: { name, data: base64 } }),
   civitaiImport: (url: string) => invoke<CivitaiImport>("civitai_import", { url }),
+  civitaiSourceKey: (url: string) => invoke<string | null>("civitai_source_key", { url }),
+  checkDuplicates: (input: { prompt?: string | null; source_key?: string | null }) =>
+    invoke<DuplicateHit[]>("check_duplicates", { input }),
   previewImage: (path: string) => invoke<string>("preview_image", { path }),
   discardTemp: (path: string) => invoke<void>("discard_temp", { path }),
 

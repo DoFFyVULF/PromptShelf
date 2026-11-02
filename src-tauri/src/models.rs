@@ -94,6 +94,10 @@ pub struct NewCardInput {
     pub checkpoint: Option<String>,
     #[serde(default)]
     pub meta: Vec<MetaItem>,
+    /// Origin fingerprint from an import (e.g. `civitai:images:12`); used to
+    /// detect a duplicate link on the next import. Set on create only.
+    #[serde(default)]
+    pub source_key: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -209,6 +213,29 @@ pub struct CivitaiImport {
     pub loras: Vec<Lora>,
     pub tags: Vec<String>,
     pub meta: Vec<MetaItem>,
+    /// Origin fingerprint derived from the pasted link (civitai source id),
+    /// travels to the editor and is stored with the card on save.
+    #[serde(default)]
+    pub source_key: Option<String>,
+}
+
+/// Duplicate warning lookup input: check by origin key when provided,
+/// otherwise by the normalized prompt text.
+#[derive(Deserialize)]
+pub struct DuplicateCheckInput {
+    #[serde(default)]
+    pub prompt: Option<String>,
+    #[serde(default)]
+    pub source_key: Option<String>,
+}
+
+/// One existing card that matches a duplicate check.
+#[derive(Serialize, Clone)]
+pub struct DuplicateHit {
+    pub id: String,
+    pub created_at: String,
+    pub prompt: String,
+    pub thumb: Option<String>,
 }
 
 pub fn app_settings_default() -> AppSettings {

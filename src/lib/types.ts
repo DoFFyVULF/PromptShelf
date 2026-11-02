@@ -78,6 +78,8 @@ export interface NewCardInput {
   author: string | null;
   checkpoint: string | null;
   meta: MetaItem[];
+  /** Origin fingerprint for an imported card (dup detection). */
+  source_key?: string | null;
 }
 
 export interface UpdateCardInput {
@@ -139,6 +141,18 @@ export interface CivitaiImport {
   loras: LoraItem[];
   tags: string[];
   meta: MetaItem[];
+  /** Origin fingerprint from the pasted CivitAI link (dup detection). */
+  source_key?: string | null;
+  /** Frontend-only marker: the user already confirmed the duplicate upstream. */
+  warned?: boolean;
+}
+
+/** Existing card that matched a duplicate check for the dialog UI. */
+export interface DuplicateHit {
+  id: string;
+  created_at: string;
+  prompt: string;
+  thumb: string | null;
 }
 
 export interface StagedImage {

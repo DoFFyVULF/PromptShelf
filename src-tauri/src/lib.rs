@@ -1,5 +1,6 @@
 mod cards;
 mod civitai;
+mod dedup;
 mod images;
 mod models;
 mod store;
@@ -8,6 +9,8 @@ mod util;
 
 #[cfg(test)]
 mod tests_cards;
+#[cfg(test)]
+mod tests_dedup;
 #[cfg(test)]
 mod tests_images;
 
@@ -58,6 +61,8 @@ pub fn run() {
             cards::move_cards,
             images::import_dropped_file,
             civitai::civitai_import,
+            civitai::civitai_source_key,
+            dedup::check_duplicates,
             store::get_settings,
             store::set_settings,
             images::paste_image_from_clipboard,
