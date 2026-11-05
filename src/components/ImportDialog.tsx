@@ -1,56 +1,50 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CloudDownload, Loader2 } from "lucide-react";
+import { CloudDownload } from "lucide-react";
 import { useI18n } from "../i18n";
 import { Dialog, DialogCloseButton } from "./Dialog";
 
 interface ImportDialogProps {
   open: boolean;
   onClose: () => void;
-  /**
-   * Resolves when one import attempt ends: "created" → the card is saved and a
-   * receipt confirms it in the corner; "dup" → the duplicate dialog took over.
-   * Rejects with the backend error string.
-   */
-  onImport: (url: string) => Promise<"created" | "dup">;
+  /** Hands the link(s) to the background runner; never blocks the form. */
+  onSubmit: (url: string) => void;
 }
 
-type ImportError = "url" | "notfound" | "generic";
+/** More than this many links in one paste is almost certainly an accident. */
+const MAX_LINKS_PER_PASTE = 10;
 
-export function ImportDialog({ open, onClose, onImport }: ImportDialogProps) {
+/** Extract every URL in the paste; fall back to the raw text so the real
+ * validation error ("that's not a CivitAI link") still surfaces in the grid. */
+function parseLinks(raw: string): string[] {
+  const text = raw.trim();
+  if (!text) return [];
+  const matches = text.match(/https?:\/\/\S+/g);
+  if (!matches) return [text];
+  const unique = [...new Set(matches.map((m) => m.replace(/[),.;]+$/, "")))];
+  return unique.slice(0, MAX_LINKS_PER_PASTE);
+}
+
+export function ImportDialog({ open, onClose, onSubmit }: ImportDialogProps) {
   const { t } = useI18n();
   const [url, setUrl] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<ImportError | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!open) return;
-    setError(null);
-    setBusy(false);
     window.setTimeout(() => inputRef.current?.focus(), 60);
   }, [open]);
 
-  /** Enters the next import: the create happens in the background, so the form
-   * clears on success while the window stays open for the following link. */
-  const submit = useCallback(async () => {
-    const v = url.trim();
-    if (!v || busy) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const outcome = await onImport(v);
-      if (outcome === "created") setUrl("");
-      // the import may park on the duplicate dialog while the window stays up;
-      // unblock the form so "cancel"/edit stays possible in that case
-      setBusy(false);
-    } catch (e) {
-      const msg = String(e);
-      setError(
-        msg.includes("CIVITAI_URL") ? "url" : msg.includes("CIVITAI_NOT_FOUND") || msg.includes("CIVITAI_NO_IMAGE") ? "notfound" : "generic"
-      );
-      setBusy(false);
-    }
-  }, [busy, onImport, url]);
+  /** Submit is instant: links join the background queue and the field clears
+   * for the next paste — the dialog stays open, while the import itself
+   * happens out in the library: placeholder tiles morph into the real cards
+   * right in the grid. */
+  const submit = useCallback(() => {
+    const links = parseLinks(url);
+    if (links.length === 0) return;
+    for (const link of links) onSubmit(link);
+    setUrl("");
+    window.setTimeout(() => inputRef.current?.focus(), 0);
+  }, [onSubmit, url]);
 
   return (
     <Dialog open={open} onClose={onClose} labelledBy="import-title" width={560}>
@@ -65,7 +59,7 @@ export function ImportDialog({ open, onClose, onImport }: ImportDialogProps) {
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          void submit();
+          submit();
         }}
       >
         <div className="space-y-4 px-7 pt-2 pb-1">
@@ -74,40 +68,17 @@ export function ImportDialog({ open, onClose, onImport }: ImportDialogProps) {
             ref={inputRef}
             type="text"
             value={url}
-            onChange={(e) => {
-              setUrl(e.target.value);
-              if (error) setError(null);
-            }}
+            onChange={(e) => setUrl(e.target.value)}
             placeholder={t("import.civitai.placeholder")}
             spellCheck={false}
-            disabled={busy}
             className="field select-text"
           />
-          {error ? (
-            <p
-              role="alert"
-              className={`text-[12.5px] leading-relaxed ${
-                error === "notfound" ? "text-body" : "text-destructive"
-              }`}
-            >
-              {error === "url"
-                ? t("import.civitai.errorUrl")
-                : error === "notfound"
-                  ? t("import.civitai.errorNotFound")
-                  : t("import.civitai.errorGeneric")}
-            </p>
-          ) : (
-            <span aria-hidden className="block h-[18px]" />
-          )}
         </div>
 
         <div className="flex items-center justify-end gap-2 border-t border-line-soft px-7 py-4">
-          <button type="button" className="btn-ghost press cursor-pointer" onClick={onClose} disabled={busy}>
-            {t("action.cancel")}
-          </button>
-          <button type="submit" className="btn-primary press min-w-[104px] cursor-pointer" disabled={!url.trim() || busy}>
-            {busy ? <Loader2 size={14} className="spin" /> : <CloudDownload size={14.5} strokeWidth={2} />}
-            {busy ? t("import.civitai.busy") : t("import.civitai.go")}
+          <button type="submit" className="btn-primary press min-w-[104px] cursor-pointer" disabled={!url.trim()}>
+            <CloudDownload size={14.5} strokeWidth={2} />
+            {t("import.civitai.go")}
           </button>
         </div>
       </form>

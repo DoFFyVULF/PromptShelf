@@ -56,6 +56,9 @@ export const ru: Record<DictKey, string> = {
   "import.receipt.ok": "Импортировано",
   "import.receipt.undo": "Отменить импорт",
   "import.receipt.undo.short": "Отменить",
+  "import.jobs.running": "Загружаем из CivitAI…",
+  "import.jobs.dup": "Возможный дубликат",
+  "import.jobs.remove": "Скрыть",
 
   "dup.title": "Такой промпт уже есть",
   "dup.hint": "Совпадения в вашей библиотеке:",
@@ -63,7 +66,6 @@ export const ru: Record<DictKey, string> = {
   "dup.anyway": "Всё равно добавить",
   "dup.proceed": "Всё равно скачать",
   "import.civitai.go": "Импортировать",
-  "import.civitai.busy": "Загружаем из CivitAI…",
   "import.civitai.errorUrl": "Похоже, это не ссылка на изображение CivitAI",
   "import.civitai.errorNotFound": "Не удалось получить изображение. Возможно, оно скрыто региональными или возрастными ограничениями — добавьте API-ключ CivitAI в настройках.",
   "import.civitai.errorGeneric": "Не удалось загрузить. Проверьте ссылку или подключение.",

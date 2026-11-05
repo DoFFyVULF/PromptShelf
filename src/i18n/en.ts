@@ -54,6 +54,9 @@ export const en = {
   "import.receipt.ok": "Imported",
   "import.receipt.undo": "Undo import",
   "import.receipt.undo.short": "Undo",
+  "import.jobs.running": "Fetching from CivitAI…",
+  "import.jobs.dup": "Possible duplicate",
+  "import.jobs.remove": "Dismiss",
 
   "dup.title": "Duplicate prompt",
   "dup.hint": "Already in your library:",
@@ -61,7 +64,6 @@ export const en = {
   "dup.anyway": "Add anyway",
   "dup.proceed": "Import anyway",
   "import.civitai.go": "Import",
-  "import.civitai.busy": "Fetching from CivitAI…",
   "import.civitai.errorUrl": "That doesn't look like a CivitAI image link",
   "import.civitai.errorNotFound": "Couldn't fetch this image. It may be hidden by region or age restrictions — add a CivitAI API key in Settings.",
   "import.civitai.errorGeneric": "Something went wrong while fetching. Check the link or your connection.",

@@ -273,6 +273,27 @@ body {
   animation: spin 0.9s linear infinite;
 }
 
+/* CivitAI import placeholder: a light sweep glides over the dormant cover
+   while the link is being fetched */
+@keyframes import-sweep {
+  from {
+    transform: translateX(-130%);
+  }
+  to {
+    transform: translateX(130%);
+  }
+}
+.import-sweep {
+  position: absolute;
+  inset: 0;
+  transform: translateX(-130%);
+  background: linear-gradient(100deg, transparent 25%, rgb(255 255 255 / 0.55) 50%, transparent 75%);
+  animation: import-sweep 1.6s var(--ease-apple) infinite;
+}
+.dark .import-sweep {
+  background: linear-gradient(100deg, transparent 25%, rgb(255 255 255 / 0.08) 50%, transparent 75%);
+}
+
 /* Import from CivitAI: reveals below the New Prompt button on hover with a
    spring overshoot. The wrapper's padding keeps the cursor connected across
    the gap so the highlight doesn't flicker off. */
@@ -281,7 +302,9 @@ body {
   .anim-fade,
   .anim-panel,
   .anim-toast,
-  .spin {
+  .spin,
+  .import-sweep,
+  .animate-pulse {
     animation: none !important;
   }
 }

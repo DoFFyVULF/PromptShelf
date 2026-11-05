@@ -1,7 +1,9 @@
 import { useState } from "react";
-import { Images, Star } from "lucide-react";
+import { AnimatePresence } from "motion/react";
+import { ImageOff, Images, Star } from "lucide-react";
 import { useI18n } from "../i18n";
 import { assetUrl } from "../lib/api";
+import { ImportJobTile, type ImportJob } from "./ImportJobs";
 import type { CardSummary } from "../lib/types";
 
 /** dataTransfer type used when dragging cards onto the groups panel. */
@@ -9,6 +11,10 @@ export const CARD_DRAG_TYPE = "application/x-promptshelf-cards";
 
 interface GridProps {
   cards: CardSummary[];
+  /** Background CivitAI imports: placeholder tiles before the real cards. */
+  jobs: ImportJob[];
+  onJobRetry: (job: ImportJob) => void;
+  onJobDismiss: (id: string) => void;
   onOpen: (id: string) => void;
   selectMode: boolean;
   selection: string[];
@@ -247,10 +253,9 @@ function CardTile({
               className="no-drag h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
             />
           ) : (
-            <div className="flex h-full w-full items-center justify-center">
-              <span className="max-w-[85%] px-3 text-center text-[12px] leading-snug text-faint line-clamp-3">
-                {card.prompt}
-              </span>
+            <div className="flex h-full w-full flex-col items-center justify-center gap-3 text-faint">
+              <ImageOff size={40} strokeWidth={1.2} />
+              <span className="text-[13px]">{t("detail.noImages")}</span>
             </div>
           )}
           {card.image_count > 1 && (
@@ -300,9 +305,14 @@ function CardTile({
   );
 }
 
-export function CardGrid({ cards, onOpen, selectMode, selection, onToggleSelect }: GridProps) {
+export function CardGrid({ cards, jobs, onJobRetry, onJobDismiss, onOpen, selectMode, selection, onToggleSelect }: GridProps) {
   return (
     <div className="grid grid-cols-[repeat(auto-fill,minmax(236px,1fr))] gap-4 px-5 pt-5 pb-10">
+      <AnimatePresence mode="popLayout">
+        {jobs.map((job) => (
+          <ImportJobTile key={job.id} job={job} onRetry={onJobRetry} onDismiss={onJobDismiss} />
+        ))}
+      </AnimatePresence>
       {cards.map((card, i) => (
         <CardTile
           key={card.id}

@@ -25,6 +25,7 @@ import { CardDetail } from "./components/CardDetail";
 import { Editor } from "./components/Editor";
 import { ImportDialog } from "./components/ImportDialog";
 import { ImportReceipts, type ImportReceipt } from "./components/ImportReceipts";
+import { importErrorToKey, type ImportJob } from "./components/ImportJobs";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { GroupsPanel } from "./components/GroupsPanel";
 import { TagsDialog } from "./components/TagsDialog";
@@ -83,10 +84,14 @@ function Shell() {
 
   const [importOpen, setImportOpen] = useState(false);
   // duplicate warning state for the CivitAI import flow; pendingDup keeps the
-  // interrupted import — just the url when the link wasn't fetched yet, or the
+  // interrupted import — just the job when the link wasn't fetched yet, or the
   // full fetched result — so "continue" can resume without a second download
   const [dupHits, setDupHits] = useState<DuplicateHit[] | null>(null);
-  const pendingDup = useRef<{ url: string; pre: CivitaiImport | null } | null>(null);
+  const pendingDup = useRef<{ jobId: string; url: string; pre: CivitaiImport | null } | null>(null);
+  // background CivitAI imports: every submitted link parks a placeholder tile
+  // in the grid until it lands on a card or fails — several run at once
+  const [jobs, setJobs] = useState<ImportJob[]>([]);
+  const jobSeq = useRef(0);
   // floating confirmations for auto-imported cards (photo + prompt head;
   // undo appears on hover), newest first
   const [receipts, setReceipts] = useState<ImportReceipt[]>([]);
@@ -412,31 +417,75 @@ function Shell() {
     [groupId, loadCards, pushReceipt]
   );
 
-  const runCivitaiImport = useCallback(
-    async (url: string): Promise<"created" | "dup"> => {
-      const sk = await api.civitaiSourceKey(url).catch(() => null);
-      if (sk) {
-        const hits = await api.checkDuplicates({ source_key: sk });
-        if (hits.length > 0) {
-          pendingDup.current = { url, pre: null };
-          setDupHits(hits);
-          return "dup";
+  // --------------------------------------------------------- import jobs
+
+  const updateJob = useCallback((id: string, patch: Partial<ImportJob>) => {
+    setJobs((prev) => prev.map((j) => (j.id === id ? { ...j, ...patch } : j)));
+  }, []);
+
+  const removeJob = useCallback((id: string) => {
+    setJobs((prev) => prev.filter((j) => j.id !== id));
+  }, []);
+
+  /** Runs the import chain in the background: the caller returns at once, so
+   * several links can download concurrently. The link's placeholder tile sits
+   * at the top of the grid until the card is saved or the fetch fails. */
+  const startCivitaiImport = useCallback(
+    async (url: string): Promise<void> => {
+      const v = url.trim();
+      if (!v) return;
+      jobSeq.current += 1;
+      const id = `civitai-job-${jobSeq.current}`;
+      setJobs((prev) => [...prev, { id, url: v, status: "running" }]);
+      try {
+        const sk = await api.civitaiSourceKey(v).catch(() => null);
+        if (sk) {
+          const hits = await api.checkDuplicates({ source_key: sk });
+          if (hits.length > 0) {
+            // park the job; the duplicate dialog picks it up (or queues it
+            // behind one that's already on screen)
+            updateJob(id, { status: "dup", hits, pre: null });
+            return;
+          }
         }
+        const res = await api.civitaiImport(v);
+        // same-prompt-different-link protection: warn before creating; the
+        // job keeps the full result, so "continue" doesn't re-download
+        const hits = await api.checkDuplicates({ prompt: res.prompt, source_key: res.source_key ?? null });
+        if (hits.length > 0) {
+          updateJob(id, { status: "dup", hits, pre: res });
+          return;
+        }
+        await createFromImport(res);
+        // stamp "done" for a beat, then dissolve under the freshly loaded card
+        updateJob(id, { status: "done", hits: undefined, pre: undefined });
+        window.setTimeout(() => removeJob(id), 900);
+      } catch (e) {
+        updateJob(id, { status: "error", error: importErrorToKey(String(e)) });
       }
-      const res = await api.civitaiImport(url);
-      // same-prompt-different-link protection: warn before creating; the
-      // dialog keeps the full result, so "continue" doesn't re-download
-      const hits = await api.checkDuplicates({ prompt: res.prompt, source_key: res.source_key ?? null });
-      if (hits.length > 0) {
-        pendingDup.current = { url, pre: res };
-        setDupHits(hits);
-        return "dup";
-      }
-      await createFromImport(res);
-      return "created";
     },
-    [createFromImport]
+    [createFromImport, removeJob, updateJob]
   );
+
+  const retryJob = useCallback(
+    (job: ImportJob) => {
+      removeJob(job.id);
+      void startCivitaiImport(job.url);
+    },
+    [removeJob, startCivitaiImport]
+  );
+
+  const dismissJob = useCallback((id: string) => removeJob(id), [removeJob]);
+
+  // while no duplicate dialog is up, promote the next parked duplicate job to
+  // it — several imports can hit duplicates while the dialog answered one
+  useEffect(() => {
+    if (dupHits !== null) return;
+    const queued = jobs.find((j) => j.status === "dup" && j.hits && j.hits.length > 0);
+    if (!queued || !queued.hits) return;
+    pendingDup.current = { jobId: queued.id, url: queued.url, pre: queued.pre ?? null };
+    setDupHits(queued.hits);
+  }, [dupHits, jobs]);
 
   const pasteGlobally = useCallback(async () => {    try {
       const res = await api.pasteImageFromClipboard();
@@ -632,7 +681,7 @@ function Shell() {
 
   // ---------------------------------------------------------------- render
 
-  const filterEmpty = !anyFilter && cards.length === 0 && !loading && !loadError;
+  const filterEmpty = !anyFilter && cards.length === 0 && jobs.length === 0 && !loading && !loadError;
 
   return (
     <div className="flex h-full flex-col">
@@ -688,7 +737,7 @@ function Shell() {
             onPaste={() => void pasteGlobally()}
             onClear={() => undefined}
           />
-        ) : cards.length === 0 && anyFilter ? (
+        ) : cards.length === 0 && anyFilter && jobs.length === 0 ? (
           <EmptyState hasFilters onNew={openEditorNew} onPaste={() => undefined} onClear={() => {
             setSelectedTags([]);
             setQuery("");
@@ -697,6 +746,9 @@ function Shell() {
         ) : (
           <CardGrid
             cards={cards}
+            jobs={jobs}
+            onJobRetry={(job) => retryJob(job)}
+            onJobDismiss={dismissJob}
             onOpen={openDetail}
             selectMode={selectMode}
             selection={selection}
@@ -818,7 +870,7 @@ function Shell() {
       <ImportDialog
         open={importOpen}
         onClose={() => setImportOpen(false)}
-        onImport={runCivitaiImport}
+        onSubmit={(url) => void startCivitaiImport(url)}
       />
       <DuplicateDialog
         open={dupHits !== null}
@@ -829,17 +881,21 @@ function Shell() {
           setDupHits(null);
           pendingDup.current = null;
           if (!p) return;
+          updateJob(p.jobId, { status: "running", hits: undefined, pre: undefined });
           void (async () => {
             // the user approved the duplicate — create it without further checks
             const res = p.pre ?? (await api.civitaiImport(p.url));
             await createFromImport(res);
-          })().catch(() => toast(t("toast.error"), "error"));
+            updateJob(p.jobId, { status: "done" });
+            window.setTimeout(() => removeJob(p.jobId), 900);
+          })().catch((e) => updateJob(p.jobId, { status: "error", error: importErrorToKey(String(e)) }));
         }}
         onOpen={(id) => {
           const p = pendingDup.current;
           if (p?.pre) void api.discardTemp(p.pre.image.temp_path).catch(() => undefined);
           setDupHits(null);
           pendingDup.current = null;
+          if (p) removeJob(p.jobId);
           setImportOpen(false);
           setDetailId(id);
         }}
@@ -849,6 +905,7 @@ function Shell() {
           if (p?.pre) void api.discardTemp(p.pre.image.temp_path).catch(() => undefined);
           setDupHits(null);
           pendingDup.current = null;
+          if (p) removeJob(p.jobId);
         }}
       />
 
