@@ -53,6 +53,7 @@ fn test_card_crud_cover_and_loras() {
         checkpoint: None,
         meta: vec![],
         source_key: None,
+        variants: vec![],
     };
 
     let detail = create_card_inner(&dir, input).unwrap();
@@ -133,6 +134,7 @@ fn test_card_crud_cover_and_loras() {
             author: Some("  SomeAuthor  ".to_string()),
             checkpoint: None,
             meta: vec![crate::models::MetaItem { k: "Seed".to_string(), v: "42".to_string() }],
+            variants: vec![],
         },
     )
     .unwrap();
@@ -221,6 +223,7 @@ fn test_add_image_sets_cover_and_sort() {    let dir = tmp_dir("addimg");
             checkpoint: None,
             meta: vec![],
             source_key: None,
+            variants: vec![],
         },
     )
     .unwrap();
@@ -289,6 +292,7 @@ fn test_groups_crud_move_and_default() {
             checkpoint: None,
             meta: vec![],
             source_key: None,
+            variants: vec![],
         },
     )
     .unwrap();
@@ -344,6 +348,97 @@ fn test_groups_crud_move_and_default() {
 
     // the default group cannot be deleted
     assert!(delete_group_inner(&dir, &default_id).is_err());
+
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn test_prompt_variants_roundtrip_and_search() {
+    let dir = tmp_dir("variants");
+    let detail = create_card_inner(
+        &dir,
+        NewCardInput {
+            prompt: "main prompt".to_string(),
+            negative_prompt: String::new(),
+            note: String::new(),
+            rating: 0,
+            tags: vec![],
+            images: vec![],
+            loras: vec![],
+            group_id: None,
+            author: None,
+            checkpoint: None,
+            meta: vec![],
+            source_key: None,
+            variants: vec![
+                "variant one  ".to_string(),
+                String::new(), // dropped: empty
+                "variant two".to_string(),
+            ],
+        },
+    )
+    .unwrap();
+    // creation trims and drops empties, order preserved
+    let card = get_card_inner(&dir, &detail.id).unwrap();
+    assert_eq!(card.variants, vec!["variant one", "variant two"]);
+
+    // search finds text inside a variant
+    let found = list_cards_inner(
+        &dir,
+        &ListFilter {
+            q: Some("variant two".to_string()),
+            tags: vec![],
+            min_rating: 0,
+            sort: None,
+            group_id: None,
+        },
+    )
+    .unwrap();
+    assert_eq!(found.len(), 1);
+
+    // edit variants wholesale; the main prompt stays untouched
+    update_card_inner(
+        &dir,
+        UpdateCardInput {
+            id: detail.id.clone(),
+            prompt: "main prompt".to_string(),
+            negative_prompt: String::new(),
+            note: String::new(),
+            rating: 0,
+            tags: vec![],
+            loras: vec![],
+            author: None,
+            checkpoint: None,
+            meta: vec![],
+            variants: vec!["rewritten variant".to_string()],
+        },
+    )
+    .unwrap();
+    let updated = get_card_inner(&dir, &detail.id).unwrap();
+    assert_eq!(updated.prompt, "main prompt");
+    assert_eq!(updated.variants, vec!["rewritten variant"]);
+
+    // oversized variants (>8000 chars) are dropped on write
+    let too_long = "x".repeat(8001);
+    update_card_inner(
+        &dir,
+        UpdateCardInput {
+            id: detail.id.clone(),
+            prompt: "main prompt".to_string(),
+            negative_prompt: String::new(),
+            note: String::new(),
+            rating: 0,
+            tags: vec![],
+            loras: vec![],
+            author: None,
+            checkpoint: None,
+            meta: vec![],
+            variants: vec![too_long, "kept".to_string()],
+        },
+    )
+    .unwrap();
+    let clamped = get_card_inner(&dir, &detail.id).unwrap();
+    assert_eq!(clamped.variants, vec!["kept"]);
 
     std::fs::remove_dir_all(&dir).ok();
 }

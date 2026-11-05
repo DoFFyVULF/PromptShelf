@@ -29,6 +29,8 @@ pub struct CardSummary {
 pub struct CardDetail {
     pub id: String,
     pub prompt: String,
+    /// Extra prompt variants stored as an ordered list; `prompt` stays the main one.
+    pub variants: Vec<String>,
     pub negative_prompt: String,
     pub note: Option<String>,
     pub rating: i64,
@@ -74,6 +76,9 @@ pub struct MetaItem {
 #[derive(Deserialize)]
 pub struct NewCardInput {
     pub prompt: String,
+    /// Additional prompt variants (retypes of the same prompt).
+    #[serde(default)]
+    pub variants: Vec<String>,
     #[serde(default)]
     pub negative_prompt: String,
     #[serde(default)]
@@ -104,6 +109,9 @@ pub struct NewCardInput {
 pub struct UpdateCardInput {
     pub id: String,
     pub prompt: String,
+    /// Additional prompt variants; sent wholesale — the client owns the list.
+    #[serde(default)]
+    pub variants: Vec<String>,
     #[serde(default)]
     pub negative_prompt: String,
     #[serde(default)]

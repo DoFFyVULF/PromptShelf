@@ -28,6 +28,8 @@ export interface CardSummary {
 export interface CardDetail {
   id: string;
   prompt: string;
+  /** Additional prompt variants (retypes of the same prompt); `prompt` stays the main one. */
+  variants: string[];
   negative_prompt: string;
   note: string | null;
   rating: number;
@@ -69,6 +71,7 @@ export interface ListFilter {
 
 export interface NewCardInput {
   prompt: string;
+  variants: string[];
   negative_prompt: string;
   note: string;
   rating: number;
@@ -86,6 +89,8 @@ export interface NewCardInput {
 export interface UpdateCardInput {
   id: string;
   prompt: string;
+  /** Sent wholesale — page edits (add/remove/rewrite) ship the full list. */
+  variants: string[];
   negative_prompt: string;
   note: string;
   rating: number;

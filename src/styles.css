@@ -419,6 +419,38 @@ select {
   box-shadow: var(--shadow-focus);
 }
 
+/* The prompt-variant draft textarea lives inside the parchment block, so its
+   fill must stay parchment in both themes (plain `.field` would go card-white). */
+.field-in-block {
+  width: 100%;
+  border: 1px solid var(--color-hairline);
+  border-radius: 12px;
+  background: var(--color-parchment);
+  padding: 14px 16px;
+  font-family: inherit;
+  color: var(--color-ink);
+  font-size: 13.5px;
+  line-height: 1.62;
+  transition: border-color 0.2s var(--ease-apple), box-shadow 0.2s var(--ease-apple);
+}
+.field-in-block::placeholder {
+  color: var(--color-faint);
+}
+.field-in-block:focus {
+  outline: none;
+  border-color: var(--color-line-active);
+  box-shadow: var(--shadow-focus);
+}
+
+/* Overflow rail with no visible scrollbar in either engine. Lives outside the
+   layers so the global `* { scrollbar-width: thin }` rule can't override it. */
+.scroll-hidden {
+  scrollbar-width: none;
+}
+.scroll-hidden::-webkit-scrollbar {
+  display: none;
+}
+
 select.field {
   appearance: none;
   cursor: pointer;

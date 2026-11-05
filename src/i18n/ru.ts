@@ -125,6 +125,14 @@ export const ru: Record<DictKey, string> = {
   "detail.added": "Добавлено",
   "detail.deleteTitle": "Удалить карточку",
 
+  "variant.original": "Оригинал",
+  "variant.of": "{i} из {n}",
+  "variant.add": "Добавить вариант",
+  "variant.add.short": "Добавить вариант промпта",
+  "variant.add.placeholder": "Ещё один промпт для этой карточки…",
+  "variant.deleteTitle": "Удалить этот вариант",
+  "variant.saved": "Вариант сохранён",
+
   "settings.title": "Настройки",
   "settings.general": "Общие",
   "settings.theme": "Оформление",

@@ -26,6 +26,7 @@ fn card_prompt(dir: &Path, prompt: &str, source_key: Option<String>) -> String {
             checkpoint: None,
             meta: vec![],
             source_key,
+            variants: vec![],
         },
     )
     .expect("create");

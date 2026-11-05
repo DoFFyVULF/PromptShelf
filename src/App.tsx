@@ -387,6 +387,7 @@ function Shell() {
       try {
         const created = await api.createCard({
           prompt: res.prompt,
+          variants: [],
           negative_prompt: res.negative_prompt,
           note: "",
           rating: 0,

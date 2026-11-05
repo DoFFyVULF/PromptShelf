@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS cards (
     updated_at TEXT NOT NULL,
     cover_image_id TEXT,
     loras TEXT NOT NULL DEFAULT '[]',
+    variants_json TEXT NOT NULL DEFAULT '[]',
     group_id TEXT,
     author TEXT,
     checkpoint TEXT,
@@ -102,6 +103,10 @@ fn ensure_columns(conn: &Connection) -> Result<(), String> {
             [],
         )
         .map_err(es)?;
+    }
+    if !names.iter().any(|n| n == "variants_json") {
+        conn.execute("ALTER TABLE cards ADD COLUMN variants_json TEXT NOT NULL DEFAULT '[]'", [])
+            .map_err(es)?;
     }
     if !names.iter().any(|n| n == "group_id") {
         conn.execute("ALTER TABLE cards ADD COLUMN group_id TEXT", [])

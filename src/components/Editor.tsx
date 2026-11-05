@@ -198,6 +198,7 @@ export function Editor({ card, staged, onStaged, settings, groupId, onClose, onS
         await api.updateCard({
           id: card.id,
           prompt: prompt.trim(),
+          variants: card.variants,
           negative_prompt: negativePrompt.trim(),
           note,
           rating,
@@ -229,6 +230,7 @@ export function Editor({ card, staged, onStaged, settings, groupId, onClose, onS
         dupProceedRef.current = false;
         const created = await api.createCard({
           prompt: prompt.trim(),
+          variants: [],
           negative_prompt: negativePrompt.trim(),
           note,
           rating,

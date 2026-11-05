@@ -57,6 +57,31 @@ fn parse_loras(s: &str) -> Vec<Lora> {
     serde_json::from_str(s).unwrap_or_default()
 }
 
+/// Trims every variant, drops empty/oversized ones. Order is preserved —
+/// the pager flips through variants in this exact order.
+fn clean_variants(variants: &[String]) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for v in variants {
+        let v = v.trim().to_string();
+        if v.is_empty() || v.len() > 8000 {
+            continue;
+        }
+        out.push(v);
+        if out.len() >= 24 {
+            break;
+        }
+    }
+    out
+}
+
+fn variants_json(variants: &[String]) -> String {
+    serde_json::to_string(&clean_variants(variants)).unwrap_or_else(|_| "[]".to_string())
+}
+
+fn parse_variants(s: &str) -> Vec<String> {
+    serde_json::from_str(s).unwrap_or_default()
+}
+
 /// Trims/clamps every metadata row; de-duplicates by key.
 fn clean_meta(meta: &[crate::models::MetaItem]) -> Vec<crate::models::MetaItem> {
     let mut seen = HashSet::new();
@@ -169,11 +194,12 @@ fn build_filter_sql(filter: &ListFilter) -> (String, Vec<rusqlite::types::Value>
             .replace('_', "\\_");
         let pat = format!("%{}%", escaped.to_lowercase());
         clauses.push(
-            "(LOWER(c.prompt) LIKE ? ESCAPE '\\' OR LOWER(c.note) LIKE ? ESCAPE '\\' OR LOWER(c.loras) LIKE ? ESCAPE '\\' OR EXISTS (
+            "(LOWER(c.prompt) LIKE ? ESCAPE '\\' OR LOWER(c.note) LIKE ? ESCAPE '\\' OR LOWER(c.loras) LIKE ? ESCAPE '\\' OR LOWER(c.variants_json) LIKE ? ESCAPE '\\' OR EXISTS (
                 SELECT 1 FROM card_tags ct2 JOIN tags t2 ON t2.id = ct2.tag_id
                 WHERE ct2.card_id = c.id AND LOWER(t2.name) LIKE ? ESCAPE '\\'
             ))".to_string(),
         );
+        vals.push(Value::Text(pat.clone()));
         vals.push(Value::Text(pat.clone()));
         vals.push(Value::Text(pat.clone()));
         vals.push(Value::Text(pat.clone()));
@@ -306,14 +332,16 @@ pub fn get_card_inner(dir: &Path, id: &str) -> Result<CardDetail, String> {
 
     let mut card = conn
         .query_row(
-            "SELECT id, prompt, negative_prompt, note, rating, created_at, updated_at, loras, group_id, author, checkpoint, meta_json FROM cards WHERE id = ?1",
+            "SELECT id, prompt, negative_prompt, note, rating, created_at, updated_at, loras, group_id, author, checkpoint, meta_json, variants_json FROM cards WHERE id = ?1",
             params![id],
             |r| {
                 let loras_raw: String = r.get(7)?;
                 let meta_raw: String = r.get(11)?;
+                let variants_raw: String = r.get(12)?;
                 Ok(CardDetail {
                     id: r.get(0)?,
                     prompt: r.get(1)?,
+                    variants: parse_variants(&variants_raw),
                     negative_prompt: r.get(2)?,
                     note: r.get(3)?,
                     rating: r.get(4)?,
@@ -403,6 +431,7 @@ pub fn create_card_inner(dir: &Path, input: NewCardInput) -> Result<CardDetail, 
     let author = input.author.as_deref().map(str::trim).filter(|s| !s.is_empty()).map(|s| s.to_string());
     let checkpoint = input.checkpoint.as_deref().map(str::trim).filter(|s| !s.is_empty()).map(|s| s.to_string());
     let meta = meta_json(&input.meta);
+    let variants = variants_json(&input.variants);
     let source_key = input.source_key.as_deref().map(str::trim).filter(|s| !s.is_empty()).map(|s| s.to_string());
     let text_hash = dedup::text_fingerprint(&prompt);
 
@@ -419,9 +448,9 @@ pub fn create_card_inner(dir: &Path, input: NewCardInput) -> Result<CardDetail, 
     };
 
     conn.execute(
-        "INSERT INTO cards(id, prompt, negative_prompt, note, rating, created_at, updated_at, loras, group_id, author, checkpoint, meta_json, source_key, text_hash)
-         VALUES(?1,?2,?3,?4,?5,?6,?6,?7,?8,?9,?10,?11,?12,?13)",
-        params![id, prompt, negative_prompt, note, rating, ts, loras, group_id, author, checkpoint, meta, source_key, text_hash],
+        "INSERT INTO cards(id, prompt, negative_prompt, note, rating, created_at, updated_at, loras, group_id, author, checkpoint, meta_json, source_key, text_hash, variants_json)
+         VALUES(?1,?2,?3,?4,?5,?6,?6,?7,?8,?9,?10,?11,?12,?13,?14)",
+        params![id, prompt, negative_prompt, note, rating, ts, loras, group_id, author, checkpoint, meta, source_key, text_hash, variants],
     )
     .map_err(es)?;
 
@@ -464,13 +493,14 @@ pub fn update_card_inner(dir: &Path, input: UpdateCardInput) -> Result<(), Strin
     let author = input.author.as_deref().map(str::trim).filter(|s| !s.is_empty()).map(|s| s.to_string());
     let checkpoint = input.checkpoint.as_deref().map(str::trim).filter(|s| !s.is_empty()).map(|s| s.to_string());
     let meta = meta_json(&input.meta);
+    let variants = variants_json(&input.variants);
     let negative_prompt = input.negative_prompt.trim().to_string();
     // re-fingerprint on edit; the origin key stays as it was set on create
     let text_hash = dedup::text_fingerprint(&prompt);
 
     conn.execute(
-        "UPDATE cards SET prompt = ?1, negative_prompt = ?2, note = ?3, rating = ?4, loras = ?5, author = ?6, checkpoint = ?7, meta_json = ?8, text_hash = ?9, updated_at = ?10 WHERE id = ?11",
-        params![prompt, negative_prompt, note, rating, loras, author, checkpoint, meta, text_hash, now(), input.id],
+        "UPDATE cards SET prompt = ?1, negative_prompt = ?2, note = ?3, rating = ?4, loras = ?5, author = ?6, checkpoint = ?7, meta_json = ?8, text_hash = ?9, variants_json = ?10, updated_at = ?11 WHERE id = ?12",
+        params![prompt, negative_prompt, note, rating, loras, author, checkpoint, meta, text_hash, variants, now(), input.id],
     )
     .map_err(es)?;
 

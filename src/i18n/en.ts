@@ -123,6 +123,14 @@ export const en = {
   "detail.added": "Added",
   "detail.deleteTitle": "Delete card",
 
+  "variant.original": "Original",
+  "variant.of": "{i} of {n}",
+  "variant.add": "Add variant",
+  "variant.add.short": "Add a prompt variant",
+  "variant.add.placeholder": "Another prompt for this card…",
+  "variant.deleteTitle": "Delete this variant",
+  "variant.saved": "Variant saved",
+
   "settings.title": "Settings",
   "settings.general": "General",
   "settings.theme": "Appearance",

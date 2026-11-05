@@ -23,6 +23,7 @@ import type { CardDetail as CardDetailType, ImageInfo, LoraItem } from "../lib/t
 import { Stars } from "./Stars";
 import { useToast } from "./Toasts";
 import { LoraEditor, applyLoraDraft, type LoraDraft } from "./LoraEditor";
+import { PromptPager } from "./PromptPager";
 import { IMAGE_EXTS } from "./Editor";
 
 interface CardDetailProps {
@@ -132,6 +133,7 @@ export function CardDetail({ card, hasPrev, hasNext, onPrev, onNext, onClose, on
       await api.updateCard({
         id: card.id,
         prompt: prompt.trim(),
+        variants: card.variants,
         negative_prompt: negativePrompt.trim(),
         note,
         rating,
@@ -205,6 +207,7 @@ export function CardDetail({ card, hasPrev, hasNext, onPrev, onNext, onClose, on
         await api.updateCard({
           id: card.id,
           prompt: card.prompt,
+          variants: card.variants,
           negative_prompt: card.negative_prompt ?? "",
           note: card.note ?? "",
           rating: v,
@@ -578,23 +581,7 @@ export function CardDetail({ card, hasPrev, hasNext, onPrev, onNext, onClose, on
               </>
             ) : (
               <>
-                <section className="group/prompt relative">
-                  <div className="flex items-center justify-between">
-                    <p className="text-[10.5px] font-semibold tracking-[0.07em] text-faint uppercase select-none">{t("editor.prompt")}</p>
-                    <button
-                      type="button"
-                      aria-label={t("action.copy")}
-                      title={t("action.copy")}
-                      onClick={copyPrompt}
-                      className="press -mr-1 flex h-6.5 w-6.5 cursor-pointer items-center justify-center rounded-md text-faint opacity-0 transition-opacity duration-150 group-hover/prompt:opacity-100 hover:bg-parchment hover:text-ink"
-                    >
-                      {copied ? <Check size={12.5} /> : <Copy size={12.5} />}
-                    </button>
-                  </div>
-                  <div className="mt-2 mb-1 rounded-xl bg-parchment px-4 py-3.5 text-[13.5px] leading-[1.62] whitespace-pre-wrap text-body select-text">
-                    {card.prompt}
-                  </div>
-                </section>
+                <PromptPager card={card} onChanged={onChanged} copyText={copyText} />
 
                 {card.negative_prompt && (
                   <section className="group/negative relative">
