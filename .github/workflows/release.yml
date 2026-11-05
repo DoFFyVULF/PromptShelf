@@ -58,6 +58,13 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: "PromptShelf ${{ github.ref_name }}"
           releaseBody: |
+            **What's new in v0.1.2**
+
+            - Async CivitAI import: paste several image links at once — they fetch in the background, nothing blocks.
+            - Each link shows a placeholder card in the library while it loads, with its URL visible underneath.
+            - On success the placeholder settles into the finished card; failed imports stay in the grid as error cards with retry.
+            - Possible duplicates are parked per link and handled through the duplicate dialog.
+
             Installers, built from this tag with the updater signing key:
 
             **Windows** — `PromptShelf_*_x64-setup.exe` (recommended) or `.msi`.
