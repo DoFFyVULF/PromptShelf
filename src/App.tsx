@@ -19,7 +19,8 @@ import type {
 } from "./lib/types";
 import { TopBar } from "./components/TopBar";
 import { FilterBar } from "./components/FilterBar";
-import { CardGrid, GridSkeleton, CARD_DRAG_TYPE } from "./components/Grid";
+import { CardGrid, CARD_DRAG_TYPE } from "./components/Grid";
+import { BootLoader } from "./components/BootLoader";
 import { EmptyState } from "./components/EmptyState";
 import { CardDetail } from "./components/CardDetail";
 import { Editor } from "./components/Editor";
@@ -715,7 +716,7 @@ function Shell() {
 
       <main ref={scrollRef} className="relative min-h-0 flex-1 overflow-y-auto">
         {loading && cards.length === 0 ? (
-          <GridSkeleton />
+          <BootLoader />
         ) : loadError && cards.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 pb-16">
             <p className="text-[14px] text-muted">{t("state.error")}</p>

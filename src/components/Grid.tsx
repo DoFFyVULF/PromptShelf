@@ -328,19 +328,3 @@ export function CardGrid({ cards, jobs, onJobRetry, onJobDismiss, onOpen, select
     </div>
   );
 }
-
-export function GridSkeleton() {
-  return (
-    <div className="grid grid-cols-[repeat(auto-fill,minmax(236px,1fr))] gap-4 px-5 pt-5 pb-10">
-      {Array.from({ length: 8 }).map((_, i) => (
-        <div key={i} className="overflow-hidden rounded-card border border-line-soft bg-card p-2.5">
-          <div className="aspect-[4/3] animate-pulse rounded-tile bg-parchment" />
-          <div className="space-y-2 px-1.5 pt-3 pb-2">
-            <div className="h-3 w-4/5 animate-pulse rounded-full bg-parchment" />
-            <div className="h-3 w-3/5 animate-pulse rounded-full bg-parchment" />
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}

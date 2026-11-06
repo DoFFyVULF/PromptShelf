@@ -4,8 +4,163 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>PromptShelf</title>
+    <script>
+      // theme before first paint so the boot canvas matches the shell
+      (function () {
+        try {
+          var t = localStorage.getItem("ps-theme");
+          var dark = t === "dark" || (t !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+          if (dark) document.documentElement.dataset.bootTheme = "dark";
+        } catch (e) {}
+      })();
+    </script>
+    <style>
+      /* Static twin of BootLoader: the window is never blank between launch and
+         the first React paint. Tokens mirror styles.css; fonts aren't loaded
+         yet, so the system face stands in for Inter. */
+      :root {
+        --boot-canvas: #fafafa;
+        --boot-ink: #18181b;
+        --boot-dim: #8e8e93;
+        --boot-dim-soft: #d4d4d8;
+        --boot-card: #ffffff;
+        --boot-edge: #e4e4e7;
+        --boot-edge-mid: #a1a1aa;
+        --boot-cover: #f4f4f5;
+        --boot-ease: cubic-bezier(0.32, 0.72, 0, 1);
+      }
+      html[data-boot-theme="dark"] {
+        --boot-canvas: #19191b;
+        --boot-ink: #f5f5f7;
+        --boot-dim: #85858b;
+        --boot-dim-soft: #4a4a4f;
+        --boot-card: #272729;
+        --boot-edge: #3a3a3e;
+        --boot-edge-mid: #606066;
+        --boot-cover: #2d2d30;
+      }
+      #boot {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 22px;
+        background: var(--boot-canvas);
+      }
+      #boot .cards {
+        display: flex;
+        align-items: flex-end;
+        gap: 6px;
+      }
+      #boot .card {
+        width: 46px;
+        border-radius: 9px;
+        border: 1px solid var(--boot-edge);
+        background: var(--boot-card);
+        padding: 6px;
+        /* entrance (spring approx.), then a per-card idle bob as a slow wave
+           of three: transforms compose with the static raise on .card-mid */
+        animation:
+          boot-card 0.7s cubic-bezier(0.34, 1.3, 0.64, 1) backwards,
+          boot-bob 2.8s ease-in-out infinite;
+        animation-delay: calc(0.14s * var(--i) + 0.1s), calc(0.24s * var(--i) + 1s);
+      }
+      #boot .card-mid {
+        position: relative;
+        top: -6px;
+        border-color: var(--boot-edge-mid);
+      }
+      #boot .cover {
+        height: 30px;
+        border-radius: 5px;
+        background: var(--boot-cover);
+      }
+      #boot .line {
+        height: 3px;
+        border-radius: 99px;
+        background: var(--boot-edge);
+        margin: 3px 2px 0;
+      }
+      #boot .line-2 {
+        width: 75%;
+        opacity: 0.6;
+      }
+      #boot .dots {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      #boot .cover,
+      #boot .line {
+        display: block;
+      }
+      #boot .dot {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--boot-dim);
+        animation: boot-dot 1.15s ease-in-out infinite;
+        animation-delay: calc(0.3s + 0.17s * var(--i));
+      }
+      #boot .word {
+        font: 600 15px/1 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+        letter-spacing: -0.03em;
+        color: var(--boot-ink);
+        opacity: 0;
+        animation: boot-fade 0.4s var(--boot-ease) 0.45s forwards;
+      }
+      @keyframes boot-bob {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-3px); }
+      }
+      @keyframes boot-card {
+        from { opacity: 0; transform: translateY(24px) scale(0.9); }
+        to { opacity: 1; transform: none; }
+      }
+      @keyframes boot-dot {
+        0%, 100% { opacity: 0.3; }
+        50% { opacity: 1; }
+      }
+      @keyframes boot-fade {
+        to { opacity: 1; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #boot .card, #boot .dot, #boot .word {
+          animation: none !important;
+          opacity: 1;
+        }
+      }
+    </style>
   </head>
   <body>
+    <div id="boot" aria-hidden="true">
+      <span class="word">PromptShelf</span>
+      <span class="cards">
+        <span class="card" style="--i: 0">
+          <span class="cover"></span>
+          <span class="line"></span>
+          <span class="line line-2"></span>
+        </span>
+        <span class="card card-mid" style="--i: 1">
+          <span class="cover"></span>
+          <span class="line"></span>
+          <span class="line line-2"></span>
+        </span>
+        <span class="card" style="--i: 2">
+          <span class="cover"></span>
+          <span class="line"></span>
+          <span class="line line-2"></span>
+        </span>
+      </span>
+      <span class="dots">
+        <span class="dot" style="--i: 0"></span>
+        <span class="dot" style="--i: 1"></span>
+        <span class="dot" style="--i: 2"></span>
+      </span>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
