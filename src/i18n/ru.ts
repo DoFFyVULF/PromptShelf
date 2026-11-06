@@ -147,6 +147,7 @@ export const ru: Record<DictKey, string> = {
 
   "lora.published": "Опубликовано",
   "lora.baseModel": "База",
+  "lora.civitaiPage": "Страница CivitAI",
   "lora.usageTips": "Рекомендации",
   "lora.triggerWords": "Триггер-слова",
   "lora.triggerCopied": "Триггер-слова скопированы",
@@ -197,6 +198,9 @@ export const ru: Record<DictKey, string> = {
   "settings.originals.hint": "Рядом со сжатой версией хранится исходный файл",
   "settings.thumbs": "Использовать сжатое фото как превью",
   "settings.thumbs.hint": "Хранится один файл на изображение — без отдельной миниатюры. В сетке показывается сжатое фото.",
+  "settings.loraPreviews": "Превью лор",
+  "settings.loraPreviews.hint": "Сколько превью импортировать со страницы лоры на CivitAI (по умолчанию — 1). Недоступные превью пропускаются; без них лора сохранится без изображений.",
+  "settings.loraPreviews.all": "Все",
   "settings.applyNote": "Действует для будущих импортов. Существующие изображения не затрагиваются.",
   "settings.storage": "Хранилище",
   "settings.location": "Расположение библиотеки",

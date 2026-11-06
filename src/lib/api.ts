@@ -95,5 +95,6 @@ export const api = {
   getLibraryPaths: () => invoke<LibraryPaths>("get_library_paths"),
   moveLibrary: (newDir: string) => invoke<void>("move_library", { newDir }),
   revealFile: (path: string) => invoke<void>("reveal_file", { path }),
+  openUrl: (url: string) => invoke<void>("open_url", { url }),
   copyText: (text: string) => invoke<void>("copy_text", { text })
 };

@@ -145,6 +145,9 @@ pub struct LoraSummary {
     pub rating: i64,
     pub created_at: String,
     pub updated_at: String,
+    /// Web link behind `source_key` ("civitai:model:<id>" → model page); "" for
+    /// loras without an import origin.
+    pub source_url: String,
     pub cover: Option<ImageInfo>,
     pub group_id: String,
     pub tags: Vec<String>,
@@ -167,6 +170,9 @@ pub struct LoraDetail {
     pub rating: i64,
     pub created_at: String,
     pub updated_at: String,
+    /// Web link behind `source_key` ("civitai:model:<id>" → model page); "" for
+    /// loras without an import origin.
+    pub source_url: String,
     pub group_id: String,
     pub tags: Vec<String>,
     pub images: Vec<ImageInfo>,
@@ -230,7 +236,8 @@ pub struct UpdateLoraInput {
 /// LoraShelf import flow saves directly, plus the staged preview image.
 #[derive(Serialize, Clone)]
 pub struct CivitaiLoraImport {
-    pub image: PasteImageResult,
+    /// Staged preview images (first becomes the cover; empty → no previews).
+    pub images: Vec<PasteImageResult>,
     pub name: String,
     pub base_model: String,
     pub published_at: String,
@@ -287,6 +294,8 @@ pub struct AppSettings {
     pub theme: String,
     /// CivitAI API key for gated/region-filtered image fetches ("" → none).
     pub civitai_api_key: String,
+    /// Preview images imported per lora model page (0 = all; 1 by default).
+    pub lora_previews: u32,
 }
 
 #[derive(Deserialize, Default)]
@@ -299,6 +308,7 @@ pub struct SettingsPatch {
     pub lang: Option<String>,
     pub theme: Option<String>,
     pub civitai_api_key: Option<String>,
+    pub lora_previews: Option<u32>,
 }
 
 /// Valid values for the persisted `theme` setting.
@@ -377,6 +387,7 @@ pub fn app_settings_default() -> AppSettings {
         lang: "en".to_string(),
         theme: "system".to_string(),
         civitai_api_key: String::new(),
+        lora_previews: 1,
     }
 }
 

@@ -64,7 +64,8 @@ export function SettingsDialog({ open, settings, paths, lang, onLang, theme, onT
           originals: next.originals,
           thumbs: next.thumbs,
           theme: next.theme,
-          civitai_api_key: next.civitai_api_key ?? ""
+          civitai_api_key: next.civitai_api_key ?? "",
+          lora_previews: next.lora_previews
         });
         onSaved(s);
         toast(t("toast.settingsSaved"));
@@ -351,6 +352,25 @@ export function SettingsDialog({ open, settings, paths, lang, onLang, theme, onT
                 <span className="mt-0.5 block text-[11.5px] text-faint">{t("settings.thumbs.hint")}</span>
               </span>
             </label>
+
+            <div className="grid grid-cols-[1fr_150px] items-center gap-4">
+              <div>
+                <label className="block text-[13.5px] font-medium text-ink">{t("settings.loraPreviews")}</label>
+                <p className="mt-0.5 text-[11.5px] text-faint">{t("settings.loraPreviews.hint")}</p>
+              </div>
+              <select
+                className="field"
+                value={draft.lora_previews ?? 0}
+                onChange={(e) => update({ lora_previews: Number(e.target.value) })}
+              >
+                <option value={0}>{t("settings.loraPreviews.all")}</option>
+                {[1, 2, 3, 4, 6, 8, 12].map((v) => (
+                  <option key={v} value={v}>
+                    {v}
+                  </option>
+                ))}
+              </select>
+            </div>
 
             <p className="text-[11.5px] text-faint">{t("settings.applyNote")}</p>
           </div>

@@ -6,6 +6,7 @@ import {
   ChevronRight,
   Copy,
   Cpu,
+  ExternalLink,
   ImageOff,
   Info,
   Loader2,
@@ -353,6 +354,18 @@ export function LoraDetail({
                     <Cpu size={12.5} className="shrink-0 text-faint" />
                     <span className="max-w-[240px] truncate">{lora.base_model}</span>
                   </span>
+                )}
+                {lora.source_url && (
+                  <button
+                    type="button"
+                    onClick={() => void api.openUrl(lora.source_url).catch(() => toast(t("toast.error"), "error"))}
+                    title={lora.source_url}
+                    aria-label={t("lora.civitaiPage")}
+                    className="press -mx-1 flex cursor-pointer items-center gap-1.5 rounded-md px-1 text-[12.5px] text-action transition-opacity hover:opacity-80"
+                  >
+                    <ExternalLink size={12.5} className="shrink-0" />
+                    {t("lora.civitaiPage")}
+                  </button>
                 )}
               </section>
             )}

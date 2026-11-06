@@ -142,7 +142,8 @@ function LoraTile({
         </div>
 
         <div className="mt-auto flex items-center justify-between pt-2.5">
-          <span className="text-[11.5px] text-faint">{formatDate(lora.published_at || lora.created_at)}</span>
+          {/* import date, not the CivitAI publish date */}
+          <span className="text-[11.5px] text-faint">{formatDate(lora.created_at)}</span>
           {lora.rating > 0 ? (
             <span className="flex items-center gap-1 text-[11.5px] font-medium text-body">
               <Star size={11.5} className="fill-ink text-ink" />

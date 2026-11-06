@@ -82,6 +82,16 @@ fn abs(dir: &Path, rel_path: &str) -> String {
     dir.join(rel_path).to_string_lossy().into_owned()
 }
 
+/// `civitai:model:<id>` → the model page link behind the source key. Manual
+/// loras (no import origin) stay empty — the detail card then hides the link.
+fn lora_source_url(source_key: &str) -> String {
+    source_key
+        .strip_prefix("civitai:model:")
+        .filter(|id| !id.is_empty() && id.chars().all(|c| c.is_ascii_digit()))
+        .map(|id| format!("https://civitai.com/models/{id}"))
+        .unwrap_or_default()
+}
+
 fn tags_for_loras(conn: &Connection, ids: &[String]) -> Result<HashMap<String, Vec<String>>, String> {
     let mut map: HashMap<String, Vec<String>> = HashMap::new();
     let idset: HashSet<&String> = ids.iter().collect();
@@ -172,11 +182,11 @@ pub fn list_loras_inner(dir: &Path, filter: &ListFilter) -> Result<Vec<LoraSumma
     store::default_lora_group_id(&conn)?;
 
     let (tail, vals) = build_filter_sql(filter);
-    // Columns: 0..=9 lora fields, 10..=16 cover image, 17 group.
+    // Columns: 0..=9 lora fields, 10..=16 cover image, 17 group, 18 origin.
     let sql = format!(
         "SELECT c.id, c.name, c.base_model, c.published_at, c.primary_tag, c.trigger_words, c.rating, c.created_at, c.updated_at, c.cover_image_id,
                 cv.id, cv.file, cv.thumb, cv.original, cv.width, cv.height, cv.bytes,
-                c.group_id
+                c.group_id, c.source_key
          FROM loras c
          LEFT JOIN lora_images cv ON cv.lora_id = c.id
            AND cv.id = COALESCE(c.cover_image_id,
@@ -203,6 +213,7 @@ pub fn list_loras_inner(dir: &Path, filter: &ListFilter) -> Result<Vec<LoraSumma
                 None
             };
             let trigger_raw: String = r.get(5)?;
+            let source_key: String = r.get(18)?;
             Ok(LoraSummary {
                 id: r.get(0)?,
                 name: r.get(1)?,
@@ -213,6 +224,7 @@ pub fn list_loras_inner(dir: &Path, filter: &ListFilter) -> Result<Vec<LoraSumma
                 rating: r.get(6)?,
                 created_at: r.get(7)?,
                 updated_at: r.get(8)?,
+                source_url: lora_source_url(&source_key),
                 tags: Vec::new(),
                 cover,
                 group_id: r.get::<_, Option<String>>(17)?.unwrap_or_default(),
@@ -253,7 +265,7 @@ pub fn get_lora_inner(dir: &Path, id: &str) -> Result<LoraDetail, String> {
     let mut lora = conn
         .query_row(
             "SELECT id, name, base_model, published_at, usage_tips, trigger_words, description,
-                    primary_tag, note, rating, created_at, updated_at, group_id
+                    primary_tag, note, rating, created_at, updated_at, group_id, source_key
              FROM loras WHERE id = ?1",
             params![id],
             |r| {
@@ -272,6 +284,7 @@ pub fn get_lora_inner(dir: &Path, id: &str) -> Result<LoraDetail, String> {
                     rating: r.get(9)?,
                     created_at: r.get(10)?,
                     updated_at: r.get(11)?,
+                    source_url: lora_source_url(&r.get::<_, String>(13)?),
                     group_id: r.get::<_, Option<String>>(12)?.unwrap_or_default(),
                     tags: Vec::new(),
                     images: Vec::new(),

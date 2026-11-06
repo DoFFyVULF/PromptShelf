@@ -117,6 +117,8 @@ export interface AppSettings {
   lang: Lang;
   theme: Theme;
   civitai_api_key: string | null;
+  /** Preview images imported per lora model page (0 = all available). */
+  lora_previews: number;
 }
 
 export interface SettingsPatch {
@@ -128,6 +130,7 @@ export interface SettingsPatch {
   lang?: Lang;
   theme?: Theme;
   civitai_api_key?: string | null;
+  lora_previews?: number;
 }
 
 export interface LibraryPaths {
@@ -171,6 +174,8 @@ export interface LoraSummary {
   rating: number;
   created_at: string;
   updated_at: string;
+  /** CivitAI model page link behind the import origin ("" → manual lora). */
+  source_url: string;
   cover: ImageInfo | null;
   group_id: string;
   tags: string[];
@@ -189,6 +194,8 @@ export interface LoraDetail {
   rating: number;
   created_at: string;
   updated_at: string;
+  /** CivitAI model page link behind the import origin ("" → manual lora). */
+  source_url: string;
   group_id: string;
   tags: string[];
   images: ImageInfo[];
@@ -226,7 +233,8 @@ export interface UpdateLoraInput {
 }
 
 export interface CivitaiLoraImport {
-  image: PasteImageResult;
+  /** Staged preview images (first becomes the cover; may be empty). */
+  images: PasteImageResult[];
   name: string;
   base_model: string;
   published_at: string;

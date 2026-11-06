@@ -92,6 +92,7 @@ pub fn run() {
             util::get_library_paths,
             util::move_library,
             util::reveal_file,
+            util::open_url,
             util::copy_text
         ])
         .run(tauri::generate_context!())

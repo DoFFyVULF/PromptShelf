@@ -145,6 +145,7 @@ export const en = {
 
   "lora.published": "Published",
   "lora.baseModel": "Base model",
+  "lora.civitaiPage": "CivitAI page",
   "lora.usageTips": "Usage tips",
   "lora.triggerWords": "Trigger words",
   "lora.triggerCopied": "Trigger words copied",
@@ -195,6 +196,9 @@ export const en = {
   "settings.originals.hint": "Saves the untouched original next to the compressed version",
   "settings.thumbs": "Use compressed photo as preview",
   "settings.thumbs.hint": "Stores one file per image — no separate thumbnail. Grid previews show the compressed photo.",
+  "settings.loraPreviews": "Lora previews",
+  "settings.loraPreviews.hint": "How many CivitAI preview images to import per model page (1 by default). Unavailable previews are skipped; pages without them import without images.",
+  "settings.loraPreviews.all": "All",
   "settings.applyNote": "Applies to future imports. Existing images are not touched.",
   "settings.storage": "Storage",
   "settings.location": "Library location",

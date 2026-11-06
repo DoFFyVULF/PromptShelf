@@ -545,6 +545,8 @@ fn option_key(k: &str) -> Option<&str> {
 const PRIMARY_TAG_ORDER: [&str; 6] = ["character", "style", "concept", "clothing", "poses", "tool"];
 const MAX_USAGE_TIPS: usize = 12;
 const MAX_TRIGGER_WORDS: usize = 24;
+/// Hard ceiling for preview images per lora import (the "all" setting value).
+const MAX_PREVIEWS: usize = 24;
 
 /// Model links: `/models/<id>` and `/models/<id>/<slug>`, optional
 /// `?modelVersionId=` pinning the version. Accepts civitai.com/.red hosts.
@@ -715,10 +717,9 @@ fn run_model(data_dir: &std::path::Path, url: &str) -> Result<CivitaiLoraImport,
     let (model_id, version_id) = parse_model_link(url)?;
     let source_key = crate::dedup::civitai_key("model", &model_id);
     let agent = agent();
-    let api_key: String = crate::store::open(data_dir)
-        .and_then(|c| crate::store::read_settings(&c))
-        .map(|s| s.civitai_api_key)
-        .unwrap_or_default();
+    let (api_key, lora_previews): (String, u32) = crate::store::open(data_dir)
+        .and_then(|c| crate::store::read_settings(&c).map(|s| (s.civitai_api_key, s.lora_previews)))
+        .unwrap_or_else(|_| (String::new(), 0));
 
     let path = format!("/api/v1/models/{model_id}");
     let mut model = get_json(&agent, &path, option_key(&api_key))?;
@@ -773,20 +774,44 @@ fn run_model(data_dir: &std::path::Path, url: &str) -> Result<CivitaiLoraImport,
 
     let usage_tips = usage_tips_of(version);
 
-    // preview: the version's cover image (its first sample)
-    let url_img = version
+    // Previews: the version's sample images in page order, the first one
+    // becoming the cover. Animated previews and the announcement videos
+    // CivitAI mixes into the list can't be decoded as stills — that used to
+    // kill the whole import; now each candidate is tried and failures are
+    // skipped until the configured count is filled (0 = all of them).
+    let candidates: Vec<String> = version
         .get("images")
         .and_then(|i| i.as_array())
-        .and_then(|a| a.iter().find_map(|im| im.get("url").and_then(scalar)))
-        .ok_or_else(|| "CIVITAI_NO_IMAGE".to_string())?;
-    let bytes = get_bytes(&agent, &url_img)?;
-    if bytes.is_empty() {
-        return Err("CIVITAI_NO_IMAGE".to_string());
+        .map(|a| {
+            a.iter()
+                .filter(|im| im.get("type").and_then(scalar).as_deref() != Some("video"))
+                .filter_map(|im| im.get("url").and_then(scalar))
+                .collect()
+        })
+        .unwrap_or_default();
+    let limit = if lora_previews == 0 {
+        MAX_PREVIEWS
+    } else {
+        (lora_previews as usize).min(MAX_PREVIEWS)
+    };
+    let mut images: Vec<PasteImageResult> = Vec::new();
+    for url_img in &candidates {
+        if images.len() >= limit {
+            break;
+        }
+        let Ok(bytes) = get_bytes(&agent, url_img) else {
+            continue;
+        };
+        if bytes.is_empty() {
+            continue;
+        }
+        if let Ok(image) = images::save_temp_image_dyn(&bytes) {
+            images.push(image);
+        }
     }
-    let image: PasteImageResult = images::save_temp_image_dyn(&bytes)?;
 
     Ok(CivitaiLoraImport {
-        image,
+        images,
         name,
         base_model,
         published_at,

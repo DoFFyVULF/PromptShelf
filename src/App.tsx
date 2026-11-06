@@ -761,18 +761,20 @@ function Shell() {
           description: res.description,
           primary_tag: res.primary_tag,
           tags: res.tags,
-          images: [res.image.temp_path],
+          images: res.images.map((img) => img.temp_path),
           group_id: loraGroupId,
           source_key: res.source_key
         });
         setLoraReceipts((prev) => [
-          { id: created.id, thumb: res.image.preview, prompt: res.name },
+          { id: created.id, thumb: res.images[0]?.preview ?? "", prompt: res.name },
           ...prev.slice(0, 4)
         ]);
         await loadLoras();
       } catch (e) {
-        // the preview was staged into the temp dir but never landed on a lora
-        void api.discardTemp(res.image.temp_path).catch(() => undefined);
+        // the previews were staged into the temp dir but never landed on a lora
+        for (const img of res.images) {
+          void api.discardTemp(img.temp_path).catch(() => undefined);
+        }
         throw e;
       }
     },
@@ -1386,7 +1388,9 @@ function Shell() {
           }}
           onOpen={(id) => {
             const p = loraPendingDup.current;
-            if (p?.pre) void api.discardTemp(p.pre.image.temp_path).catch(() => undefined);
+            if (p?.pre) {
+              for (const img of p.pre.images) void api.discardTemp(img.temp_path).catch(() => undefined);
+            }
             setLoraDupHits(null);
             loraPendingDup.current = null;
             if (p) removeLoraJob(p.jobId);
@@ -1395,7 +1399,9 @@ function Shell() {
           }}
           onClose={() => {
             const p = loraPendingDup.current;
-            if (p?.pre) void api.discardTemp(p.pre.image.temp_path).catch(() => undefined);
+            if (p?.pre) {
+              for (const img of p.pre.images) void api.discardTemp(img.temp_path).catch(() => undefined);
+            }
             setLoraDupHits(null);
             loraPendingDup.current = null;
             if (p) removeLoraJob(p.jobId);

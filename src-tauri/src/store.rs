@@ -265,6 +265,12 @@ pub fn read_settings(conn: &Connection) -> Result<AppSettings, String> {
                 }
             }
             "civitai_api_key" => s.civitai_api_key = v,
+            "lora_previews" => {
+                if let Ok(n) = v.parse::<u32>() {
+                    // 0 = all available; the UI keeps the floor at 1
+                    s.lora_previews = n.clamp(0, 24);
+                }
+            }
             _ => {}
         }
     }
@@ -322,6 +328,9 @@ pub fn set_settings(
     }
     if let Some(v) = patch.civitai_api_key {
         put_setting(&conn, "civitai_api_key", v.trim())?;
+    }
+    if let Some(v) = patch.lora_previews {
+        put_setting(&conn, "lora_previews", &v.clamp(0, 24).to_string())?;
     }
     read_settings(&conn)
 }

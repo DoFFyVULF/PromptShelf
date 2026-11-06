@@ -130,6 +130,17 @@ pub fn reveal_file(state: tauri::State<'_, crate::AppState>, path: String) -> Re
     tauri_plugin_opener::reveal_item_in_dir(&path).map_err(es)
 }
 
+/// Open a web link in the system browser (model-page buttons in the UI).
+#[tauri::command]
+pub fn open_url(state: tauri::State<'_, crate::AppState>, url: String) -> Result<(), String> {
+    let _ = &state;
+    let trimmed = url.trim();
+    if !trimmed.starts_with("https://") {
+        return Err("OPEN_URL".to_string());
+    }
+    tauri_plugin_opener::open_url(trimmed, None::<&str>).map_err(es)
+}
+
 #[tauri::command]
 pub fn copy_text(state: tauri::State<'_, crate::AppState>, text: String) -> Result<(), String> {
     let _ = &state;

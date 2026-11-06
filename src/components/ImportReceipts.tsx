@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { CheckCircle2, X } from "lucide-react";
+import { CheckCircle2, Layers, X } from "lucide-react";
 import { useI18n } from "../i18n";
 
 /** One auto-imported card waiting in the top-right stack. */
@@ -113,12 +113,18 @@ function ReceiptRow({
       }}
       className="group pointer-events-auto relative flex w-full cursor-pointer items-center gap-3 rounded-card border border-hairline bg-card py-2.5 pr-11 pl-3 shadow-panel transition-colors duration-150 hover:border-line-hover hover:bg-parchment"
     >
-      <img
-        src={item.thumb}
-        alt=""
-        draggable={false}
-        className="no-drag h-11 w-11 shrink-0 rounded-[9px] border border-hairline bg-parchment object-cover"
-      />
+      {item.thumb ? (
+        <img
+          src={item.thumb}
+          alt=""
+          draggable={false}
+          className="no-drag h-11 w-11 shrink-0 rounded-[9px] border border-hairline bg-parchment object-cover"
+        />
+      ) : (
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[9px] border border-hairline bg-parchment text-faint">
+          <Layers size={16} strokeWidth={1.5} />
+        </div>
+      )}
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
           <CheckCircle2 size={12} strokeWidth={2.2} className="shrink-0 text-leaf-icon" />
