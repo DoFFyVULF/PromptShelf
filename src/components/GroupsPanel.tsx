@@ -6,6 +6,18 @@ import type { GroupInfo } from "../lib/types";
 import { CARD_DRAG_TYPE } from "./Grid";
 import { useToast } from "./Toasts";
 
+/** Group management calls, one set per shelf. */
+const cardGroupApi = {
+  create: (name: string) => api.createGroup(name),
+  rename: (id: string, name: string) => api.renameGroup(id, name),
+  remove: (id: string) => api.deleteGroup(id)
+};
+const loraGroupApi = {
+  create: (name: string) => api.createLoraGroup(name),
+  rename: (id: string, name: string) => api.renameLoraGroup(id, name),
+  remove: (id: string) => api.deleteLoraGroup(id)
+};
+
 interface GroupsPanelProps {
   open: boolean;
   onClose: () => void;
@@ -15,6 +27,8 @@ interface GroupsPanelProps {
   onSwitch: (id: string) => void;
   onChanged: () => void;
   onMoved: (toGroup: GroupInfo, ids: string[]) => void;
+  /** Lora shelf: the panel stays identical, the group APIs differ. */
+  lora?: boolean;
 }
 
 export function GroupsPanel({
@@ -25,10 +39,12 @@ export function GroupsPanel({
   selection,
   onSwitch,
   onChanged,
-  onMoved
+  onMoved,
+  lora
 }: GroupsPanelProps) {
   const { t } = useI18n();
   const { toast } = useToast();
+  const apiGroup = lora ? loraGroupApi : cardGroupApi;
 
   const [creating, setCreating] = useState(false);
   const [draftName, setDraftName] = useState("");
@@ -108,7 +124,7 @@ export function GroupsPanel({
       return;
     }
     try {
-      await api.createGroup(name);
+      await apiGroup.create(name);
       toast(t("toast.groupCreated"));
       setDraftName("");
       setCreating(false);
@@ -124,7 +140,7 @@ export function GroupsPanel({
     setEditingId(null);
     if (!name) return;
     try {
-      await api.renameGroup(id, name);
+      await apiGroup.rename(id, name);
       toast(t("toast.groupRenamed"));
       onChanged();
     } catch {
@@ -140,7 +156,7 @@ export function GroupsPanel({
     }
     setArmDelete(null);
     try {
-      await api.deleteGroup(group.id);
+      await apiGroup.remove(group.id);
       toast(t("toast.groupDeleted"));
       onChanged();
       onClose();

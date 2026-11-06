@@ -10,7 +10,7 @@ interface I18nValue {
   lang: Lang;
   setLang: (l: Lang) => void;
   t: (key: DictKey, vars?: Record<string, string | number>) => string;
-  count: (n: number) => string;
+  count: (n: number, kind?: "prompt" | "lora") => string;
   formatDate: (iso: string) => string;
 }
 
@@ -39,8 +39,19 @@ export function I18nProvider({ lang, setLang, children }: { lang: Lang; setLang:
   );
 
   const count = useCallback(
-    (n: number) => {
-      if (n === 0) return DICTS[lang]["grid.count.zero"];
+    (n: number, kind: "prompt" | "lora" = "prompt") => {
+      if (n === 0) {
+        return DICTS[lang][kind === "lora" ? "grid.count.lora.zero" : "grid.count.zero"];
+      }
+      if (kind === "lora") {
+        const key: DictKey =
+          lang === "ru"
+            ? `plurals.ru.lora.${ruPluralForm(n)}`
+            : n === 1
+              ? "plurals.loras.one"
+              : "plurals.loras.other";
+        return DICTS[lang]["grid.count"].replace("{n}", String(n)).replace("{form}", DICTS[lang][key]);
+      }
       const key: DictKey =
         lang === "ru"
           ? `plurals.ru.${ruPluralForm(n)}`

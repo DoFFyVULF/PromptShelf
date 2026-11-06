@@ -4,15 +4,21 @@ import type {
   CardDetail,
   CardSummary,
   CivitaiImport,
+  CivitaiLoraImport,
   DuplicateHit,
   GroupInfo,
+  ImageInfo,
   LibraryPaths,
   ListFilter,
+  LoraDetail,
+  LoraSummary,
   NewCardInput,
+  NewLoraInput,
   PasteImageResult,
   SettingsPatch,
   TagCount,
-  UpdateCardInput
+  UpdateCardInput,
+  UpdateLoraInput
 } from "./types";
 
 // The active library dir (from get_library_paths). Image paths in the DB are
@@ -60,6 +66,26 @@ export const api = {
   civitaiSourceKey: (url: string) => invoke<string | null>("civitai_source_key", { url }),
   checkDuplicates: (input: { prompt?: string | null; source_key?: string | null }) =>
     invoke<DuplicateHit[]>("check_duplicates", { input }),
+
+  // LoraShelf
+  listLoras: (filter: ListFilter) => invoke<LoraSummary[]>("list_loras", { filter }),
+  getLora: (id: string) => invoke<LoraDetail>("get_lora", { id }),
+  createLora: (input: NewLoraInput) => invoke<LoraDetail>("create_lora", { input }),
+  updateLora: (input: UpdateLoraInput) => invoke<LoraDetail>("update_lora", { input }),
+  deleteLora: (id: string) => invoke<void>("delete_lora", { id }),
+  addLoraImage: (lora: string, path: string) => invoke<ImageInfo>("add_lora_image", { lora, path }),
+  deleteLoraImage: (id: string) => invoke<void>("delete_lora_image", { id }),
+  setLoraCover: (id: string) => invoke<void>("set_lora_cover", { id }),
+  listLoraTags: () => invoke<TagCount[]>("list_lora_tags"),
+  listLoraGroups: () => invoke<GroupInfo[]>("list_lora_groups"),
+  createLoraGroup: (name: string) => invoke<GroupInfo>("create_lora_group", { input: { name } }),
+  renameLoraGroup: (id: string, name: string) => invoke<void>("rename_lora_group", { input: { id, name } }),
+  deleteLoraGroup: (id: string) => invoke<void>("delete_lora_group", { id }),
+  moveLoras: (ids: string[], group_id: string) => invoke<void>("move_loras", { input: { ids, group_id } }),
+  checkLoraDuplicates: (input: { prompt?: string | null; source_key?: string | null }) =>
+    invoke<DuplicateHit[]>("check_lora_duplicates", { input }),
+  civitaiLoraImport: (url: string) => invoke<CivitaiLoraImport>("civitai_lora_import", { url }),
+  civitaiLoraSourceKey: (url: string) => invoke<string | null>("civitai_lora_source_key", { url }),
   previewImage: (path: string) => invoke<string>("preview_image", { path }),
   discardTemp: (path: string) => invoke<void>("discard_temp", { path }),
 

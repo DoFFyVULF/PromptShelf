@@ -130,6 +130,119 @@ pub struct UpdateCardInput {
     pub meta: Vec<MetaItem>,
 }
 
+// ---------------------------------------------------------------- lora shelf
+
+#[derive(Serialize)]
+pub struct LoraSummary {
+    pub id: String,
+    pub name: String,
+    pub base_model: String,
+    /// ISO date from the CivitAI "Published" field ("").
+    pub published_at: String,
+    /// CivitAI model type, e.g. "character" — the blue badge on the tile.
+    pub primary_tag: Option<String>,
+    pub trigger_words: Vec<String>,
+    pub rating: i64,
+    pub created_at: String,
+    pub updated_at: String,
+    pub cover: Option<ImageInfo>,
+    pub group_id: String,
+    pub tags: Vec<String>,
+}
+
+#[derive(Serialize)]
+pub struct LoraDetail {
+    pub id: String,
+    pub name: String,
+    pub base_model: String,
+    /// ISO date from the CivitAI "Published" field ("").
+    pub published_at: String,
+    /// Ordered usage tips, e.g. ["Strength: 0.9"].
+    pub usage_tips: Vec<String>,
+    pub trigger_words: Vec<String>,
+    /// Plain-text model description from the CivitAI page.
+    pub description: String,
+    pub primary_tag: Option<String>,
+    pub note: Option<String>,
+    pub rating: i64,
+    pub created_at: String,
+    pub updated_at: String,
+    pub group_id: String,
+    pub tags: Vec<String>,
+    pub images: Vec<ImageInfo>,
+    pub cover: Option<ImageInfo>,
+}
+
+#[derive(Deserialize)]
+pub struct NewLoraInput {
+    pub name: String,
+    #[serde(default)]
+    pub base_model: String,
+    #[serde(default)]
+    pub published_at: String,
+    #[serde(default)]
+    pub usage_tips: Vec<String>,
+    #[serde(default)]
+    pub trigger_words: Vec<String>,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default)]
+    pub primary_tag: Option<String>,
+    #[serde(default)]
+    pub note: String,
+    #[serde(default)]
+    pub rating: i64,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    /// Staged temp image paths (same pipeline as prompt cards).
+    #[serde(default)]
+    pub images: Vec<String>,
+    #[serde(default)]
+    pub group_id: Option<String>,
+    /// Origin fingerprint from an import (e.g. `civitai:model:2945627`).
+    #[serde(default)]
+    pub source_key: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct UpdateLoraInput {
+    pub id: String,
+    pub name: String,
+    #[serde(default)]
+    pub base_model: String,
+    #[serde(default)]
+    pub usage_tips: Vec<String>,
+    #[serde(default)]
+    pub trigger_words: Vec<String>,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default)]
+    pub primary_tag: Option<String>,
+    #[serde(default)]
+    pub note: String,
+    #[serde(default)]
+    pub rating: i64,
+    #[serde(default)]
+    pub tags: Vec<String>,
+}
+
+/// The result of importing a CivitAI *model* (LoRA) page: everything the
+/// LoraShelf import flow saves directly, plus the staged preview image.
+#[derive(Serialize, Clone)]
+pub struct CivitaiLoraImport {
+    pub image: PasteImageResult,
+    pub name: String,
+    pub base_model: String,
+    pub published_at: String,
+    pub usage_tips: Vec<String>,
+    pub trigger_words: Vec<String>,
+    pub description: String,
+    pub primary_tag: Option<String>,
+    pub tags: Vec<String>,
+    #[serde(default)]
+    pub source_key: Option<String>,
+}
+
 #[derive(Serialize)]
 pub struct GroupInfo {
     pub id: String,

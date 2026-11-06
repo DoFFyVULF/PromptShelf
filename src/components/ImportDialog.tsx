@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CloudDownload } from "lucide-react";
-import { useI18n } from "../i18n";
+import { useI18n, type DictKey } from "../i18n";
 import { Dialog, DialogCloseButton } from "./Dialog";
 
 interface ImportDialogProps {
@@ -8,6 +8,8 @@ interface ImportDialogProps {
   onClose: () => void;
   /** Hands the link(s) to the background runner; never blocks the form. */
   onSubmit: (url: string) => void;
+  /** Lora shelf: same dialog, model-page copy. */
+  lora?: boolean;
 }
 
 /** More than this many links in one paste is almost certainly an accident. */
@@ -24,10 +26,13 @@ function parseLinks(raw: string): string[] {
   return unique.slice(0, MAX_LINKS_PER_PASTE);
 }
 
-export function ImportDialog({ open, onClose, onSubmit }: ImportDialogProps) {
+export function ImportDialog({ open, onClose, onSubmit, lora }: ImportDialogProps) {
   const { t } = useI18n();
   const [url, setUrl] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  const prefix = lora ? "import.lora" : "import.civitai";
+  /** Template-literal keys both exist in the dictionaries. */
+  const keyFor = (suffix: string) => t((`${prefix}.${suffix}` as DictKey));
 
   useEffect(() => {
     if (!open) return;
@@ -51,7 +56,7 @@ export function ImportDialog({ open, onClose, onSubmit }: ImportDialogProps) {
       <div className="flex items-center justify-between px-7 pt-6 pb-1">
         <h2 id="import-title" className="t-display flex items-center gap-2.5 text-[19px] text-ink">
           <CloudDownload size={18} strokeWidth={1.8} className="text-faint" />
-          {t("import.civitai.title")}
+          {keyFor("title")}
         </h2>
         <DialogCloseButton onClose={onClose} label={t("action.close")} />
       </div>
@@ -63,13 +68,13 @@ export function ImportDialog({ open, onClose, onSubmit }: ImportDialogProps) {
         }}
       >
         <div className="space-y-4 px-7 pt-2 pb-1">
-          <p className="text-[13px] leading-relaxed text-muted">{t("import.civitai.hint")}</p>
+          <p className="text-[13px] leading-relaxed text-muted">{keyFor("hint")}</p>
           <input
             ref={inputRef}
             type="text"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            placeholder={t("import.civitai.placeholder")}
+            placeholder={keyFor("placeholder")}
             spellCheck={false}
             className="field select-text"
           />

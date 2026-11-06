@@ -13,7 +13,7 @@ fn now() -> String {
     chrono::Utc::now().to_rfc3339()
 }
 
-fn clean_tags(tags: &[String]) -> Vec<String> {
+pub(crate) fn clean_tags(tags: &[String]) -> Vec<String> {
     let mut seen = HashSet::new();
     let mut out = Vec::new();
     for t in tags {
@@ -147,7 +147,7 @@ fn abs(dir: &Path, rel_path: &str) -> String {
     dir.join(rel_path).to_string_lossy().into_owned()
 }
 
-fn image_info_from_row(dir: &Path, r: &rusqlite::Row) -> rusqlite::Result<ImageInfo> {
+pub(crate) fn image_info_from_row(dir: &Path, r: &rusqlite::Row) -> rusqlite::Result<ImageInfo> {
     Ok(ImageInfo {
         id: r.get(0)?,
         file: abs(dir, &r.get::<_, String>(1)?),

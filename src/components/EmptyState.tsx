@@ -1,4 +1,4 @@
-import { ClipboardPaste, ImagePlus, SearchX } from "lucide-react";
+import { ClipboardPaste, ImagePlus, Import, Plus, SearchX } from "lucide-react";
 import { useI18n } from "../i18n";
 import { modKey } from "../lib/platform";
 
@@ -18,9 +18,12 @@ interface EmptyStateProps {
   onNew: () => void;
   onPaste: () => void;
   onClear: () => void;
+  /** Lora shelf: the shelf CTA becomes "add lora", the second button imports. */
+  lora?: boolean;
+  onImport?: () => void;
 }
 
-export function EmptyState({ hasFilters, onNew, onPaste, onClear }: EmptyStateProps) {
+export function EmptyState({ hasFilters, onNew, onPaste, onClear, lora, onImport }: EmptyStateProps) {
   const { t } = useI18n();
 
   if (hasFilters) {
@@ -34,6 +37,29 @@ export function EmptyState({ hasFilters, onNew, onPaste, onClear }: EmptyStatePr
         <button type="button" className="btn-ghost press cursor-pointer" onClick={onClear}>
           {t("action.clear")}
         </button>
+      </div>
+    );
+  }
+
+  if (lora) {
+    return (
+      <div className="anim-fade flex h-full flex-col items-center justify-center gap-5 pb-16 text-center">
+        <ShelfGlyph />
+        <div>
+          <h2 className="t-display text-[24px] text-ink">{t("empty.lora.title")}</h2>
+          <p className="mx-auto mt-2 max-w-[380px] text-[14px] leading-relaxed text-muted">{t("empty.lora.sub")}</p>
+        </div>
+        <div className="flex items-center gap-2.5">
+          <button type="button" className="btn-primary press cursor-pointer" onClick={onImport}>
+            <Import size={15.5} />
+            {t("empty.lora.cta")}
+          </button>
+          <button type="button" className="btn-ghost press cursor-pointer" onClick={onNew}>
+            <Plus size={15.5} />
+            {t("empty.lora.add")}
+          </button>
+        </div>
+        <p className="text-[12.5px] text-faint">{t("empty.lora.dropHint")}</p>
       </div>
     );
   }

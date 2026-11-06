@@ -2,10 +2,16 @@ export const en = {
   "app.name": "PromptShelf",
   "app.tagline": "Your local prompt library",
 
+  "app.modePrompt": "Prompt",
+  "app.modeLora": "Lora",
+  "app.mode.toggle": "Switch between prompts and loras",
+
   "search.placeholder": "Search prompts, notes, tags…",
+  "search.placeholderLora": "Search loras…",
   "search.shortcut": "F",
 
   "action.new": "New prompt",
+  "action.newLora": "New lora",
   "action.save": "Save",
   "action.cancel": "Cancel",
   "action.delete": "Delete",
@@ -46,11 +52,18 @@ export const en = {
 
   "grid.count.zero": "No prompts",
   "grid.count": "{n} {form}",
+  "grid.count.lora.zero": "No loras",
 
   "import.civitai": "Import from CivitAI",
   "import.civitai.title": "Import from CivitAI",
   "import.civitai.hint": "Paste a link to an image page on civitai.com or civitai.red — the card is saved instantly and the window stays open, so you can import the next one right away.",
   "import.civitai.placeholder": "https://civitai.com/images/…",
+  "import.lora": "Import from CivitAI",
+  "import.lora.title": "Import loras from CivitAI",
+  "import.lora.hint": "Paste a link to a model page on civitai.com — the lora is saved instantly with its preview, trigger words and description, and the window stays open, so you can import the next one right away.",
+  "import.lora.placeholder": "https://civitai.com/models/…",
+  "import.lora.errorUrl": "That doesn't look like a CivitAI model link",
+  "import.lora.errorNotFound": "Couldn't fetch this model. It may be hidden by region or age restrictions — add a CivitAI API key in Settings.",
   "import.receipt.ok": "Imported",
   "import.receipt.undo": "Undo import",
   "import.receipt.undo.short": "Undo",
@@ -74,6 +87,11 @@ export const en = {
   "empty.paste": "Paste image",
   "empty.pasteHint": "…or paste an image straight from the clipboard",
   "empty.dropHint": "You can also drag images here",
+  "empty.lora.title": "Your lora shelf is empty",
+  "empty.lora.sub": "Import loras from CivitAI model pages, or add them by hand. Everything stays on this machine.",
+  "empty.lora.cta": "Import from CivitAI",
+  "empty.lora.add": "Add lora",
+  "empty.lora.dropHint": "You can also drag lora preview images here",
   "empty.noResults": "Nothing found",
   "empty.noResultsSub": "Try a different query or clear the filters",
 
@@ -124,6 +142,32 @@ export const en = {
   "detail.other": "Other metadata",
   "detail.added": "Added",
   "detail.deleteTitle": "Delete card",
+
+  "lora.published": "Published",
+  "lora.baseModel": "Base model",
+  "lora.usageTips": "Usage tips",
+  "lora.triggerWords": "Trigger words",
+  "lora.triggerCopied": "Trigger words copied",
+  "lora.description": "Description",
+  "lora.note": "Note",
+  "lora.deleteTitle": "Delete lora",
+  "lora.copyTriggers": "Copy trigger words",
+  "lora.emptyTriggers": "No trigger words",
+  "lora.detail.noImages": "Lora without images",
+
+  "loraeditor.new.title": "New lora",
+  "loraeditor.edit.title": "Edit lora",
+  "loraeditor.name": "Name",
+  "loraeditor.name.placeholder": "Lora name, e.g. add_detail_xl",
+  "loraeditor.baseModel": "Base model",
+  "loraeditor.baseModel.placeholder": "e.g. SDXL, Krea 2…",
+  "loraeditor.triggerWords": "Trigger words",
+  "loraeditor.triggerWords.placeholder": "Comma-separated, e.g. finjax, long red hair",
+  "loraeditor.usageTips": "Usage tips",
+  "loraeditor.usageTips.placeholder": "One per line, e.g. Strength: 0.9",
+  "loraeditor.description": "Description",
+  "loraeditor.description.placeholder": "What this lora does…",
+  "loraeditor.error.name": "Add the lora name first",
 
   "variant.original": "Original",
   "variant.of": "{i} of {n}",
@@ -197,6 +241,7 @@ export const en = {
   "toast.imageCopied": "No image in clipboard",
   "toast.error": "Something went wrong",
   "toast.promptRequired": "Add the prompt text first",
+  "toast.loraRequired": "Add the lora name first",
   "toast.loraCopied": "LoRA copied",
   "toast.moved": "Moved to {name}",
   "toast.groupCreated": "Group created",
@@ -211,9 +256,14 @@ export const en = {
 
   "plurals.prompts.one": "prompt",
   "plurals.prompts.other": "prompts",
+  "plurals.loras.one": "lora",
+  "plurals.loras.other": "loras",
   "plurals.ru.one": "промпт",
   "plurals.ru.few": "промпта",
-  "plurals.ru.many": "промптов"
+  "plurals.ru.many": "промптов",
+  "plurals.ru.lora.one": "лора",
+  "plurals.ru.lora.few": "лоры",
+  "plurals.ru.lora.many": "лор"
 } as const;
 
 export type DictKey = keyof typeof en;

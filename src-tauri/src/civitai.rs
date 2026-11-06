@@ -6,7 +6,7 @@
 //! responsive.
 
 use crate::images;
-use crate::models::{es, CivitaiImport, Lora, MetaItem, PasteImageResult};
+use crate::models::{es, CivitaiImport, CivitaiLoraImport, Lora, MetaItem, PasteImageResult};
 use serde_json::Value;
 use std::collections::HashSet;
 use std::io::Read;
@@ -538,6 +538,267 @@ fn option_key(k: &str) -> Option<&str> {
     }
 }
 
+// ---------------------------------------------------------------- model pages (LoRA shelf)
+
+/// Primary/category tag for the blue badge, keyed the same way CivitAI label
+/// its model cards, "character" being the badge users see most.
+const PRIMARY_TAG_ORDER: [&str; 6] = ["character", "style", "concept", "clothing", "poses", "tool"];
+const MAX_USAGE_TIPS: usize = 12;
+const MAX_TRIGGER_WORDS: usize = 24;
+
+/// Model links: `/models/<id>` and `/models/<id>/<slug>`, optional
+/// `?modelVersionId=` pinning the version. Accepts civitai.com/.red hosts.
+fn parse_model_link(raw: &str) -> Result<(String, Option<i64>), String> {
+    let s = raw.trim();
+    let without_scheme = s.split("://").last().unwrap_or(s);
+    let mut host_rest = without_scheme.splitn(2, '/');
+    let host = host_rest.next().unwrap_or("").to_ascii_lowercase();
+    let rest = host_rest.next().unwrap_or("");
+    if host != "civitai.com" && host != "civitai.red" && !host.ends_with(".civitai.com") {
+        return Err("CIVITAI_URL".to_string());
+    }
+    let path = rest.split(['?', '#']).next().unwrap_or("");
+    let segs: Vec<&str> = path.split('/').filter(|x| !x.is_empty()).collect();
+    let model = segs.get(0).copied().unwrap_or("");
+    if model != "models" {
+        return Err("CIVITAI_URL".to_string());
+    }
+    let id = segs.get(1).copied().unwrap_or("");
+    if id.is_empty() || !id.chars().all(|c| c.is_ascii_digit()) {
+        return Err("CIVITAI_URL".to_string());
+    }
+    let version = rest
+        .split_once('?')
+        .and_then(|(_, q)| q.split('&').find(|p| p.starts_with("modelVersionId=")))
+        .and_then(|p| p.strip_prefix("modelVersionId="))
+        .and_then(|v| v.split(['&', '#']).next())
+        .and_then(|v| v.parse::<i64>().ok());
+    Ok((id.to_string(), version))
+}
+
+/// Minimal HTML → plain text for CivitAI descriptions: block endings become
+/// newlines, tags are dropped, common entities are decoded.
+fn html_to_text(html: &str) -> String {
+    if !html.contains('<') {
+        return html.to_string();
+    }
+    let mut out = String::with_capacity(html.len());
+    let mut rest = html;
+    loop {
+        match rest.find('<') {
+            None => {
+                out.push_str(rest);
+                break;
+            }
+            Some(i) => {
+                out.push_str(&rest[..i]);
+                // tag name decides whether it ends a line
+                let after = &rest[i + 1..];
+                let name_end = after.find(['>', ' ']).unwrap_or(after.len());
+                let raw_name = after[..name_end].to_ascii_lowercase();
+                // closing tag → drop the '/' before matching block names
+                let is_close = raw_name.starts_with('/');
+                let name = raw_name.trim_start_matches('/').to_string();
+                let block = matches!(
+                    name.as_str(),
+                    "br" | "p" | "div" | "li" | "ul" | "ol" | "table" | "tr" | "center"
+                ) || (name.len() == 2 && name.starts_with('h') && name.as_bytes()[1].is_ascii_digit())
+                    || (is_close
+                        && matches!(
+                            name.as_str(),
+                            "p" | "div" | "li" | "ul" | "ol" | "table" | "tr" | "center"
+                        ));
+                let Some(close_rel) = rest[i..].find('>') else {
+                    out.push_str(&rest[i..]);
+                    break;
+                };
+                rest = &rest[i + close_rel + 1..];
+                if block && !out.ends_with('\n') && !out.is_empty() {
+                    out.push('\n');
+                }
+            }
+        }
+    }
+    // decode common entities
+    let text = out
+        .replace("&nbsp;", " ")
+        .replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'");
+    // collapse runs of blank lines and stray whitespace around lines
+    let mut lines: Vec<String> = Vec::new();
+    for l in text.split('\n') {
+        let l = l.trim();
+        if l.is_empty() && lines.last().map(String::is_empty).unwrap_or(true) {
+            continue;
+        }
+        lines.push(l.to_string());
+    }
+    while lines.first().map(String::is_empty).unwrap_or(false) {
+        lines.remove(0);
+    }
+    while lines.last().map(String::is_empty).unwrap_or(false) {
+        lines.pop();
+    }
+    lines.join("\n")
+}
+
+/// Usage tips on the LoRA page ("Strength: 0.9") come from the version's
+/// settings block. Weights are stored ×100 on CivitAI (strength 90 → 0.9), so
+/// values above 3 are scaled back; skips and integers stay as they are.
+fn usage_tips_of(version: &Value) -> Vec<String> {
+    const KEYS: [(&str, &str); 8] = [
+        ("strength", "Strength"),
+        ("clipSkip", "Clip skip"),
+        ("vae", "VAE"),
+        ("vPerception", "Perception"),
+        ("vPrecise", "Precision"),
+        ("vCharacter", "Character"),
+        ("vVelq", "Velocity"),
+        ("vVelqFull", "Velocity (full)"),
+    ];
+    let Some(settings) = version.get("settings").and_then(|s| s.as_object()) else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    for (key, label) in KEYS {
+        if out.len() >= MAX_USAGE_TIPS {
+            break;
+        }
+        let Some(v) = settings.get(key) else { continue };
+        let Some(s) = scalar(v) else { continue };
+        let display: String = match v.as_f64() {
+            Some(f) if key == "strength" || key.starts_with("vVelq") && f > 3.0 => {
+                let scaled = format!("{}", f / 100.0);
+                scaled.trim_end_matches('0').trim_end_matches('.').to_string()
+            }
+            _ => s,
+        };
+        if display.is_empty() {
+            continue;
+        }
+        out.push(format!("{label}: {display}"));
+    }
+    // leftovers, scalar values we don't model
+    if out.len() < MAX_USAGE_TIPS {
+        if let Some(obj) = version.get("settings").and_then(|s| s.as_object()) {
+            for (k, v) in obj {
+                if out.len() >= MAX_USAGE_TIPS {
+                    break;
+                }
+                if KEYS.iter().any(|(known, _)| *known == k.as_str()) || k == "id" {
+                    continue;
+                }
+                if let Some(s) = scalar(v) {
+                    out.push(format!("{k}: {s}"));
+                }
+            }
+        }
+    }
+    out
+}
+
+/// The blue badge tag: the first "category" tag CivitAI itself shows this way
+/// ("character", "style", …), falling back to the model type label.
+fn primary_tag_of(model: &Value, tags: &[String]) -> Option<String> {
+    for want in PRIMARY_TAG_ORDER {
+        if tags.iter().any(|t| t.eq_ignore_ascii_case(want)) {
+            return Some(want.to_string());
+        }
+    }
+    model.get("type").and_then(scalar).map(|t| t.to_lowercase())
+}
+
+fn run_model(data_dir: &std::path::Path, url: &str) -> Result<CivitaiLoraImport, String> {
+    let (model_id, version_id) = parse_model_link(url)?;
+    let source_key = crate::dedup::civitai_key("model", &model_id);
+    let agent = agent();
+    let api_key: String = crate::store::open(data_dir)
+        .and_then(|c| crate::store::read_settings(&c))
+        .map(|s| s.civitai_api_key)
+        .unwrap_or_default();
+
+    let path = format!("/api/v1/models/{model_id}");
+    let mut model = get_json(&agent, &path, option_key(&api_key))?;
+    // anonymous requests can be gated exactly like the image endpoints
+    if model.is_none() && !api_key.is_empty() {
+        model = get_json(&agent, &path, Some(api_key.as_str()))?;
+    }
+    let model = model.ok_or_else(|| "CIVITAI_NOT_FOUND".to_string())?;
+
+    let versions = model
+        .get("modelVersions")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    if versions.is_empty() {
+        return Err("CIVITAI_NOT_FOUND".to_string());
+    }
+    // the pinned version wins; otherwise the first one (the page's default,
+    // and the one whose preview is on the model card)
+    let version = version_id
+        .and_then(|vid| versions.iter().find(|v| v.get("id").and_then(|x| x.as_i64()) == Some(vid)))
+        .unwrap_or(versions.first().unwrap());
+
+    let name = model
+        .get("name")
+        .and_then(scalar)
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| "CIVITAI_NOT_FOUND".to_string())?;
+    let base_model = version.get("baseModel").and_then(scalar).unwrap_or_default();
+    let published_at = version.get("publishedAt").and_then(scalar).unwrap_or_default();
+    let trigger_words: Vec<String> = version
+        .get("trainedWords")
+        .and_then(|v| v.as_array())
+        .map(|a| a.iter().filter_map(scalar).collect())
+        .unwrap_or_default();
+    let description = model
+        .get("description")
+        .and_then(|d| d.as_str())
+        .map(html_to_text)
+        .unwrap_or_default();
+    let mut tags: Vec<String> = model
+        .get("tags")
+        .and_then(|v| v.as_array())
+        .map(|a| a.iter().filter_map(scalar).collect())
+        .unwrap_or_default();
+    let primary_tag = primary_tag_of(&model, &tags);
+    // the primary badge is shown separately; don't duplicate it in the chip row
+    if let Some(pt) = &primary_tag {
+        tags.retain(|t| !t.eq_ignore_ascii_case(pt));
+    }
+    tags.truncate(MAX_TAGS);
+
+    let usage_tips = usage_tips_of(version);
+
+    // preview: the version's cover image (its first sample)
+    let url_img = version
+        .get("images")
+        .and_then(|i| i.as_array())
+        .and_then(|a| a.iter().find_map(|im| im.get("url").and_then(scalar)))
+        .ok_or_else(|| "CIVITAI_NO_IMAGE".to_string())?;
+    let bytes = get_bytes(&agent, &url_img)?;
+    if bytes.is_empty() {
+        return Err("CIVITAI_NO_IMAGE".to_string());
+    }
+    let image: PasteImageResult = images::save_temp_image_dyn(&bytes)?;
+
+    Ok(CivitaiLoraImport {
+        image,
+        name,
+        base_model,
+        published_at,
+        usage_tips,
+        trigger_words: trigger_words.into_iter().take(MAX_TRIGGER_WORDS).collect(),
+        description,
+        primary_tag,
+        tags,
+        source_key: Some(source_key),
+    })
+}
+
 // ---------------------------------------------------------------- command
 
 #[tauri::command]
@@ -561,10 +822,76 @@ pub fn civitai_source_key(url: String) -> Option<String> {
     parse_link(&url).map(|(kind, id)| crate::dedup::civitai_key(kind, &id)).ok()
 }
 
+/// CivitAI **model page** import for the LoraShelf. Same background-thread
+/// pipeline as the image import.
+#[tauri::command]
+pub async fn civitai_lora_import(
+    state: tauri::State<'_, crate::AppState>,
+    url: String,
+) -> Result<CivitaiLoraImport, String> {
+    let dir = state.dir.clone();
+    let handle = tauri::async_runtime::spawn_blocking(move || run_model(&dir, &url));
+    match handle.await {
+        Ok(res) => res,
+        Err(e) => Err(format!("CIVITAI_NETWORK: {}", es(e))),
+    }
+}
+
+/// Link → origin key pre-check for the lora flow (models only).
+#[tauri::command]
+pub fn civitai_lora_source_key(url: String) -> Option<String> {
+    parse_model_link(&url).map(|(id, _)| crate::dedup::civitai_key("model", &id)).ok()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::store::init_schema;
+
+    #[test]
+    fn parses_model_links() {
+        assert_eq!(
+            parse_model_link("https://civitai.com/models/2945627/bemyhero-finjax"),
+            Ok(("2945627".to_string(), None))
+        );
+        assert_eq!(
+            parse_model_link("https://civitai.com/models/2945627/bemyhero-finjax?modelVersionId=3335418"),
+            Ok(("2945627".to_string(), Some(3335418)))
+        );
+        assert_eq!(parse_model_link("civitai.com/models/123"), Ok(("123".to_string(), None)));
+        assert_eq!(parse_model_link("https://civitai.com/images/5"), Err("CIVITAI_URL".into()));
+        assert_eq!(parse_model_link("https://civitai.com/models/"), Err("CIVITAI_URL".into()));
+        // classic model pages carry no version id
+        assert_eq!(parse_model_link("https://civitai.com/models/2945627/bemyhero-finjax?notif=1&x=2"), Ok(("2945627".to_string(), None)));
+    }
+
+    #[test]
+    fn strips_html() {
+        assert_eq!(html_to_text("<p>First</p><p>Second</p>"), "First\nSecond");
+        assert_eq!(html_to_text("A<br>B"), "A\nB");
+        assert_eq!(html_to_text("<ul><li>one</li><li>two</li></ul>"), "one\ntwo");
+        assert_eq!(html_to_text("Fish &amp; <b>chips</b>"), "Fish & chips");
+        assert_eq!(html_to_text("plain text"), "plain text");
+        assert_eq!(html_to_text("<h4>Heading</h4>Body"), "Heading\nBody");
+    }
+
+    #[test]
+    fn builds_usage_tips() {
+        let v: Value = serde_json::json!({ "settings": { "strength": 90, "clipSkip": 2, "garbage": "x" } });
+        let tips = usage_tips_of(&v);
+        assert_eq!(tips, vec!["Strength: 0.9", "Clip skip: 2", "garbage: x"]);
+
+        let v2: Value = serde_json::json!({ "settings": { "strength": 100 } });
+        assert_eq!(usage_tips_of(&v2), vec!["Strength: 1"]);
+    }
+
+    #[test]
+    fn picks_primary_tag() {
+        let model: Value = serde_json::json!({ "type": "LORA" });
+        let tags = vec!["armour".to_string(), "character".to_string()];
+        assert_eq!(primary_tag_of(&model, &tags).as_deref(), Some("character"));
+        assert_eq!(primary_tag_of(&model, &Vec::new()).as_deref(), Some("lora"));
+    }
 
     #[test]
     fn parses_links() {

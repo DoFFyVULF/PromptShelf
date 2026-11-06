@@ -73,6 +73,11 @@
   --color-leaf-target: #d1fae5;
   --color-destructive: #dc2626;
   --color-destructive-soft: #fef2f2;
+  /* CivitAI violet family: trigger-word chips on the lora shelf */
+  --color-violet: #7c3aed;
+  --color-violet-hover: #6d28d9;
+  --color-violet-soft: #f5f3ff;
+  --color-violet-edge: #ddd6fe;
   --color-scroll: #d4d4d8;
   --color-scroll-hover: #a1a1aa;
 
@@ -170,6 +175,10 @@ body {
   --color-leaf-target: #1d3327;
   --color-destructive: #ff453a;
   --color-destructive-soft: #351a17;
+  --color-violet: #8b5cf6;
+  --color-violet-hover: #7c3aed;
+  --color-violet-soft: #2b2440;
+  --color-violet-edge: #3f3358;
   --color-scroll: #46464b;
   --color-scroll-hover: #5d5d63;
 

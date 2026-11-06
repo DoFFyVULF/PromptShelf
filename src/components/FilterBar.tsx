@@ -14,6 +14,8 @@ interface FilterBarProps {
   onOpenTags: () => void;
   selectMode: boolean;
   onToggleSelectMode: () => void;
+  /** Lora shelf: pluralised count words differ. */
+  lora?: boolean;
 }
 
 export function FilterBar({
@@ -27,7 +29,8 @@ export function FilterBar({
   onOpenGroups,
   onOpenTags,
   selectMode,
-  onToggleSelectMode
+  onToggleSelectMode,
+  lora
 }: FilterBarProps) {
   const { t, count } = useI18n();
   const hasTagsFilter = selected.length > 0;
@@ -102,7 +105,7 @@ export function FilterBar({
         <ListChecks size={13.5} />
       </button>
 
-      <span className="shrink-0 pl-1 text-[12px] text-faint">{count(shown)}</span>
+      <span className="shrink-0 pl-1 text-[12px] text-faint">{count(shown, lora ? "lora" : "prompt")}</span>
     </div>
   );
 }

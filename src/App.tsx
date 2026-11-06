@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import { ImageDown } from "lucide-react";
 import { I18nProvider, useI18n } from "./i18n";
 import { api, setLibraryDir } from "./lib/api";
@@ -7,11 +8,15 @@ import type {
   CardDetail as CardDetailData,
   CardSummary,
   CivitaiImport,
+  CivitaiLoraImport,
   DuplicateHit,
   GroupInfo,
   Lang,
   LibraryPaths,
   ListFilter,
+  LoraDetail as LoraDetailData,
+  LoraSummary,
+  Mode,
   Sort,
   StagedImage,
   TagCount,
@@ -20,9 +25,12 @@ import type {
 import { TopBar } from "./components/TopBar";
 import { FilterBar } from "./components/FilterBar";
 import { CardGrid, CARD_DRAG_TYPE } from "./components/Grid";
+import { LoraGrid } from "./components/LoraGrid";
 import { BootLoader } from "./components/BootLoader";
 import { EmptyState } from "./components/EmptyState";
 import { CardDetail } from "./components/CardDetail";
+import { LoraDetail } from "./components/LoraDetail";
+import { LoraShelfEditor } from "./components/LoraShelfEditor";
 import { Editor } from "./components/Editor";
 import { ImportDialog } from "./components/ImportDialog";
 import { ImportReceipts, type ImportReceipt } from "./components/ImportReceipts";
@@ -100,16 +108,50 @@ function Shell() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [dragging, setDragging] = useState(false);
 
+  // ---------------------------------------------------------------- lora shelf
+
+  // The logo toggles between the two shelves. Both have parallel state: grid,
+  // tags, groups, detail, editor, imports and receipts — the prompt flows are
+  // untouched, the lora flows mirror them.
+  const [mode, setMode] = useState<Mode>(() =>
+    window.localStorage.getItem("ps-mode") === "lora" ? "lora" : "prompt"
+  );
+
+  const [loras, setLoras] = useState<LoraSummary[]>([]);
+  const [loraTags, setLoraTags] = useState<TagCount[]>([]);
+
+  const [loraGroups, setLoraGroups] = useState<GroupInfo[]>([]);
+  const [loraGroupsReady, setLoraGroupsReady] = useState(false);
+  const [loraGroupId, setLoraGroupId] = useState<string>(() => window.localStorage.getItem("ps-lora-group") ?? "");
+
+  const [loraDetailId, setLoraDetailId] = useState<string | null>(null);
+  const [loraDetail, setLoraDetail] = useState<LoraDetailData | null>(null);
+
+  const [loraEditorOpen, setLoraEditorOpen] = useState(false);
+  const [loraEditorLora, setLoraEditorLora] = useState<LoraDetailData | null>(null);
+  const [loraStaged, setLoraStaged] = useState<StagedImage[]>([]);
+
+  const [loraJobs, setLoraJobs] = useState<ImportJob[]>([]);
+  const loraJobSeq = useRef(0);
+  const [loraDupHits, setLoraDupHits] = useState<DuplicateHit[] | null>(null);
+  const loraPendingDup = useRef<{ jobId: string; url: string; pre: CivitaiLoraImport | null } | null>(null);
+  const [loraReceipts, setLoraReceipts] = useState<ImportReceipt[]>([]);
+
   // refs for stable listeners
   const scrollRef = useRef<HTMLElement | null>(null);
   const editorOpenRef = useRef(false);
   const stagedRef = useRef<StagedImage[]>([]);
   const detailOpenRef = useRef(false);
   const detailIdRef = useRef<string | null>(null);
+  const loraDetailOpenRef = useRef(false);
   const cardsRef = useRef<CardSummary[]>([]);
   const filterEmptyRef = useRef(false);
   const groupsOpenRef = useRef(false);
   const selectModeRef = useRef(false);
+
+  const loraStagedRef = useRef<StagedImage[]>([]);
+  const loraEditorOpenRef = useRef(false);
+  const modeRef = useRef<Mode>(mode);
 
   useEffect(() => {
     editorOpenRef.current = editorOpen;
@@ -122,14 +164,41 @@ function Shell() {
     detailIdRef.current = detailId;
   }, [detailId]);
   useEffect(() => {
+    loraDetailOpenRef.current = loraDetailId !== null;
+  }, [loraDetailId]);
+  useEffect(() => {
     cardsRef.current = cards;
   }, [cards]);
+  const lorasRef = useRef<LoraSummary[]>([]);
+  useEffect(() => {
+    lorasRef.current = loras;
+  }, [loras]);
   useEffect(() => {
     groupsOpenRef.current = groupsOpen;
   }, [groupsOpen]);
   useEffect(() => {
     selectModeRef.current = selectMode;
   }, [selectMode]);
+
+  useEffect(() => {
+    loraStagedRef.current = loraStaged;
+  }, [loraStaged]);
+  useEffect(() => {
+    loraEditorOpenRef.current = loraEditorOpen;
+  }, [loraEditorOpen]);
+  useEffect(() => {
+    modeRef.current = mode;
+  }, [mode]);
+
+  /** Clicking the Prompt‹Shelf› logo flips the shelf; everything that mode
+   * owns is reset so the other shelf comes up clean. */
+  const toggleMode = useCallback(() => {
+    setMode((m) => {
+      const next: Mode = m === "prompt" ? "lora" : "prompt";
+      window.localStorage.setItem("ps-mode", next);
+      return next;
+    });
+  }, []);
 
   const anyFilter = debouncedQ.trim() !== "" || selectedTags.length > 0;
 
@@ -180,6 +249,36 @@ function Shell() {
     }
   }, []);
 
+  const loadLoraGroups = useCallback(async () => {
+    try {
+      const list = await api.listLoraGroups();
+      setLoraGroups(list);
+      setLoraGroupsReady(true);
+    } catch {
+      /* the grid will surface library errors */
+    }
+  }, []);
+
+  const loadLoras = useCallback(async () => {
+    const filter: ListFilter = {
+      q: debouncedQ.trim() || null,
+      tags: selectedTags,
+      min_rating: 0,
+      sort,
+      group_id: loraGroupId || null
+    };
+    try {
+      const [list, tagList] = await Promise.all([api.listLoras(filter), api.listLoraTags()]);
+      setLoras(list);
+      setLoraTags(tagList);
+      setLoadError(false);
+    } catch {
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [debouncedQ, loraGroupId, selectedTags, sort]);
+
   // keep groupId valid (e.g. the group was deleted or the library was replaced)
   useEffect(() => {
     if (!groupsReady || groups.length === 0) return;
@@ -189,16 +288,46 @@ function Shell() {
     window.localStorage.setItem("ps-group", def.id);
   }, [groups, groupsReady, groupId]);
 
+  // the same, per shelf: lora groups live separately
+  useEffect(() => {
+    if (!loraGroupsReady || loraGroups.length === 0) return;
+    if (loraGroups.some((g) => g.id === loraGroupId)) return;
+    const def = loraGroups.find((g) => g.is_default) ?? loraGroups[0];
+    setLoraGroupId(def.id);
+    window.localStorage.setItem("ps-lora-group", def.id);
+  }, [loraGroups, loraGroupsReady, loraGroupId]);
+
   const [tagsOpen, setTagsOpen] = useState(false);
 
   useEffect(() => {
     void loadMeta();
     void loadGroups();
-  }, [loadMeta, loadGroups]);
+    void loadLoraGroups();
+  }, [loadMeta, loadGroups, loadLoraGroups]);
+
+  // only the active shelf hits the grid endpoint on start / filter change
+  useEffect(() => {
+    if (groupsReady && mode === "prompt") void loadCards();
+  }, [groupsReady, mode, loadCards]);
 
   useEffect(() => {
-    if (groupsReady) void loadCards();
-  }, [groupsReady, loadCards]);
+    if (loraGroupsReady && mode === "lora") void loadLoras();
+  }, [loraGroupsReady, mode, loadLoras]);
+
+  // switching the shelf resets what mode owns: filters, selection, overlays
+  useEffect(() => {
+    setQuery("");
+    setDebouncedQ("");
+    setSelectedTags([]);
+    setSelection([]);
+    setSelectMode(false);
+    setGroupsOpen(false);
+    setTagsOpen(false);
+    setDetailId(null);
+    setDetail(null);
+    setLoraDetailId(null);
+    setLoraDetail(null);
+  }, [mode]);
 
   useEffect(() => {
     const id = window.setTimeout(() => setDebouncedQ(query), 220);
@@ -239,6 +368,54 @@ function Shell() {
     []
   );
 
+  // ---------------------------------------------------------------- lora detail
+
+  useEffect(() => {
+    if (!loraDetailId) {
+      setLoraDetail(null);
+      return;
+    }
+    let alive = true;
+    api
+      .getLora(loraDetailId)
+      .then((d) => {
+        if (alive) setLoraDetail(d);
+      })
+      .catch(() => {
+        if (alive) setLoraDetailId(null);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [loraDetailId]);
+
+  const openLoraDetail = useCallback((id: string) => setLoraDetailId(id), []);
+
+  const navLoraDetail = useCallback(
+    (dir: 1 | -1) => {
+      const list = lorasRef.current;
+      const idx = list.findIndex((c) => c.id === loraDetailId);
+      if (idx === -1) return;
+      const next = idx + dir;
+      if (next >= 0 && next < list.length) setLoraDetailId(list[next].id);
+    },
+    [loraDetailId]
+  );
+
+  const handleDeleteLora = useCallback(async () => {
+    setLoraDetailId(null);
+    await loadLoras();
+  }, [loadLoras]);
+
+  const onLoraDetailChanged = useCallback(
+    (fresh: LoraDetailData) => {
+      setLoraDetail(fresh);
+      void loadLoras();
+      void loadLoraGroups();
+    },
+    [loadLoras, loadLoraGroups]
+  );
+
   const copyPromptText = useCallback(
     async (text: string) => {
       try {
@@ -253,7 +430,10 @@ function Shell() {
 
   // ---------------------------------------------------------------- groups & selection
 
-  const currentGroup = groups.find((g) => g.id === groupId) ?? groups.find((g) => g.is_default) ?? null;
+  const currentGroup =
+    mode === "prompt"
+      ? groups.find((g) => g.id === groupId) ?? groups.find((g) => g.is_default) ?? null
+      : loraGroups.find((g) => g.id === loraGroupId) ?? loraGroups.find((g) => g.is_default) ?? null;
 
   const toggleTags = useCallback(() => {
     setTagsOpen((on) => !on);
@@ -261,13 +441,18 @@ function Shell() {
 
   const switchGroup = useCallback(
     (id: string) => {
-      setGroupId(id);
-      window.localStorage.setItem("ps-group", id);
+      if (mode === "prompt") {
+        setGroupId(id);
+        window.localStorage.setItem("ps-group", id);
+      } else {
+        setLoraGroupId(id);
+        window.localStorage.setItem("ps-lora-group", id);
+      }
       setSelection([]);
       setSelectMode(false);
       setGroupsOpen(false);
     },
-    []
+    [mode]
   );
 
   const toggleSelectMode = useCallback(() => {
@@ -285,17 +470,18 @@ function Shell() {
     async (toGroup: GroupInfo, ids: string[]) => {
       if (ids.length === 0) return;
       try {
-        await api.moveCards(ids, toGroup.id);
+        if (mode === "prompt") await api.moveCards(ids, toGroup.id);
+        else await api.moveLoras(ids, toGroup.id);
         toast(t("toast.moved", { name: toGroup.name }));
         setSelection([]);
         setSelectMode(false);
         setGroupsOpen(false);
-        await Promise.all([loadCards(), loadGroups()]);
+        await Promise.all([mode === "prompt" ? loadCards() : loadLoras(), mode === "prompt" ? loadGroups() : loadLoraGroups()]);
       } catch {
         toast(t("toast.error"), "error");
       }
     },
-    [loadCards, loadGroups, t, toast]
+    [loadCards, loadGroups, loadLoraGroups, loadLoras, mode, t, toast]
   );
 
   // ---------------------------------------------------------------- editor
@@ -318,6 +504,52 @@ function Shell() {
     setEditorCard(null);
     setEditorOpen(true);
   }, []);
+
+  // ---------------------------------------------------------------- lora editor
+
+  const clearLoraStaged = useCallback(() => {
+    for (const img of loraStagedRef.current) {
+      void api.discardTemp(img.path).catch(() => undefined);
+    }
+    setLoraStaged([]);
+    loraStagedRef.current = [];
+  }, []);
+
+  const closeLoraEditor = useCallback(() => {
+    setLoraEditorOpen(false);
+    setLoraEditorLora(null);
+    clearLoraStaged();
+  }, [clearLoraStaged]);
+
+  const openLoraEditorNew = useCallback(() => {
+    setLoraEditorLora(null);
+    setLoraEditorOpen(true);
+  }, []);
+
+  const openLoraEditorEdit = useCallback((lora: LoraDetailData) => {
+    setLoraDetailId(null);
+    setLoraEditorLora(lora);
+    setLoraEditorOpen(true);
+  }, []);
+
+  const pasteLoraGlobally = useCallback(async () => {
+    try {
+      const res = await api.pasteImageFromClipboard();
+      if (!res) {
+        toast(t("toast.imageCopied"), "info");
+        return;
+      }
+      setLoraStaged((prev) => {
+        const next = [...prev, { path: res.temp_path, preview: res.preview }];
+        loraStagedRef.current = next;
+        return next;
+      });
+      setLoraEditorLora(null);
+      setLoraEditorOpen(true);
+    } catch {
+      toast(t("toast.error"), "error");
+    }
+  }, [t, toast]);
 
   const onEditorSaved = useCallback(
     async (fresh: CardDetailData) => {
@@ -382,6 +614,31 @@ function Shell() {
       setDetailId(id);
     },
     [dropReceipt]
+  );
+
+  const undoLoraImport = useCallback(
+    async (id: string) => {
+      setLoraReceipts((prev) => prev.filter((r) => r.id !== id));
+      setLoraDetailId((cur) => (cur === id ? null : cur));
+      setSelection((prev) => prev.filter((x) => x !== id));
+      try {
+        await api.deleteLora(id);
+      } catch {
+        toast(t("toast.error"), "error");
+      }
+      await loadLoras();
+    },
+    [loadLoras, t, toast]
+  );
+
+  const openLoraReceipt = useCallback(
+    (id: string) => {
+      setLoraReceipts((prev) => prev.filter((r) => r.id !== id));
+      setImportOpen(false);
+      setMode("lora");
+      setLoraDetailId(id);
+    },
+    []
   );
 
   // CivitAI import flow: the link is resolved to its origin key and checked
@@ -488,6 +745,98 @@ function Shell() {
     setDupHits(queued.hits);
   }, [dupHits, jobs]);
 
+  // ------------------------------------------------------- lora import flow
+
+  /** Saves a fetched CivitAI model straight into the lora grid; a floating
+   * receipt confirms it, the dialog stays open for the next link. */
+  const createLoraFromImport = useCallback(
+    async (res: CivitaiLoraImport) => {
+      try {
+        const created = await api.createLora({
+          name: res.name,
+          base_model: res.base_model,
+          published_at: res.published_at,
+          usage_tips: res.usage_tips,
+          trigger_words: res.trigger_words,
+          description: res.description,
+          primary_tag: res.primary_tag,
+          tags: res.tags,
+          images: [res.image.temp_path],
+          group_id: loraGroupId,
+          source_key: res.source_key
+        });
+        setLoraReceipts((prev) => [
+          { id: created.id, thumb: res.image.preview, prompt: res.name },
+          ...prev.slice(0, 4)
+        ]);
+        await loadLoras();
+      } catch (e) {
+        // the preview was staged into the temp dir but never landed on a lora
+        void api.discardTemp(res.image.temp_path).catch(() => undefined);
+        throw e;
+      }
+    },
+    [loraGroupId, loadLoras]
+  );
+
+  const updateLoraJob = useCallback((id: string, patch: Partial<ImportJob>) => {
+    setLoraJobs((prev) => prev.map((j) => (j.id === id ? { ...j, ...patch } : j)));
+  }, []);
+
+  const removeLoraJob = useCallback((id: string) => {
+    setLoraJobs((prev) => prev.filter((j) => j.id !== id));
+  }, []);
+
+  const startLoraImport = useCallback(
+    async (url: string): Promise<void> => {
+      const v = url.trim();
+      if (!v) return;
+      loraJobSeq.current += 1;
+      const id = `lora-job-${loraJobSeq.current}`;
+      setLoraJobs((prev) => [...prev, { id, url: v, status: "running" }]);
+      try {
+        const sk = await api.civitaiLoraSourceKey(v).catch(() => null);
+        if (sk) {
+          const hits = await api.checkLoraDuplicates({ source_key: sk });
+          if (hits.length > 0) {
+            updateLoraJob(id, { status: "dup", hits, pre: null });
+            return;
+          }
+        }
+        const res = await api.civitaiLoraImport(v);
+        const hits = await api.checkLoraDuplicates({ prompt: res.name, source_key: res.source_key ?? null });
+        if (hits.length > 0) {
+          updateLoraJob(id, { status: "dup", hits, pre: res as unknown as CivitaiImport });
+          return;
+        }
+        await createLoraFromImport(res);
+        updateLoraJob(id, { status: "done", hits: undefined, pre: undefined });
+        window.setTimeout(() => removeLoraJob(id), 900);
+      } catch (e) {
+        updateLoraJob(id, { status: "error", error: importErrorToKey(String(e)) });
+      }
+    },
+    [createLoraFromImport, removeLoraJob, updateLoraJob]
+  );
+
+  const retryLoraJob = useCallback(
+    (job: ImportJob) => {
+      removeLoraJob(job.id);
+      void startLoraImport(job.url);
+    },
+    [removeLoraJob, startLoraImport]
+  );
+
+  const dismissLoraJob = useCallback((id: string) => removeLoraJob(id), [removeLoraJob]);
+
+  useEffect(() => {
+    if (loraDupHits !== null) return;
+    const queued = loraJobs.find((j) => j.status === "dup" && j.hits && j.hits.length > 0);
+    if (!queued || !queued.hits) return;
+    loraPendingDup.current = { jobId: queued.id, url: queued.url, pre: (queued.pre as unknown as CivitaiLoraImport) ?? null };
+    setLoraDupHits(queued.hits);
+  }, [loraDupHits, loraJobs]);
+
   const pasteGlobally = useCallback(async () => {    try {
       const res = await api.pasteImageFromClipboard();
       if (!res) {
@@ -542,7 +891,11 @@ function Shell() {
 
       if (meta && key === "n" && !e.shiftKey) {
         e.preventDefault();
-        if (!editorOpenRef.current) openEditorNew();
+        if (modeRef.current === "prompt") {
+          if (!editorOpenRef.current) openEditorNew();
+        } else if (!loraEditorOpenRef.current) {
+          openLoraEditorNew();
+        }
       } else if (meta && key === "f") {
         e.preventDefault();
         document.getElementById("global-search")?.focus();
@@ -550,33 +903,47 @@ function Shell() {
         e.preventDefault();
         setSettingsOpen(true);
       } else if (meta && key === "c") {
-        if (detailOpenRef.current && !editorOpenRef.current && !inField && !window.getSelection()?.toString()) {
-          const d = detail;
-          if (d) {
+        const sel = window.getSelection()?.toString();
+        if (modeRef.current === "prompt") {
+          if (detailOpenRef.current && !editorOpenRef.current && !inField && !sel) {
+            const d = detail;
+            if (d) {
+              e.preventDefault();
+              void copyPromptText(d.prompt);
+            }
+          }
+        } else if (loraDetailOpenRef.current && !loraEditorOpenRef.current && !inField && !sel && loraDetail) {
+          // ⌘C on a lora copies its trigger words (comma-separated)
+          if (loraDetail.trigger_words.length > 0) {
             e.preventDefault();
-            void copyPromptText(d.prompt);
+            void copyPromptText(loraDetail.trigger_words.join(", "));
           }
         }
       } else if (meta && key === "v") {
-        if (!inField && !editorOpenRef.current) {
+        const editorBusy = modeRef.current === "prompt" ? editorOpenRef.current : loraEditorOpenRef.current;
+        if (!inField && !editorBusy) {
           e.preventDefault();
-          void pasteGlobally();
+          void (modeRef.current === "prompt" ? pasteGlobally() : pasteLoraGlobally());
         }
       } else if (!meta && e.key === "Escape") {
         if (groupsOpenRef.current) {
           setGroupsOpen(false);
         } else if (detailOpenRef.current && !editorOpenRef.current && !settingsOpen) {
           setDetailId(null);
+        } else if (loraDetailOpenRef.current && !loraEditorOpenRef.current && !settingsOpen) {
+          setLoraDetailId(null);
         }
       } else if (!meta && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
-        if (detailOpenRef.current && !editorOpenRef.current && !inField) {
+        if (!inField && loraDetailOpenRef.current && !loraEditorOpenRef.current) {
+          navLoraDetail(e.key === "ArrowLeft" ? -1 : 1);
+        } else if (detailOpenRef.current && !editorOpenRef.current && !inField) {
           navDetail(e.key === "ArrowLeft" ? -1 : 1);
         }
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [copyPromptText, detail, navDetail, openEditorNew, pasteGlobally, settingsOpen]);
+  }, [copyPromptText, detail, loraDetail, navDetail, navLoraDetail, openEditorNew, openLoraEditorNew, pasteGlobally, pasteLoraGlobally, settingsOpen]);
 
   // ---------------------------------------------------------------- drag & drop
 
@@ -634,17 +1001,33 @@ function Shell() {
           })
         );
         const ok = results.flatMap((r) => (r.status === "fulfilled" ? [r.value] : []));
-        setStaged((prev) => {
-          const next = [...prev];
-          for (const r of ok) {
-            if (!next.some((s) => s.path === r.temp_path)) next.push({ path: r.temp_path, preview: r.preview });
+        for (const r of ok) {
+          // staged paths go to the editor of the active shelf
+          if (modeRef.current === "lora") {
+            setLoraStaged((prev) => {
+              if (prev.some((s) => s.path === r.temp_path)) return prev;
+              const next = [...prev, { path: r.temp_path, preview: r.preview }];
+              loraStagedRef.current = next;
+              return next;
+            });
+          } else {
+            setStaged((prev) => {
+              if (prev.some((s) => s.path === r.temp_path)) return prev;
+              const next = [...prev, { path: r.temp_path, preview: r.preview }];
+              stagedRef.current = next;
+              return next;
+            });
           }
-          stagedRef.current = next;
-          return next;
-        });
-        if (ok.length > 0 && !editorOpenRef.current) {
-          setEditorCard(null);
-          setEditorOpen(true);
+        }
+        const currentEditor = modeRef.current === "lora" ? loraEditorOpenRef.current : editorOpenRef.current;
+        if (ok.length > 0 && !currentEditor) {
+          if (modeRef.current === "lora") {
+            setLoraEditorLora(null);
+            setLoraEditorOpen(true);
+          } else {
+            setEditorCard(null);
+            setEditorOpen(true);
+          }
         }
       })();
     };
@@ -682,22 +1065,28 @@ function Shell() {
 
   // ---------------------------------------------------------------- render
 
-  const filterEmpty = !anyFilter && cards.length === 0 && jobs.length === 0 && !loading && !loadError;
+  const activeCards = mode === "prompt" ? cards : loras;
+  const activeJobs = mode === "prompt" ? jobs : loraJobs;
+
+  const filterEmpty =
+    !anyFilter && activeCards.length === 0 && activeJobs.length === 0 && !loading && !loadError;
 
   return (
     <div className="flex h-full flex-col">
       <TopBar
+        mode={mode}
+        onToggleMode={toggleMode}
         query={query}
         onQuery={setQuery}
         sort={sort}
         onSort={setSort}
-        onNew={openEditorNew}
+        onNew={mode === "prompt" ? openEditorNew : openLoraEditorNew}
         onImportCivitai={() => setImportOpen(true)}
         onSettings={() => setSettingsOpen(true)}
       />
 
       <FilterBar
-        tags={tags}
+        tags={mode === "prompt" ? tags : loraTags}
         selected={selectedTags}
         onToggle={(tag) => setSelectedTags((prev) => (prev.includes(tag) ? prev.filter((x) => x !== tag) : [...prev, tag]))}
         onClear={() => {
@@ -705,19 +1094,20 @@ function Shell() {
           setQuery("");
           setDebouncedQ("");
         }}
-        shown={cards.length}
+        shown={activeCards.length}
         filtering={anyFilter}
         group={currentGroup}
         onOpenGroups={() => setGroupsOpen((v) => !v)}
         onOpenTags={toggleTags}
         selectMode={selectMode}
         onToggleSelectMode={toggleSelectMode}
+        lora={mode === "lora"}
       />
 
       <main ref={scrollRef} className="relative min-h-0 flex-1 overflow-y-auto">
-        {loading && cards.length === 0 ? (
+        {loading && activeCards.length === 0 ? (
           <BootLoader />
-        ) : loadError && cards.length === 0 ? (
+        ) : loadError && activeCards.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 pb-16">
             <p className="text-[14px] text-muted">{t("state.error")}</p>
             <button
@@ -725,7 +1115,7 @@ function Shell() {
               className="btn-ghost press cursor-pointer"
               onClick={() => {
                 setLoading(true);
-                void loadCards();
+                void (mode === "prompt" ? loadCards() : loadLoras());
               }}
             >
               {t("action.retry")}
@@ -734,27 +1124,62 @@ function Shell() {
         ) : filterEmpty ? (
           <EmptyState
             hasFilters={false}
-            onNew={openEditorNew}
+            lora={mode === "lora"}
+            onImport={() => setImportOpen(true)}
+            onNew={mode === "prompt" ? openEditorNew : openLoraEditorNew}
             onPaste={() => void pasteGlobally()}
             onClear={() => undefined}
           />
-        ) : cards.length === 0 && anyFilter && jobs.length === 0 ? (
-          <EmptyState hasFilters onNew={openEditorNew} onPaste={() => undefined} onClear={() => {
-            setSelectedTags([]);
-            setQuery("");
-            setDebouncedQ("");
-          }} />
-        ) : (
-          <CardGrid
-            cards={cards}
-            jobs={jobs}
-            onJobRetry={(job) => retryJob(job)}
-            onJobDismiss={dismissJob}
-            onOpen={openDetail}
-            selectMode={selectMode}
-            selection={selection}
-            onToggleSelect={toggleSelect}
+        ) : activeCards.length === 0 && anyFilter && activeJobs.length === 0 ? (
+          <EmptyState
+            lora={mode === "lora"}
+            hasFilters
+            onNew={mode === "prompt" ? openEditorNew : openLoraEditorNew}
+            onPaste={() => undefined}
+            onClear={() => {
+              setSelectedTags([]);
+              setQuery("");
+              setDebouncedQ("");
+            }}
           />
+        ) : (
+          <AnimatePresence mode="wait" initial={false}>
+            {mode === "prompt" ? (
+              <motion.div
+                key="prompt"
+                exit={{ opacity: 0, y: -12, scale: 0.985 }}
+                transition={{ duration: 0.18, ease: "easeOut" }}
+              >
+                <CardGrid
+                  cards={cards}
+                  jobs={jobs}
+                  onJobRetry={(job) => retryJob(job)}
+                  onJobDismiss={dismissJob}
+                  onOpen={openDetail}
+                  selectMode={selectMode}
+                  selection={selection}
+                  onToggleSelect={toggleSelect}
+                />
+              </motion.div>
+            ) : (
+              <motion.div
+                key="lora"
+                exit={{ opacity: 0, y: -12, scale: 0.985 }}
+                transition={{ duration: 0.18, ease: "easeOut" }}
+              >
+                <LoraGrid
+                  loras={loras}
+                  jobs={loraJobs}
+                  onJobRetry={(job) => retryLoraJob(job)}
+                  onJobDismiss={dismissLoraJob}
+                  onOpen={openLoraDetail}
+                  selectMode={selectMode}
+                  selection={selection}
+                  onToggleSelect={toggleSelect}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
         )}
       </main>
 
@@ -763,18 +1188,19 @@ function Shell() {
       <GroupsPanel
         open={groupsOpen}
         onClose={() => setGroupsOpen(false)}
-        groups={groups}
+        groups={mode === "prompt" ? groups : loraGroups}
         currentGroupId={currentGroup?.id ?? ""}
         selection={selection}
+        lora={mode === "lora"}
         onSwitch={switchGroup}
-        onChanged={() => void loadGroups()}
+        onChanged={() => void (mode === "prompt" ? loadGroups() : loadLoraGroups())}
         onMoved={(toGroup, ids) => void moveSelection(toGroup, ids)}
       />
 
       <TagsDialog
         open={tagsOpen}
         onClose={() => setTagsOpen(false)}
-        tags={tags}
+        tags={mode === "prompt" ? tags : loraTags}
         selected={selectedTags}
         onToggle={(tag) =>
           setSelectedTags((prev) => (prev.includes(tag) ? prev.filter((x) => x !== tag) : [...prev, tag]))
@@ -824,7 +1250,7 @@ function Shell() {
         </div>
       )}
 
-      {detail && detailId && (
+      {detail && detailId && mode === "prompt" && (
         <CardDetail
           card={detail}
           hasPrev={cards.findIndex((c) => c.id === detailId) > 0}
@@ -834,6 +1260,33 @@ function Shell() {
           onClose={() => setDetailId(null)}
           onChanged={onDetailChanged}
           onDeleted={() => void handleDeleteCard()}
+        />
+      )}
+
+      {loraDetail && loraDetailId && mode === "lora" && (
+        <LoraDetail
+          lora={loraDetail}
+          hasPrev={loras.findIndex((c) => c.id === loraDetailId) > 0}
+          hasNext={loras.findIndex((c) => c.id === loraDetailId) < loras.length - 1}
+          onPrev={() => navLoraDetail(-1)}
+          onNext={() => navLoraDetail(1)}
+          onClose={() => setLoraDetailId(null)}
+          onChanged={onLoraDetailChanged}
+          onEdit={openLoraEditorEdit}
+          onDeleted={() => void handleDeleteLora()}
+        />
+      )}
+
+      {loraEditorOpen && (
+        <LoraShelfEditor
+          lora={loraEditorLora}
+          staged={loraStaged}
+          onStaged={setLoraStaged}
+          onClose={closeLoraEditor}
+          onSaved={(fresh: LoraDetailData) => {
+            closeLoraEditor();
+            void loadLoras().then(() => setLoraDetailId(fresh.id));
+          }}
         />
       )}
 
@@ -871,50 +1324,96 @@ function Shell() {
       <ImportDialog
         open={importOpen}
         onClose={() => setImportOpen(false)}
-        onSubmit={(url) => void startCivitaiImport(url)}
+        lora={mode === "lora"}
+        onSubmit={(url) => void (mode === "prompt" ? startCivitaiImport(url) : startLoraImport(url))}
       />
-      <DuplicateDialog
-        open={dupHits !== null}
-        hits={dupHits ?? []}
-        proceedKey="dup.proceed"
-        onProceed={() => {
-          const p = pendingDup.current;
-          setDupHits(null);
-          pendingDup.current = null;
-          if (!p) return;
-          updateJob(p.jobId, { status: "running", hits: undefined, pre: undefined });
-          void (async () => {
-            // the user approved the duplicate — create it without further checks
-            const res = p.pre ?? (await api.civitaiImport(p.url));
-            await createFromImport(res);
-            updateJob(p.jobId, { status: "done" });
-            window.setTimeout(() => removeJob(p.jobId), 900);
-          })().catch((e) => updateJob(p.jobId, { status: "error", error: importErrorToKey(String(e)) }));
-        }}
-        onOpen={(id) => {
-          const p = pendingDup.current;
-          if (p?.pre) void api.discardTemp(p.pre.image.temp_path).catch(() => undefined);
-          setDupHits(null);
-          pendingDup.current = null;
-          if (p) removeJob(p.jobId);
-          setImportOpen(false);
-          setDetailId(id);
-        }}
-        onClose={() => {
-          const p = pendingDup.current;
-          // leaving two hits without a decision must not leak the staged image
-          if (p?.pre) void api.discardTemp(p.pre.image.temp_path).catch(() => undefined);
-          setDupHits(null);
-          pendingDup.current = null;
-          if (p) removeJob(p.jobId);
-        }}
-      />
+      {mode === "prompt" && (
+        <DuplicateDialog
+          open={dupHits !== null}
+          hits={dupHits ?? []}
+          proceedKey="dup.proceed"
+          onProceed={() => {
+            const p = pendingDup.current;
+            setDupHits(null);
+            pendingDup.current = null;
+            if (!p) return;
+            updateJob(p.jobId, { status: "running", hits: undefined, pre: undefined });
+            void (async () => {
+              // the user approved the duplicate — create it without further checks
+              const res = p.pre ?? (await api.civitaiImport(p.url));
+              await createFromImport(res);
+              updateJob(p.jobId, { status: "done" });
+              window.setTimeout(() => removeJob(p.jobId), 900);
+            })().catch((e) => updateJob(p.jobId, { status: "error", error: importErrorToKey(String(e)) }));
+          }}
+          onOpen={(id) => {
+            const p = pendingDup.current;
+            if (p?.pre) void api.discardTemp(p.pre.image.temp_path).catch(() => undefined);
+            setDupHits(null);
+            pendingDup.current = null;
+            if (p) removeJob(p.jobId);
+            setImportOpen(false);
+            setDetailId(id);
+          }}
+          onClose={() => {
+            const p = pendingDup.current;
+            // leaving two hits without a decision must not leak the staged image
+            if (p?.pre) void api.discardTemp(p.pre.image.temp_path).catch(() => undefined);
+            setDupHits(null);
+            pendingDup.current = null;
+            if (p) removeJob(p.jobId);
+          }}
+        />
+      )}
+      {mode === "lora" && (
+        <DuplicateDialog
+          open={loraDupHits !== null}
+          hits={loraDupHits ?? []}
+          proceedKey="dup.proceed"
+          onProceed={() => {
+            const p = loraPendingDup.current;
+            setLoraDupHits(null);
+            loraPendingDup.current = null;
+            if (!p) return;
+            updateLoraJob(p.jobId, { status: "running", hits: undefined, pre: undefined });
+            void (async () => {
+              // the user approved the duplicate — create it without further checks
+              const res = (p.pre as CivitaiLoraImport | null) ?? (await api.civitaiLoraImport(p.url));
+              await createLoraFromImport(res);
+              updateLoraJob(p.jobId, { status: "done" });
+              window.setTimeout(() => removeLoraJob(p.jobId), 900);
+            })().catch((e) => updateLoraJob(p.jobId, { status: "error", error: importErrorToKey(String(e)) }));
+          }}
+          onOpen={(id) => {
+            const p = loraPendingDup.current;
+            if (p?.pre) void api.discardTemp(p.pre.image.temp_path).catch(() => undefined);
+            setLoraDupHits(null);
+            loraPendingDup.current = null;
+            if (p) removeLoraJob(p.jobId);
+            setImportOpen(false);
+            setLoraDetailId(id);
+          }}
+          onClose={() => {
+            const p = loraPendingDup.current;
+            if (p?.pre) void api.discardTemp(p.pre.image.temp_path).catch(() => undefined);
+            setLoraDupHits(null);
+            loraPendingDup.current = null;
+            if (p) removeLoraJob(p.jobId);
+          }}
+        />
+      )}
 
       <ImportReceipts
         items={receipts}
         onOpen={openReceipt}
         onUndo={(id) => void undoImport(id)}
         onExpire={dropReceipt}
+      />
+      <ImportReceipts
+        items={loraReceipts}
+        onOpen={openLoraReceipt}
+        onUndo={(id) => void undoLoraImport(id)}
+        onExpire={(id) => setLoraReceipts((prev) => prev.filter((r) => r.id !== id))}
       />
 
       {dragging && (

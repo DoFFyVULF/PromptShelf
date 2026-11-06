@@ -56,6 +56,58 @@ CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
 );
+-- LoRA shelf: a parallel library with its own groups and tags.
+CREATE TABLE IF NOT EXISTS loras (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL DEFAULT '',
+    base_model TEXT NOT NULL DEFAULT '',
+    published_at TEXT NOT NULL DEFAULT '',
+    usage_tips TEXT NOT NULL DEFAULT '[]',
+    trigger_words TEXT NOT NULL DEFAULT '[]',
+    description TEXT NOT NULL DEFAULT '',
+    primary_tag TEXT,
+    note TEXT NOT NULL DEFAULT '',
+    rating INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    group_id TEXT,
+    cover_image_id TEXT,
+    source_key TEXT,
+    text_hash TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_loras_group ON loras(group_id);
+CREATE INDEX IF NOT EXISTS idx_loras_source_key ON loras(source_key) WHERE source_key IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_loras_text_hash ON loras(text_hash) WHERE text_hash IS NOT NULL;
+CREATE TABLE IF NOT EXISTS lora_images (
+    id TEXT PRIMARY KEY,
+    lora_id TEXT NOT NULL REFERENCES loras(id) ON DELETE CASCADE,
+    file TEXT NOT NULL,
+    thumb TEXT NOT NULL,
+    original TEXT,
+    width INTEGER NOT NULL,
+    height INTEGER NOT NULL,
+    bytes INTEGER NOT NULL,
+    sort INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_lora_images_lora ON lora_images(lora_id, sort);
+CREATE TABLE IF NOT EXISTS lora_groups (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    is_default INTEGER NOT NULL DEFAULT 0,
+    sort INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_lora_groups_sort ON lora_groups(is_default DESC, sort, name);
+CREATE TABLE IF NOT EXISTS lora_tags (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE COLLATE NOCASE
+);
+CREATE TABLE IF NOT EXISTS lora_card_tags (
+    lora_id TEXT NOT NULL REFERENCES loras(id) ON DELETE CASCADE,
+    tag_id INTEGER NOT NULL REFERENCES lora_tags(id) ON DELETE CASCADE,
+    PRIMARY KEY (lora_id, tag_id)
+);
+CREATE INDEX IF NOT EXISTS idx_lora_card_tags_tag ON lora_card_tags(tag_id);
 "#;
 
 pub fn open(dir: &Path) -> Result<Connection, String> {
@@ -132,10 +184,18 @@ fn ensure_columns(conn: &Connection) -> Result<(), String> {
 }
 
 /// Id of the default group; creates it (and backfills cards) when missing.
-/// The seed name follows the stored UI language.
-pub fn default_group_id(conn: &Connection) -> Result<String, String> {
+/// The seed name follows the stored UI language. Generic over the prompt
+/// (`groups`/`cards`) and Lora (`lora_groups`/`loras`) shelves.
+pub fn default_group_id_in(
+    conn: &Connection,
+    groups_table: &str,
+    cards_table: &str,
+) -> Result<String, String> {
+    let sql = format!(
+        "SELECT id FROM {groups_table} WHERE is_default = 1 LIMIT 1"
+    );
     if let Some(id) = conn
-        .query_row("SELECT id FROM groups WHERE is_default = 1 LIMIT 1", [], |r| r.get::<_, String>(0))
+        .query_row(&sql, [], |r| r.get::<_, String>(0))
         .optional()
         .map_err(es)?
     {
@@ -148,14 +208,24 @@ pub fn default_group_id(conn: &Connection) -> Result<String, String> {
         .map_err(es)?;
     let name = if lang.as_deref() == Some("ru") { "Домашняя" } else { "Home" };
     let id = uuid::Uuid::new_v4().to_string();
-    conn.execute(
-        "INSERT INTO groups(id, name, is_default, sort, created_at) VALUES(?1, ?2, 1, 0, ?3)",
-        rusqlite::params![id, name, chrono::Utc::now().to_rfc3339()],
-    )
-    .map_err(es)?;
-    conn.execute("UPDATE cards SET group_id = ?1 WHERE group_id IS NULL", rusqlite::params![id])
+    let ins = format!(
+        "INSERT INTO {groups_table}(id, name, is_default, sort, created_at) VALUES(?1, ?2, 1, 0, ?3)"
+    );
+    conn.execute(&ins, rusqlite::params![id, name, chrono::Utc::now().to_rfc3339()])
         .map_err(es)?;
+    let backfill = format!("UPDATE {cards_table} SET group_id = ?1 WHERE group_id IS NULL");
+    conn.execute(&backfill, rusqlite::params![id]).map_err(es)?;
     Ok(id)
+}
+
+/// Prompt shelf default group (moved onto the generic helper).
+pub fn default_group_id(conn: &Connection) -> Result<String, String> {
+    default_group_id_in(conn, "groups", "cards")
+}
+
+/// Lora shelf default group.
+pub fn default_lora_group_id(conn: &Connection) -> Result<String, String> {
+    default_group_id_in(conn, "lora_groups", "loras")
 }
 
 pub fn read_settings(conn: &Connection) -> Result<AppSettings, String> {

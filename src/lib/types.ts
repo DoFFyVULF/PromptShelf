@@ -1,6 +1,8 @@
 export type Lang = "en" | "ru";
 export type Theme = "system" | "light" | "dark";
 export type Sort = "newest" | "oldest" | "rating";
+/** Which shelf is on screen: the logo toggles these. */
+export type Mode = "prompt" | "lora";
 
 export interface ImageInfo {
   id: string;
@@ -150,6 +152,89 @@ export interface CivitaiImport {
   tags: string[];
   meta: MetaItem[];
   /** Origin fingerprint from the pasted CivitAI link (dup detection). */
+  source_key?: string | null;
+}
+
+// ---------------------------------------------------------------- lora shelf
+
+export type LoraUsageTip = string;
+
+export interface LoraSummary {
+  id: string;
+  name: string;
+  base_model: string;
+  /** ISO date from the CivitAI "Published" field. */
+  published_at: string;
+  /** CivitAI model type/category, e.g. "character" — the blue badge. */
+  primary_tag: string | null;
+  trigger_words: string[];
+  rating: number;
+  created_at: string;
+  updated_at: string;
+  cover: ImageInfo | null;
+  group_id: string;
+  tags: string[];
+}
+
+export interface LoraDetail {
+  id: string;
+  name: string;
+  base_model: string;
+  published_at: string;
+  usage_tips: LoraUsageTip[];
+  trigger_words: string[];
+  description: string;
+  primary_tag: string | null;
+  note: string | null;
+  rating: number;
+  created_at: string;
+  updated_at: string;
+  group_id: string;
+  tags: string[];
+  images: ImageInfo[];
+  cover: ImageInfo | null;
+}
+
+export interface NewLoraInput {
+  name: string;
+  base_model?: string;
+  published_at?: string;
+  usage_tips?: string[];
+  trigger_words?: string[];
+  description?: string;
+  primary_tag?: string | null;
+  note?: string;
+  rating?: number;
+  tags: string[];
+  images?: string[];
+  group_id?: string | null;
+  /** Origin fingerprint for an imported lora (dup detection). */
+  source_key?: string | null;
+}
+
+export interface UpdateLoraInput {
+  id: string;
+  name: string;
+  base_model?: string;
+  usage_tips?: string[];
+  trigger_words?: string[];
+  description?: string;
+  primary_tag?: string | null;
+  note?: string;
+  rating?: number;
+  tags: string[];
+}
+
+export interface CivitaiLoraImport {
+  image: PasteImageResult;
+  name: string;
+  base_model: string;
+  published_at: string;
+  usage_tips: string[];
+  trigger_words: string[];
+  description: string;
+  primary_tag: string | null;
+  tags: string[];
   source_key?: string | null;
 }
 

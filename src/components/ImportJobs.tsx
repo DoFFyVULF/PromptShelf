@@ -1,6 +1,6 @@
 import { motion, useReducedMotion } from "motion/react";
 import { Check, CloudDownload, Copy, Loader2, RotateCcw, TriangleAlert, X } from "lucide-react";
-import { useI18n } from "../i18n";
+import { useI18n, type DictKey } from "../i18n";
 import type { CivitaiImport, DuplicateHit } from "../lib/types";
 
 /** One background CivitAI import: lives as a placeholder card in the grid
@@ -40,15 +40,21 @@ interface ImportJobTileProps {
   job: ImportJob;
   onRetry: (job: ImportJob) => void;
   onDismiss: (id: string) => void;
+  /** Lora shelf: the same tile, model-page error copy. */
+  lora?: boolean;
 }
 
 /** Grid placeholder that mirrors the CardTile anatomy: cover area up top,
  * meta underneath. Running = dormant cover with a light sweep; done = a
  * stamped check for a beat before the tile dissolves under the real card. */
-export function ImportJobTile({ job, onRetry, onDismiss }: ImportJobTileProps) {
+export function ImportJobTile({ job, onRetry, onDismiss, lora }: ImportJobTileProps) {
   const { t } = useI18n();
   const reduce = useReducedMotion() ?? false;
   const label = importJobLabel(job.url);
+  const errorKey = (err: ImportJobError) =>
+    lora
+      ? `import.lora.error${err === "url" ? "Url" : err === "notfound" ? "NotFound" : "Generic"}`
+      : `import.civitai.error${err === "url" ? "Url" : err === "notfound" ? "NotFound" : "Generic"}`;
 
   return (
     <motion.article
@@ -110,7 +116,7 @@ export function ImportJobTile({ job, onRetry, onDismiss }: ImportJobTileProps) {
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-destructive">
               <TriangleAlert size={26} strokeWidth={1.4} />
               <span role="alert" className="sr-only">
-                {t(`import.civitai.error${job.error === "url" ? "Url" : job.error === "notfound" ? "NotFound" : "Generic"}`)}
+                {t(errorKey(job.error ?? "generic") as DictKey)}
               </span>
             </div>
           )}
@@ -121,9 +127,7 @@ export function ImportJobTile({ job, onRetry, onDismiss }: ImportJobTileProps) {
         {job.status === "error" ? (
           <>
             <p className="line-clamp-2 min-h-[2.6em] text-[12.5px] leading-[1.42] text-destructive">
-              {t(
-                `import.civitai.error${job.error === "url" ? "Url" : job.error === "notfound" ? "NotFound" : "Generic"}`
-              )}
+              {t(errorKey(job.error ?? "generic") as DictKey)}
             </p>
             <div className="mt-auto flex items-center justify-between pt-2.5">
               <button

@@ -2,6 +2,7 @@ mod cards;
 mod civitai;
 mod dedup;
 mod images;
+mod loras;
 mod models;
 mod store;
 mod transfer;
@@ -62,6 +63,23 @@ pub fn run() {
             images::import_dropped_file,
             civitai::civitai_import,
             civitai::civitai_source_key,
+            loras::list_loras,
+            loras::get_lora,
+            loras::create_lora,
+            loras::update_lora,
+            loras::delete_lora,
+            loras::add_lora_image,
+            loras::delete_lora_image,
+            loras::set_lora_cover,
+            loras::list_lora_tags,
+            loras::list_lora_groups,
+            loras::create_lora_group,
+            loras::rename_lora_group,
+            loras::delete_lora_group,
+            loras::move_loras,
+            loras::check_lora_duplicates,
+            civitai::civitai_lora_import,
+            civitai::civitai_lora_source_key,
             dedup::check_duplicates,
             store::get_settings,
             store::set_settings,
