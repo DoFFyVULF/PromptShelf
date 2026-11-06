@@ -204,6 +204,46 @@ body {
   font-weight: 800;
   letter-spacing: -0.045em;
 }
+/* A quiet sheen sweeps across the active word every few seconds — enough to
+   hint the logo is interactive without competing with the page. Colors come
+   from vars (not currentColor): background-clip:text forces color:transparent
+   on the element itself, which would resolve currentColor to transparent.
+   On "Prompt" the sheen is a blue glint over ink; on "Lora" a lighter blue
+   over the action accent. */
+.wordmark-word {
+  --wm-base: var(--color-ink);
+  --wm-sheen: color-mix(in oklab, var(--color-ink), var(--color-action) 80%);
+  background-image: linear-gradient(
+    105deg,
+    var(--wm-base) 32%,
+    var(--wm-sheen) 50%,
+    var(--wm-base) 68%
+  );
+  background-size: 260% 100%;
+  background-position: 100% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: wordmark-shimmer 5s ease-in-out infinite;
+}
+.wordmark-word.text-action {
+  --wm-base: var(--color-action);
+  --wm-sheen: color-mix(in oklab, var(--color-action), var(--color-canvas) 35%);
+}
+@keyframes wordmark-shimmer {
+  0%,
+  58% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: 0% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wordmark-word {
+    animation: none;
+  }
+}
 .t-title {
   font-size: 22px;
   line-height: 1.15;
@@ -330,6 +370,16 @@ body {
 }
 .press:active {
   transform: scale(0.96);
+}
+/* Like .press but without the transform transition — for elements whose
+   transform is written per-frame by Motion layout animations. Press feedback
+   comes from whileTap instead. */
+.press-bg {
+  transition:
+    background-color 0.2s var(--ease-apple),
+    border-color 0.2s var(--ease-apple),
+    color 0.2s var(--ease-apple),
+    opacity 0.2s var(--ease-apple);
 }
 
 .btn-primary {
