@@ -858,3 +858,47 @@ mod tests {
         assert_eq!(clean_strings(&["x".into()], 96, 0), Vec::<String>::new());
     }
 }
+
+
+#[cfg(test)]
+mod repro {
+    use super::*;
+    use crate::models::NewLoraInput;
+
+    #[test]
+    fn delete_lora_clears_duplicate_hits() {
+        let dir = std::env::temp_dir().join(format!("repro-lora-dup-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let input = NewLoraInput {
+            name: "Aunt Cass".into(),
+            base_model: "Krea 2".into(),
+            published_at: String::new(),
+            usage_tips: vec![],
+            trigger_words: vec!["c4ss".into()],
+            description: "desc".into(),
+            primary_tag: None,
+            note: String::new(),
+            rating: 0,
+            tags: vec![],
+            images: vec![],
+            group_id: None,
+            source_key: Some("civitai:model/2846111".into()),
+        };
+        let created = create_lora_inner(&dir, input).unwrap();
+
+        let check = crate::models::DuplicateCheckInput {
+            prompt: None,
+            source_key: Some("civitai:model/2846111".into()),
+        };
+        let hits = find_lora_duplicates(&dir, &check).unwrap();
+        assert_eq!(hits.len(), 1, "before delete a duplicate must be found");
+
+        delete_lora_inner(&dir, &created.id).unwrap();
+
+        let hits = find_lora_duplicates(&dir, &check).unwrap();
+        assert!(hits.is_empty(), "after delete there must be no duplicates");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+}
