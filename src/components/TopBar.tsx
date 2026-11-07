@@ -1,4 +1,5 @@
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { useMemo } from "react";
 import { Search, Plus, Settings2, ChevronDown, CloudDownload } from "lucide-react";
 import { useI18n } from "../i18n";
 import { modKey } from "../lib/platform";
@@ -14,6 +15,8 @@ interface TopBarProps {
   onNew: () => void;
   onImportCivitai: () => void;
   onSettings: () => void;
+  updateAvailable: boolean;
+  onUpdateOpen: () => void;
 }
 
 /** Word/label swaps are soft blur-crossfades; size/position changes ride on
@@ -35,6 +38,66 @@ const WORD_ROLL_VARIANTS = {
   exit: (dir: Mode) => ({ y: dir === "lora" ? "-150%" : "150%" }),
 };
 
+/** The update tease: a real slot drum. Instead of swapping single words, a
+ * continuous strip of Prompt/Lora/Update cells scrolls through the window —
+ * neighbours are visible mid-pull — decelerating pull by pull, until the last
+ * pull overshoots past the Update slot (the next Prompt peeks in from below)
+ * and Update eases back down into place. */
+const DRUM_CYCLE = ["Prompt", "Lora", "Update"] as const;
+const DRUM_SLOT = 16; // px, one cell — matches text-[16px] leading-none
+const DRUM_OVERSHOOT = 5; // px past the final slot, the near-miss peek
+const DRUM_EASE: [number, number, number, number] = [0.32, 0.72, 0, 1];
+
+interface DrumStrip {
+  words: string[];
+  keys: number[];
+  times: number[];
+  eases: ([number, number, number, number] | "easeOut")[];
+  total: number;
+}
+
+function buildDrum(mode: Mode): DrumStrip {
+  // the strip starts at the currently shown word, so mounting the drum is
+  // seamless, and always ends on the third Update
+  const words: string[] = [mode === "lora" ? "Lora" : "Prompt"];
+  let i = DRUM_CYCLE.indexOf(words[0] as (typeof DRUM_CYCLE)[number]) + 1;
+  let updates = 0;
+  for (; updates < 3; i++) {
+    const w = DRUM_CYCLE[i % 3];
+    if (w === "Update") updates += 1;
+    words.push(w);
+  }
+  // the drum parks on the last Update — count the pulls before appending the
+  // peek cell below it, which the strip never scrolls to
+  const n = words.length - 1;
+  words.push(DRUM_CYCLE[i % 3]);
+  const keys: number[] = [0];
+  const durs: number[] = [];
+  const eases: DrumStrip["eases"] = [];
+  for (let p = 0; p < n; p++) {
+    if (p < n - 1) {
+      // quadratic slowdown: brisk pulls first, lazier ones towards the end
+      durs.push(0.26 + 0.4 * Math.pow(p / Math.max(1, n - 2), 2));
+      eases.push(DRUM_EASE);
+      keys.push(-(p + 1) * DRUM_SLOT);
+    } else {
+      // the final pull runs past the Update slot, then eases back into it
+      durs.push(0.72, 0.3);
+      eases.push("easeOut", DRUM_EASE);
+      keys.push(-(n * DRUM_SLOT) - DRUM_OVERSHOOT, -(n * DRUM_SLOT));
+    }
+  }
+  const total = durs.reduce((a, b) => a + b, 0);
+  const times: number[] = [];
+  let at = 0;
+  for (const d of durs) {
+    times.push(at / total);
+    at += d;
+  }
+  times.push(1);
+  return { words, keys, times, eases, total };
+}
+
 function SwappableLabel({ show, text, reduce, className = "" }: { show: boolean; text: string; reduce: boolean; className?: string }) {
   return (
     <motion.span layout={reduce ? false : true} className={`relative inline-block ${show ? "" : "hidden"} ${className}`}>
@@ -55,19 +118,28 @@ function SwappableLabel({ show, text, reduce, className = "" }: { show: boolean;
   );
 }
 
-export function TopBar({ mode, onToggleMode, query, onQuery, sort, onSort, onNew, onImportCivitai, onSettings }: TopBarProps) {
+export function TopBar({ mode, onToggleMode, query, onQuery, sort, onSort, onNew, onImportCivitai, onSettings, updateAvailable, onUpdateOpen }: TopBarProps) {
   const { t } = useI18n();
   const reduce = useReducedMotion() ?? false;
   const layout = reduce ? false : true;
+
+  // The drum is mounted for the whole life of the badge: it spins once when
+  // the update appears and stays parked on the final Update slot; dismissing
+  // it unmounts, so it replays when the badge returns.
+  const drum = useMemo(() => (updateAvailable && !reduce ? buildDrum(mode) : null), [updateAvailable, reduce, mode]);
+
+  // While an update is pending the wordmark slot shows "Update" and clicking
+  // the logo opens the update dialog.
+  const label = updateAvailable ? "Update" : mode === "prompt" ? "Prompt" : "Lora";
 
   return (
     <header className="relative z-40 flex h-14 shrink-0 items-center gap-3 border-b border-hairline bg-canvas/85 px-4 backdrop-blur-xl">
       <div className="pr-1">
         <button
           type="button"
-          onClick={onToggleMode}
-          aria-label={t("app.mode.toggle")}
-          title={t("app.mode.toggle")}
+          onClick={updateAvailable ? onUpdateOpen : onToggleMode}
+          aria-label={updateAvailable ? t("settings.updates.badge") : t("app.mode.toggle")}
+          title={updateAvailable ? t("settings.updates.badge") : t("app.mode.toggle")}
           className="press group flex cursor-pointer items-baseline rounded-md outline-offset-4"
         >
           <span className="wordmark flex items-baseline text-[16px] leading-none text-ink">
@@ -80,21 +152,45 @@ export function TopBar({ mode, onToggleMode, query, onQuery, sort, onSort, onNew
               style={{ clipPath: "inset(-10% 0 -10% 0)" }}
               className="relative inline-block"
             >
-              <AnimatePresence mode="popLayout" initial={false} custom={mode}>
-                <motion.span
-                  key={mode}
-                  custom={mode}
-                  variants={WORD_ROLL_VARIANTS}
-                  initial={reduce ? { opacity: 0 } : "enter"}
-                  animate={reduce ? { opacity: 1 } : "center"}
-                  exit={reduce ? { opacity: 0 } : "exit"}
-                  transition={reduce ? REDUCE_TWEEN : WORD_ROLL_TWEEN}
-                  className={`wordmark-word inline-block whitespace-nowrap ${mode === "lora" ? "text-action" : ""}`}
-                >
-                  {/* brand wordmark — deliberately not localized, like "Shelf" */}
-                  {mode === "prompt" ? "Prompt" : "Lora"}
-                </motion.span>
-              </AnimatePresence>
+              {drum ? (
+                <>
+                  {/* invisible sizer: the window keeps the width of the final
+                      word, so "Shelf" doesn't wander while the drum spins */}
+                  <span className="invisible block whitespace-nowrap">Update</span>
+                  <motion.span
+                    aria-hidden
+                    className="absolute top-0 left-0 flex flex-col items-start"
+                    initial={false}
+                    animate={{ y: drum.keys }}
+                    transition={{ duration: drum.total, times: drum.times, ease: drum.eases }}
+                  >
+                    {drum.words.map((w, i) => (
+                      <span
+                        key={i}
+                        className={`block h-4 whitespace-nowrap leading-none ${w === "Update" ? "text-action" : ""}`}
+                      >
+                        {w}
+                      </span>
+                    ))}
+                  </motion.span>
+                </>
+              ) : (
+                <AnimatePresence mode="popLayout" initial={false} custom={updateAvailable ? "lora" : mode}>
+                  <motion.span
+                    key={updateAvailable ? "update" : mode}
+                    custom={updateAvailable ? "lora" : mode}
+                    variants={WORD_ROLL_VARIANTS}
+                    initial={reduce ? { opacity: 0 } : "enter"}
+                    animate={reduce ? { opacity: 1 } : "center"}
+                    exit={reduce ? { opacity: 0 } : "exit"}
+                    transition={reduce ? REDUCE_TWEEN : WORD_ROLL_TWEEN}
+                    className={`wordmark-word inline-block whitespace-nowrap ${label === "Update" || mode === "lora" ? "text-action" : ""}`}
+                  >
+                    {/* brand wordmark — deliberately not localized, like "Shelf" */}
+                    {label}
+                  </motion.span>
+                </AnimatePresence>
+              )}
             </motion.span>
             <motion.span layout={layout} className="inline-block text-faint">
               Shelf
