@@ -232,6 +232,7 @@ export const ru: Record<DictKey, string> = {
 
   "settings.updates": "Обновления",
   "settings.updates.check": "Проверить обновления",
+  "settings.updates.version": "Текущая версия",
   "settings.updates.checking": "Проверяю…",
   "settings.updates.title": "Обновления",
   "settings.updates.latest": "У вас последняя версия",
@@ -240,6 +241,10 @@ export const ru: Record<DictKey, string> = {
   "settings.updates.install": "Скачать и обновить",
   "settings.updates.installing": "Скачиваю…",
   "settings.updates.error": "Не удалось проверить обновления. Проверьте подключение — источник обновлений: страница релизов GitHub.",
+  "settings.updates.autoCheck": "Автоматически проверять обновления",
+  "settings.updates.autoCheck.hint": "При запуске PromptShelf тихо проверит страницу релизов GitHub в фоне.",
+  "settings.updates.open": "Открыть",
+  "settings.updates.badge": "Доступно обновление — открыть окно обновления",
 
   "settings.civitai": "Импорт из CivitAI",
   "settings.civitaiKey": "API-ключ",

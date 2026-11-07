@@ -230,6 +230,7 @@ export const en = {
 
   "settings.updates": "Updates",
   "settings.updates.check": "Check for updates",
+  "settings.updates.version": "Current version",
   "settings.updates.checking": "Checking…",
   "settings.updates.title": "Updates",
   "settings.updates.latest": "You're up to date",
@@ -238,6 +239,10 @@ export const en = {
   "settings.updates.install": "Download and update",
   "settings.updates.installing": "Downloading…",
   "settings.updates.error": "Couldn't check for updates. Check your connection — the update source is the GitHub releases page.",
+  "settings.updates.autoCheck": "Check for updates automatically",
+  "settings.updates.autoCheck.hint": "At launch PromptShelf quietly checks the GitHub releases page in the background.",
+  "settings.updates.open": "View",
+  "settings.updates.badge": "Update available — open the update dialog",
 
   "settings.civitai": "CivitAI import",
   "settings.civitaiKey": "API key",

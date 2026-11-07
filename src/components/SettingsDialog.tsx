@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { motion } from "motion/react";
 import { getVersion } from "@tauri-apps/api/app";
 import { Download, Upload, FolderOpen, Loader2, Eye, EyeOff, Pencil, FolderUp, RefreshCw, Sun, Moon, Monitor } from "lucide-react";
 import { save as saveFileDialog, open as openFileDialog, message } from "@tauri-apps/plugin-dialog";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { useI18n } from "../i18n";
 import { api } from "../lib/api";
+import type { UpdateAvailability } from "../lib/useUpdateCheck";
 import type { AppSettings, Lang, LibraryPaths, Theme } from "../lib/types";
 import { Dialog } from "./Dialog";
 import { useToast } from "./Toasts";
@@ -23,9 +25,59 @@ interface SettingsDialogProps {
   onClose: () => void;
   onSaved: (s: AppSettings) => void;
   onImported: () => void;
+  /** Version pending in the update source, even after the user dismissed the
+   * header badge — the settings section is the quiet reminder. */
+  updateVersion: string | null;
+  onUpdateOpen: () => void;
+  onUpdateDismissed: () => void;
+  onUpdateFound: (a: UpdateAvailability) => void;
 }
 
-export function SettingsDialog({ open, settings, paths, lang, onLang, theme, onTheme, onClose, onSaved, onImported }: SettingsDialogProps) {
+/** A soft checkbox: the box fills with ink and the checkmark draws itself,
+ * instead of the hard native accent swap. Rendered as a quiet row — the
+ * surrounding card provides the frame. */
+function FancyCheckbox({ checked, onChange, label, hint }: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+  hint: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      className="flex w-full cursor-pointer items-start gap-3 px-4 py-3.5 text-left transition-colors hover:bg-parchment/60"
+    >
+      <span
+        className={`mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[6px] border transition-colors duration-200 ${
+          checked ? "border-ink bg-ink" : "border-line-active bg-transparent"
+        }`}
+      >
+        <svg viewBox="0 0 12 12" className="h-3 w-3 text-on-ink" aria-hidden>
+          <motion.path
+            d="M2.2 6.4 L4.8 9 L9.8 3.2"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.8}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            initial={false}
+            animate={{ pathLength: checked ? 1 : 0, opacity: checked ? 1 : 0 }}
+            transition={{ duration: checked ? 0.28 : 0.16, ease: [0.32, 0.72, 0, 1] }}
+          />
+        </svg>
+      </span>
+      <span>
+        <span className="block text-[13.5px] font-medium text-ink">{label}</span>
+        <span className="mt-0.5 block text-[11.5px] text-faint">{hint}</span>
+      </span>
+    </button>
+  );
+}
+
+export function SettingsDialog({ open, settings, paths, lang, onLang, theme, onTheme, onClose, onSaved, onImported, updateVersion, onUpdateOpen, onUpdateDismissed, onUpdateFound }: SettingsDialogProps) {
   const { t } = useI18n();
   const { toast } = useToast();
 
@@ -65,7 +117,8 @@ export function SettingsDialog({ open, settings, paths, lang, onLang, theme, onT
           thumbs: next.thumbs,
           theme: next.theme,
           civitai_api_key: next.civitai_api_key ?? "",
-          lora_previews: next.lora_previews
+          lora_previews: next.lora_previews,
+          update_auto_check: next.update_auto_check
         });
         onSaved(s);
         toast(t("toast.settingsSaved"));
@@ -496,17 +549,57 @@ export function SettingsDialog({ open, settings, paths, lang, onLang, theme, onT
 
         <section>
           <h3 className="t-section">{t("settings.updates")}</h3>
-          <div className="mt-3 flex items-center gap-3">
-            <button type="button" className="btn-ghost press cursor-pointer" onClick={() => setUpdatesOpen(true)}>
-              <RefreshCw size={14.5} />
-              {t("settings.updates.check")}
-            </button>
-            {version && <span className="text-[11.5px] text-faint">v{version}</span>}
+          <div className="mt-3 overflow-hidden rounded-xl border border-hairline bg-card">
+            <div className="flex items-center justify-between gap-3 py-3 pr-3 pl-4">
+              <div className="min-w-0">
+                <span className="block text-[13.5px] font-medium text-ink">{t("settings.updates.version")}</span>
+                <span className="mt-0.5 block text-[11.5px] text-faint">
+                  PromptShelf {version ? `v${version}` : "…"}
+                </span>
+              </div>
+              <button type="button" className="btn-ghost press shrink-0 cursor-pointer" onClick={() => setUpdatesOpen(true)}>
+                <RefreshCw size={14.5} />
+                {t("settings.updates.check")}
+              </button>
+            </div>
+
+            <div className="h-px bg-hairline" aria-hidden />
+
+            <FancyCheckbox
+              checked={draft.update_auto_check}
+              onChange={(v) => update({ update_auto_check: v })}
+              label={t("settings.updates.autoCheck")}
+              hint={t("settings.updates.autoCheck.hint")}
+            />
+
+            {updateVersion && (
+              <div className="flex items-center gap-3 border-t border-hairline bg-action/5 px-4 py-3">
+                <Download size={15} className="shrink-0 text-action" />
+                <span className="min-w-0 flex-1 truncate text-[12.5px] text-body">
+                  {t("settings.updates.available").replace("{version}", updateVersion)}
+                </span>
+                <button
+                  type="button"
+                  className="press shrink-0 cursor-pointer rounded-full bg-action px-3.5 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-action/85"
+                  onClick={onUpdateOpen}
+                >
+                  {t("settings.updates.open")}
+                </button>
+              </div>
+            )}
           </div>
         </section>
       </div>
 
-      <UpdateDialog open={updatesOpen} onClose={() => setUpdatesOpen(false)} />
+      {/* manual check entry: a fresh network check, reported back to the
+          shared availability state so the badge stays in sync */}
+      <UpdateDialog
+        open={updatesOpen}
+        onClose={() => setUpdatesOpen(false)}
+        known={null}
+        onDismissed={onUpdateDismissed}
+        onFound={onUpdateFound}
+      />
     </Dialog>
   );
 }
