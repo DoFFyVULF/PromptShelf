@@ -188,8 +188,6 @@ them, one networked test is marked `#[ignore]` and runs manually):
 cd src-tauri && cargo test --lib
 ```
 
-The design system and UI pattern descriptions live in `design-system/promptshelf/`.
-
 ## Stack
 
 | Layer    | Technologies                                                                                                                                       |

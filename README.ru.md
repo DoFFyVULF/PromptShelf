@@ -192,8 +192,6 @@ npm run icons          # перегенерировать набор иконо�
 cd src-tauri && cargo test --lib
 ```
 
-Дизайн-система и описания UI-паттернов живут в `design-system/promptshelf/`.
-
 ## Стек
 
 | Слой      | Технологии                                                                                                                                                    |
