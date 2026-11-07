@@ -245,7 +245,7 @@ export function TagInput({ id, tags, onChange, suggestions, placeholder }: TagIn
     <>
       <div
         ref={fieldRef}
-        className={`relative mt-2 flex flex-wrap items-center gap-1.5 rounded-xl border bg-card px-2.5 py-2 transition-colors focus-within:shadow-focus ${
+        className={`relative mt-2 flex flex-wrap items-center gap-1.5 rounded-xl border bg-card px-2.5 py-2 transition-[border-color,box-shadow] duration-200 ease-[cubic-bezier(0.32,0.72,0,1)] focus-within:shadow-focus ${
           tooLong ? "border-destructive/60" : "border-hairline focus-within:border-line-active"
         }`}
       >

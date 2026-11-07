@@ -112,7 +112,7 @@ export function TopBar({ mode, onToggleMode, query, onQuery, sort, onSort, onNew
           onChange={(e) => onQuery(e.target.value)}
           placeholder={mode === "prompt" ? t("search.placeholder") : t("search.placeholderLora")}
           spellCheck={false}
-          className="h-9 w-full rounded-full border border-hairline bg-card pr-10 pl-9.5 text-[13.5px] transition-colors placeholder:text-faint hover:border-line-hover focus:border-line-active focus:outline-none"
+          className="h-9 w-full rounded-full border border-hairline bg-card pr-10 pl-9.5 text-[13.5px] transition-[border-color,box-shadow] duration-200 ease-[cubic-bezier(0.32,0.72,0,1)] placeholder:text-faint hover:border-line-hover focus:border-line-active focus:shadow-focus focus:outline-none"
         />
         {!query && (
           <kbd className="kbd pointer-events-none absolute top-1/2 right-2.5 hidden -translate-y-1/2 group-focus-within:hidden sm:flex">

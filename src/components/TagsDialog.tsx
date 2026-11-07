@@ -62,7 +62,7 @@ export function TagsDialog({ open, onClose, tags, selected, onToggle, onClear }:
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={t("search.placeholder")}
-                className="h-9 w-full rounded-[10px] border border-hairline bg-card pl-10 pr-3 text-[13.5px] transition-colors placeholder:text-faint hover:border-line-hover focus:border-line-active focus:outline-none focus:shadow-focus"
+                className="h-9 w-full rounded-[10px] border border-hairline bg-card pl-10 pr-3 text-[13.5px] transition-[border-color,box-shadow] duration-200 ease-[cubic-bezier(0.32,0.72,0,1)] placeholder:text-faint hover:border-line-hover focus:border-line-active focus:shadow-focus focus:outline-none"
                 autoFocus
               />
             </div>

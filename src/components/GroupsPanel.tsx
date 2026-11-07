@@ -296,7 +296,7 @@ export function GroupsPanel({
                   onBlur={() => void commitRename(g.id)}
                   maxLength={48}
                   spellCheck={false}
-                  className="min-w-0 flex-1 rounded-md border border-leaf-edge bg-card px-2 py-1 text-[13px] text-ink outline-none"
+                  className="min-w-0 flex-1 rounded-md border border-leaf-edge bg-card px-2 py-1 text-[13px] text-ink outline-none focus:shadow-focus"
                 />
               ) : (
                 <span className={`min-w-0 flex-1 truncate text-[13.5px] font-medium ${current ? "text-leaf" : ""}`}>
@@ -397,7 +397,7 @@ export function GroupsPanel({
             placeholder={t("groups.new.placeholder")}
             maxLength={48}
             spellCheck={false}
-            className="w-full rounded-md border border-hairline bg-parchment px-2.5 py-1.5 text-[13px] text-ink outline-none placeholder:text-faint"
+            className="w-full rounded-md border border-hairline bg-parchment px-2.5 py-1.5 text-[13px] text-ink outline-none placeholder:text-faint focus:shadow-focus"
           />
         ) : (
           <button

@@ -534,10 +534,27 @@ body {
   border-radius: 9999px;
 }
 
-:focus-visible {
-  outline: 2px solid var(--color-ink);
-  outline-offset: 2px;
-  border-radius: 6px;
+/* Keyboard focus ring for buttons, links and selects. Lives in the base
+   layer: utilities (focus:outline-none + a soft ring) must be able to
+   override it. Text-entry fields are exempt — the caret, border-color and
+   shadow ring already signal focus there, and a 2px ink outline crowds the
+   inline rows (tag input, search fields) it draws around. */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--color-ink);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+
+  input[type="text"],
+  input[type="number"],
+  input[type="search"],
+  input[type="password"],
+  input[type="email"],
+  input[type="url"],
+  textarea {
+    outline: none;
+  }
 }
 
 input[type="text"],
