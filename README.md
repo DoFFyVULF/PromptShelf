@@ -1,13 +1,13 @@
 <div align="center">
-  <sub><b><a href="README.en.md">English</a> · <a href="README.md">Русский</a></b></sub>
+  <sub><b><a href="README.md">English</a> · <a href="README.ru.md">Русский</a></b></sub>
 </div>
 
 <div align="center">
-  <img src="docs/banner.png" alt="PromptShelf — полка для промптов" width="100%">
+  <img src="docs/banner.png" alt="PromptShelf — a shelf for your prompts" width="100%">
 
-  **Локальная библиотека промптов для macOS и Windows.**<br>
-  Каждая карточка — текст промпта плюс изображения-результаты. Всё хранится на диске:
-  никаких облаков, аккаунтов и внешних сервисов.
+  **A local prompt & LoRA library for macOS and Windows.**<br>
+  Every card is a prompt plus its result images. Everything lives on your disk:
+  no clouds, no accounts, no external services.
 
   <p>
     <img src="https://img.shields.io/badge/macOS_%C2%B7_Windows-3f3f46?style=flat-square&labelColor=18181b" alt="macOS · Windows">
@@ -18,172 +18,188 @@
     <img src="https://img.shields.io/badge/SQLite-bundled-3f3f46?style=flat-square&labelColor=18181b" alt="SQLite">
   </p>
 
-  <img src="docs/PromptShelf_preview.png" alt="Интерфейс PromptShelf: сетка карточек с изображениями, промптами и тегами" width="100%">
+  <img src="docs/PromptShelf_preview.png" alt="PromptShelf UI: a grid of cards with images, prompts and tags" width="100%">
 </div>
 
 ---
 
-## Зачем
+## Why
 
-Хорошие промпты на CivitAI нередко исчезают. Автор удаляет картинку или пост, чистит
-галерею или уходит с платформы целиком. Вы сохраняли ссылку, чтобы вернуться к промпту
-позже, а его уже нет — вместе с ним пропадают негативные теги и все параметры генерации.
+Good prompts on CivitAI tend to disappear. Authors delete images or posts, clean up
+galleries, or leave the platform altogether. You save a link to come back to the prompt
+later, and by then it is gone — together with the negative prompt and every generation
+parameter. LoRAs suffer the same fate: a description with settings, trigger words and
+usage tips can vanish any moment.
 
-PromptShelf создан как раз на этот случай. Один импорт из CivitAI — и картинка, промпт,
-негативный промпт, LoRA, параметры (seed, sampler, шаги, CFG), автор и теги остаются
-в вашей библиотеке на диске. Дальше чужая страница уже ни при чём: всё лежит локально
-и никуда не денется.
+PromptShelf exists for exactly this case. One import from CivitAI — and the image, prompt,
+negative prompt, LoRAs, parameters (seed, sampler, steps, CFG), author and tags stay in
+your library on disk. One import of a model page — and its description, trigger words and
+usage tips stay too. The other person's page no longer matters: everything is local and
+nothing deletes it.
 
-## Возможности
+## Features
 
-- **Карточки** — многострочный промпт, одно или несколько изображений, заметка, теги,
-  оценка звёздами, даты.
-- **Негативный промпт** — отдельное поле в редакторе; в детальном просмотре показывается
-  под промптом и копируется одной кнопкой.
-- **Импорт из CivitAI** — вставьте ссылку на картинку CivitAI: приложение само скачает
-  изображение и заполнит карточку — промпт, негативный промпт, автор, чекпоинт, LoRA,
-  параметры генерации (seed, sampler, шаги, CFG) и теги поста. Популярные теги сообщества
-  подтягиваются через CivitAI API-ключ (задаётся в настройках).
-- **Умное сжатие при импорте** — изображение уменьшается до лимита длинной стороны
-  (по умолчанию 1200 px) и пересжимается в JPEG или WebP с заданным качеством (по умолчанию 75%).
-  Оригиналы не хранятся (опционально — «сохранять оригиналы» в настройках). Дополнительно
-  создаётся миниатюра для быстрой сетки.
-- **Просмотр** — сетка миниатюр + детальный просмотр (крупное фото, полный промпт,
-  копирование одной кнопкой), навигация стрелками, полноэкранный зум по клику. Список LoRA
-  у карточки с быстрым редактированием и удалением при наведении.
-- **Поиск и фильтры** — полнотекстовый поиск по промптам, заметкам и тегам; фильтр по тегам;
-  сортировка по дате и оценке.
-- **Группы** — карточка всегда лежит в одной группе. По умолчанию — группа «Home»/«Домашняя»,
-  её нельзя удалить. Панель групп открывается чипом в панели фильтров: создание, переименование,
-  удаление (карточки удаляемой группы возвращаются в дефолтную), переключение кликом, счётчик
-  карточек у каждой группы. Текущая группа подсвечивается изумрудным — единственный цветовой
-  акцент в интерфейсе.
-- **Мультивыбор** — переключатель «выделение» в панели фильтров; клики по плиткам
-  добавляют/убирают карточки. Внизу появляется панель выделения: количество, «Переместить в…»,
-  «Снять», «Готово».
-- **Drag & drop карточек в группы** — возьмите карточку, и панель групп выедет автоматически.
-  Под курсором едет уменьшенная копия карточки с фото (при мультивыборе — с бейджем количества),
-  плитка на полке «съёживается» и притухает. Все группы становятся целями: пунктирная изумрудная
-  рамка и стрелка у каждой строки, строка под курсором заливается сплошным изумрудным.
-  Отпустите — карточки переедут. Выделенные карточки можно также переносить кнопкой
-  «Переместить сюда» в панели.
-- **Вставка из буфера** — ⌘V / Ctrl+V вставляет скриншот или скопированный файл изображения
-  прямо в новую карточку; текст промпта вставляется в поле как обычно.
-- **Drag & drop файлов** — перетащите изображения в окно, и откроется новая карточка
-  (приём файлов работает через HTML5-события webview, что позволяет сосуществовать
-  с перетаскиванием карточек).
-- **Импорт/экспорт** — вся библиотека выгружается одним файлом `.promptshelf`
-  (zip: SQLite + изображения) для бэкапа или переноса на другую машину. Импорт заменяет
-  текущую библиотеку.
-- **Перенос библиотеки** — библиотеку можно скопировать в любую папку и переключиться
-  на неё из настроек (вступает в силу после перезапуска, старая копия остаётся нетронутой).
--  **Проверка обновлений** — кнопка в настройках сообщает о новой версии и устанавливает
-  её: скачивание и перезапуск в два клика.
-- **Языки интерфейса** — английский и русский, переключатель в шапке.
+- **Cards** — a multiline prompt, one or more images, a note, tags, a star rating, dates.
+- **Negative prompt** — a separate field in the editor; shown under the prompt in the
+  detail view and copied with one click.
+- **CivitAI card import** — paste a link to a CivitAI image and the app downloads it and fills
+  the card in: prompt, negative prompt, author, checkpoint, LoRAs, generation parameters
+  (seed, sampler, steps, CFG) and post tags. The popular community tags come through a
+  CivitAI API key (set in settings).
+- **LoRA mode (the LoraShelf)** — a second shelf next to prompts, switched in the header.
+  A LoRA card holds a cover, base model, publish date, rating, tags and its own groups.
+  LoRA tiles support the same multi-select, drag & drop into groups, search and filters
+  as prompts.
+- **CivitAI LoRA import** — paste a model page link: the app pulls the name, base model,
+  publish date, trigger words, usage tips (Strength, Clip skip and other version settings),
+  the primary tag, tags and preview images (how many previews to fetch is configurable
+  in settings).
+- **Trigger words** — shown in the LoRA card as violet chips: click a chip to copy the word,
+  the button at the bottom (or ⌘C) copies all of them comma-separated.
+- **Rich LoRA descriptions** — the CivitAI description is kept as markup (a sanitizer with a
+  strict allow-list): headings, lists, inline code, the author's colored highlights and
+  highlighted links that open in the browser. Long descriptions fold behind "Show more".
+  Manually typed descriptions are stored as paragraphs and render just as tidy.
+- **Duplicate protection** — both import kinds check for duplicates and offer to keep the
+  existing card or create a new one.
+- **Smart compression on import** — an image is downscaled to the long-side limit
+  (1200 px by default) and re-encoded to JPEG or WebP at a configurable quality (75% by default).
+  Originals are not kept (optionally enable "keep originals" in settings). A thumbnail is
+  generated as well for the fast grid.
+- **Browsing** — a thumbnail grid plus a detail view (large photo, full prompt, one-click
+  copy), arrow-key navigation, click-to-zoom fullscreen. Each card has a LoRA list with quick
+  editing and delete-on-hover.
+- **Search & filters** — full-text search across prompts, notes and tags; tag filter;
+  sorting by date and rating.
+- **Groups** — every card lives in exactly one group (each shelf has its own groups). The
+  default group ("Home"/"Домашняя") cannot be deleted. The groups panel opens from a chip in
+  the filter bar: create, rename, delete (cards of a deleted group return to the default one),
+  switch by clicking, per-group card counters. The current group is highlighted in emerald —
+  the only color accent in the UI (on the LoRA shelf the violet trigger-word chips echo it).
+- **Multi-select** — a "select" toggle in the filter bar; clicking tiles adds or removes cards.
+  A selection bar appears at the bottom: count, "Move to…", "Clear", "Done".
+- **Drag & drop cards into groups** — pick up a card and the groups panel slides out
+  automatically. A shrunken copy of the card with its photo follows the cursor (with a count
+  badge when multiple cards are selected); the tile on the shelf shrinks and dims. Every group
+  becomes a target: a dashed emerald outline and an arrow on each row, the row under the cursor
+  fills with solid emerald. Drop — the cards move over. Selected cards can also be moved with the
+  "Move here" button in the panel.
+- **Paste from clipboard** — ⌘V / Ctrl+V pastes a screenshot or a copied image file straight
+  into a new card; prompt text pastes into the field as usual.
+- **Drag & drop files** — drop images into the window and a new card opens (file intake uses
+  HTML5 webview events, which lets it coexist with card dragging).
+- **Import/export** — the whole library (prompts and LoRAs) exports to a single `.promptshelf`
+  file (zip: SQLite + images) for backup or moving to another machine. Import replaces the
+  current library.
+- **Library location** — copy the library to any folder and switch to it from settings
+  (applies after a restart; the old copy stays untouched).
+-  **Update check** — a button in settings tells you about a new version and installs it:
+  download and restart, two clicks.
+- **Interface languages** — English and Russian, with a switcher in the header.
 
-## Установка
+## Installation
 
-### Готовые сборки
+### Ready-made builds
 
-Скачайте пакет со [страницы релизов](https://github.com/DoFFyVULF/PromptShelf/releases/latest):
-универсальный `.dmg` для macOS и `.msi` / `setup.exe` для Windows.
+Grab a package from the [releases page](https://github.com/DoFFyVULF/PromptShelf/releases/latest):
+a universal `.dmg` for macOS and `.msi` / `setup.exe` for Windows.
 
-### Сборка из исходников
+### Build from source
 
 ```bash
 npm install
 npm run tauri build
 ```
 
-Готовые дистрибутивы появятся в `src-tauri/target/release/bundle/`:
+Distribution artifacts land in `src-tauri/target/release/bundle/`:
 
-| Платформа | Файл                                 | Папка    |
-| --------- | ------------------------------------ | -------- |
-| macOS     | `PromptShelf_<версия>_aarch64.dmg`   | `dmg/`   |
-| macOS     | `PromptShelf.app`                    | `macos/` |
-| Windows   | `PromptShelf_<версия>_x64_en-US.msi` | `msi/`   |
-| Windows   | `PromptShelf_<версия>_x64-setup.exe` | `nsis/`  |
+| Platform | File                                 | Folder   |
+| -------- | ------------------------------------ | -------- |
+| macOS    | `PromptShelf_<version>_aarch64.dmg`  | `dmg/`   |
+| macOS    | `PromptShelf.app`                    | `macos/` |
+| Windows  | `PromptShelf_<version>_x64_en-US.msi`| `msi/`   |
+| Windows  | `PromptShelf_<version>_x64-setup.exe`| `nsis/`  |
 
-**macOS** — откройте `.dmg` и перетащите PromptShelf в «Программы».
+**macOS** — open the `.dmg` and drag PromptShelf into Applications.
 
-Приложение не подписано сертификатом Apple Developer, поэтому при первом запуске
-Gatekeeper может заблокировать его. Варианты:
+The app is not signed with an Apple Developer certificate, so Gatekeeper may block the first
+launch. Options:
 
-- Системные настройки → Конфиденциальность и безопасность → «Всё равно открыть»;
-- или в терминале: `xattr -cr /Applications/PromptShelf.app`.
+- System Settings → Privacy & Security → "Open Anyway";
+- or in Terminal: `xattr -cr /Applications/PromptShelf.app`.
 
-**Windows** — запустите `.msi` (или `-setup.exe`) и следуйте мастеру установки.
-SmartScreen может показать предупреждение о неизвестном издателе: «Подробнее» →
-«Выполнить в любом случае».
+**Windows** — run the `.msi` (or `-setup.exe`) and follow the installer. SmartScreen may warn
+about an unknown publisher: "More info" → "Run anyway".
 
-### Без установки (режим разработки)
+### Without installing (development mode)
 
 ```bash
 npm run tauri dev
 ```
 
-## Хоткеи
+## Keyboard shortcuts
 
-| Клавиши          | Действие                                        |
-| ---------------- | ----------------------------------------------- |
-| ⌘/Ctrl + N       | Новая карточка                                   |
-| ⌘/Ctrl + V       | Вставить изображение из буфера                   |
-| ⌘/Ctrl + F       | Фокус на поиск                                   |
-| ⌘/Ctrl + C       | Копировать промпт (в детальном просмотре)        |
-| ⌘/Ctrl + ,       | Настройки                                        |
-| ← / →            | Предыдущая / следующая карточка                  |
-| Esc              | Закрыть панель групп → просмотр → диалог/зум     |
+| Keys             | Action                                              |
+| ---------------- | --------------------------------------------------- |
+| ⌘/Ctrl + N       | New card or new LoRA — depends on the active shelf   |
+| ⌘/Ctrl + V       | Paste image from clipboard                           |
+| ⌘/Ctrl + F       | Focus search                                         |
+| ⌘/Ctrl + C       | Copy the prompt; on the LoRA shelf — the card's trigger words |
+| ⌘/Ctrl + ,       | Settings                                             |
+| ← / →            | Previous / next card                                 |
+| Esc              | Close groups panel → viewer → dialog/zoom            |
 
-## Хранение
+## Storage
 
-Библиотека живёт в стандартном каталоге данных приложения
-(расположение можно изменить в настройках — приложение скопирует библиотеку
-в выбранную папку):
+The library lives in the standard application data directory
+(the location can be changed in settings — the app copies the library to the folder
+you pick):
 
 - macOS: `~/Library/Application Support/app.promptshelf.desktop/`
 - Windows: `%APPDATA%\app.promptshelf.desktop\`
 
 ```
-library.db            # SQLite (карточки, изображения, теги, группы, настройки)
-images/<uuid>.jpg     # сжатые изображения
-images/<uuid>.t.webp  # миниатюры
-images/originals/     # опциональные оригиналы
+library.db            # SQLite (cards, LoRAs, images, tags, groups, settings)
+images/<uuid>.jpg     # compressed images (prompts and LoRAs)
+images/<uuid>.t.webp  # thumbnails
+images/originals/     # optional originals
 ```
 
-Экспорт: `.promptshelf` = ZIP со снимком `library.db` + папкой `images`.
+Export: `.promptshelf` = ZIP with a snapshot of `library.db` + the `images` folder.
 
-## Разработка
+## Development
 
-Требования: Node 20+, Rust 1.77+ (на Windows — MSVC Build Tools).
+Requirements: Node 20+, Rust 1.77+ (on Windows — MSVC Build Tools).
 
 ```bash
 npm install
-npm run tauri dev      # запуск в режиме разработки
-npm run build          # проверка типов + сборка фронтенда
-npm run tauri build    # сборка .app / .dmg / .msi / .exe
-npm run icons          # перегенерировать набор иконок из app-icon.png
+npm run tauri dev      # run in development mode
+npm run build          # type check + frontend build
+npm run tauri build    # build .app / .dmg / .msi / .exe
+npm run icons          # regenerate the icon set from app-icon.png
 ```
 
-Только фронтенд (без нативного окна): `npm run dev` → http://localhost:5173
+Frontend only (no native window): `npm run dev` → http://localhost:5173
 
-Тесты (сжатие, работа с карточками, миграции и т.д., всего 13):
+Tests (compression pipeline, cards & LoRAs, migrations, the description sanitizer; 24 of
+them, one networked test is marked `#[ignore]` and runs manually):
 
 ```bash
 cd src-tauri && cargo test --lib
 ```
 
-Дизайн-система и описания UI-паттернов живут в `design-system/promptshelf/`.
+The design system and UI pattern descriptions live in `design-system/promptshelf/`.
 
-## Стек
+## Stack
 
-| Слой      | Технологии                                                                                                                                                    |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Оболочка  | **Tauri 2** — нативное окно, IPC, диалоги. Drag & drop файлов — HTML5 внутри webview (нативный перехватчик Tauri отключён через `dragDropEnabled: false)`       |
-| Backend   | **Rust**: `rusqlite` (bundled SQLite), `image` + `webp` (сжатие, EXIF-поворот), `arboard` (буфер обмена), `zip` (экспорт), `kamadak-exif`                        |
-| Frontend  | **React 18 + TypeScript + Vite + Tailwind CSS 4**, иконки — Lucide, шрифты — Inter (UI) и Manrope (название в шапке), локально, кириллица + латиница             |
+| Layer    | Technologies                                                                                                                                       |
+| -------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Shell    | **Tauri 2** — native window, IPC, dialogs. File drag & drop runs via HTML5 inside the webview (Tauri's native handler is off via `dragDropEnabled: false`) |
+| Backend  | **Rust**: `rusqlite` (bundled SQLite), `image` + `webp` (compression, EXIF rotation), `arboard` (clipboard), `zip` (export), `kamadak-exif`, `ammonia` (LoRA description HTML sanitizer) |
+| Frontend | **React 18 + TypeScript + Vite + Tailwind CSS 4**, icons by Lucide, fonts Inter (UI) and Manrope (header wordmark), served locally, Cyrillic + Latin |
 
 ---
 
 <div align="center">
-  <sub>PromptShelf — промпты на своей полке</sub>
+  <sub>PromptShelf — keep your prompts and LoRAs on your own shelf</sub>
 </div>
