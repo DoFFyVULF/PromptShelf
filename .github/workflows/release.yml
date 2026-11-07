@@ -58,12 +58,25 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: "PromptShelf ${{ github.ref_name }}"
           releaseBody: |
-            **What's new in v0.1.2**
+            **What's new in v0.2.0**
 
-            - Async CivitAI import: paste several image links at once — they fetch in the background, nothing blocks.
-            - Each link shows a placeholder card in the library while it loads, with its URL visible underneath.
-            - On success the placeholder settles into the finished card; failed imports stay in the grid as error cards with retry.
-            - Possible duplicates are parked per link and handled through the duplicate dialog.
+            **Lora shelf** — a second, dedicated library next to your prompts:
+
+            - One click on the logo flips between the prompt and lora shelves, each with its own groups, tags and detail panel.
+            - Import Lora models straight from CivitAI model pages: preview images, base model, trigger words, usage tips and descriptions land as a rich card with highlighted links.
+            - Inline editing — rename, tag and annotate loras right in the detail panel.
+
+            **Self-updating**
+
+            - PromptShelf now checks GitHub releases in the background at launch. Don't want it? There's a toggle in Settings → Updates.
+            - When a new version is found, the logo plays a slot-drum tease and turns into "Update Shelf" — click it to review and install. Cancelling keeps things quiet until the next launch, and the Updates section in Settings always shows the pending version.
+            - Release notes are now typeset: headings, bullets, filenames and links render the way they were written.
+
+            **Editing & polish**
+
+            - Tag suggestions in every editor; paste images from the clipboard straight into card / lora detail while editing.
+            - Animated boot loader, a typewriter empty state for the prompt shelf and a before/after comparison card for the lora shelf.
+            - Smoother mode-switch transitions in the header, softer focus rings, and a ⌘C hint on the lora copy button.
 
             Installers, built from this tag with the updater signing key:
 
@@ -73,6 +86,9 @@ jobs:
             **macOS** — `PromptShelf_*.dmg` (universal: Apple Silicon + Intel).
             First launch: if Gatekeeper blocks an unsigned app, right-click the app
             in /Applications → "Open" once.
-          releaseDraft: false
+          # The release itself is pre-created as a draft by DoFFyVULF (so the
+          # release author is a human, not github-actions); the action finds
+          # the draft by tag and only uploads the built assets to it.
+          releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
