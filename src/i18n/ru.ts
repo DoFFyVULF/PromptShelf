@@ -153,6 +153,8 @@ export const ru: Record<DictKey, string> = {
   "lora.triggerCopied": "Триггер-слова скопированы",
   "lora.description": "Описание",
   "lora.note": "Заметка",
+  "lora.showMore": "Показать больше",
+  "lora.showLess": "Свернуть",
   "lora.deleteTitle": "Удалить лору",
   "lora.copyTriggers": "Копировать триггер-слова",
   "lora.emptyTriggers": "Нет триггер-слов",

@@ -578,73 +578,77 @@ fn parse_model_link(raw: &str) -> Result<(String, Option<i64>), String> {
     Ok((id.to_string(), version))
 }
 
-/// Minimal HTML → plain text for CivitAI descriptions: block endings become
-/// newlines, tags are dropped, common entities are decoded.
-fn html_to_text(html: &str) -> String {
-    if !html.contains('<') {
-        return html.to_string();
-    }
-    let mut out = String::with_capacity(html.len());
-    let mut rest = html;
-    loop {
-        match rest.find('<') {
-            None => {
-                out.push_str(rest);
-                break;
+/// CivitAI descriptions arrive as pre-rendered HTML from their markdown
+/// pipeline. We keep the rich structure (headings, lists, highlighted spans,
+/// code, links) but enforce our own allow-list: only the tags the shelf
+/// styles, href/src limited to safe schemes, and a `style` attribute reduced
+/// to author colouring on any tag (`<font color>` is kept as-is). Everything
+/// else is escaped into visible text. Hand-typed descriptions (no tags) are
+/// wrapped into paragraphs the same way.
+pub fn sanitize_rich_html(html: &str) -> String {
+    use std::borrow::Cow;
+    use std::collections::HashMap;
+
+    let tags: HashSet<&str> = [
+        "a", "p", "br", "b", "strong", "i", "em", "u", "s", "del", "ins", "span", "code", "pre",
+        "blockquote", "ul", "ol", "li", "h1", "h2", "h3", "h4", "h5", "h6", "table", "thead",
+        "tbody", "tr", "th", "td", "hr", "sup", "sub", "kbd", "mark", "small", "img", "center",
+        "details", "summary", "dl", "dt", "dd", "font",
+    ]
+    .into_iter()
+    .collect();
+
+    let mut tag_attrs: HashMap<&str, HashSet<&str>> = HashMap::new();
+    tag_attrs.insert("a", ["href"].into_iter().collect());
+    tag_attrs.insert("img", ["src", "alt", "title"].into_iter().collect());
+    tag_attrs.insert("span", ["style"].into_iter().collect());
+    tag_attrs.insert("td", ["align"].into_iter().collect());
+    tag_attrs.insert("th", ["align"].into_iter().collect());
+    tag_attrs.insert("font", ["color"].into_iter().collect());
+
+    let schemes: HashSet<&str> = ["https", "http", "mailto"].into_iter().collect();
+
+    let cleaned = ammonia::Builder::new()
+        .tags(tags)
+        .tag_attributes(tag_attrs)
+        .generic_attributes(["style"].into_iter().collect())
+        .url_schemes(schemes)
+        .link_rel(Some("noopener noreferrer"))
+        .attribute_filter(|_element: &str, attribute: &str, value: &str| {
+            // ammonia's attribute filter overrides the allow-list for every
+            // attribute, so pass everything else through untouched and only
+            // prune `style` down to author colouring declarations
+            if attribute == "style" {
+                let kept: Vec<&str> = value
+                    .split(';')
+                    .map(str::trim)
+                    .filter(|decl| {
+                        let prop = decl.split(':').next().unwrap_or("").trim().to_ascii_lowercase();
+                        matches!(
+                            prop.as_str(),
+                            "color" | "background-color" | "font-weight" | "font-style" | "text-decoration"
+                        )
+                    })
+                    .collect();
+                (!kept.is_empty()).then(|| Cow::Owned(kept.join("; ")))
+            } else {
+                Some(Cow::Borrowed(value))
             }
-            Some(i) => {
-                out.push_str(&rest[..i]);
-                // tag name decides whether it ends a line
-                let after = &rest[i + 1..];
-                let name_end = after.find(['>', ' ']).unwrap_or(after.len());
-                let raw_name = after[..name_end].to_ascii_lowercase();
-                // closing tag → drop the '/' before matching block names
-                let is_close = raw_name.starts_with('/');
-                let name = raw_name.trim_start_matches('/').to_string();
-                let block = matches!(
-                    name.as_str(),
-                    "br" | "p" | "div" | "li" | "ul" | "ol" | "table" | "tr" | "center"
-                ) || (name.len() == 2 && name.starts_with('h') && name.as_bytes()[1].is_ascii_digit())
-                    || (is_close
-                        && matches!(
-                            name.as_str(),
-                            "p" | "div" | "li" | "ul" | "ol" | "table" | "tr" | "center"
-                        ));
-                let Some(close_rel) = rest[i..].find('>') else {
-                    out.push_str(&rest[i..]);
-                    break;
-                };
-                rest = &rest[i + close_rel + 1..];
-                if block && !out.ends_with('\n') && !out.is_empty() {
-                    out.push('\n');
-                }
-            }
-        }
+        })
+        .clean(html)
+        .to_string();
+
+    if cleaned.contains("<p") || cleaned.contains("<br") || cleaned.contains("<li") {
+        return cleaned;
     }
-    // decode common entities
-    let text = out
-        .replace("&nbsp;", " ")
-        .replace("&amp;", "&")
-        .replace("&lt;", "<")
-        .replace("&gt;", ">")
-        .replace("&quot;", "\"")
-        .replace("&#39;", "'");
-    // collapse runs of blank lines and stray whitespace around lines
-    let mut lines: Vec<String> = Vec::new();
-    for l in text.split('\n') {
-        let l = l.trim();
-        if l.is_empty() && lines.last().map(String::is_empty).unwrap_or(true) {
-            continue;
-        }
-        lines.push(l.to_string());
-    }
-    while lines.first().map(String::is_empty).unwrap_or(false) {
-        lines.remove(0);
-    }
-    while lines.last().map(String::is_empty).unwrap_or(false) {
-        lines.pop();
-    }
-    lines.join("\n")
+    // Plain text: every line becomes its own paragraph.
+    let paragraphs: String = cleaned
+        .split('\n')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|s| format!("<p>{s}</p>"))
+        .collect();
+    paragraphs
 }
 
 /// Usage tips on the LoRA page ("Strength: 0.9") come from the version's
@@ -758,7 +762,7 @@ fn run_model(data_dir: &std::path::Path, url: &str) -> Result<CivitaiLoraImport,
     let description = model
         .get("description")
         .and_then(|d| d.as_str())
-        .map(html_to_text)
+        .map(sanitize_rich_html)
         .unwrap_or_default();
     let mut tags: Vec<String> = model
         .get("tags")
@@ -891,13 +895,36 @@ mod tests {
     }
 
     #[test]
-    fn strips_html() {
-        assert_eq!(html_to_text("<p>First</p><p>Second</p>"), "First\nSecond");
-        assert_eq!(html_to_text("A<br>B"), "A\nB");
-        assert_eq!(html_to_text("<ul><li>one</li><li>two</li></ul>"), "one\ntwo");
-        assert_eq!(html_to_text("Fish &amp; <b>chips</b>"), "Fish & chips");
-        assert_eq!(html_to_text("plain text"), "plain text");
-        assert_eq!(html_to_text("<h4>Heading</h4>Body"), "Heading\nBody");
+    fn sanitizes_rich_html() {
+        // rich markdown keeps its structure, links get a safe rel
+        assert_eq!(
+            sanitize_rich_html("<h2><strong>Settings</strong></h2><ul><li>Strength <code>0.9</code></li></ul><p><a href=\"https://civitai.com/user/a\" rel=\"ugc\">coffee</a></p>"),
+            "<h2><strong>Settings</strong></h2><ul><li>Strength <code>0.9</code></li></ul><p><a href=\"https://civitai.com/user/a\" rel=\"noopener noreferrer\">coffee</a></p>"
+        );
+        // coloured spans: author colours survive, layout props are dropped
+        assert_eq!(
+            sanitize_rich_html("<p><span style=\"color: rgb(64, 192, 87); font-size: 42px; position: fixed\"><strong>0.9</strong></span></p>"),
+            "<p><span style=\"color: rgb(64, 192, 87)\"><strong>0.9</strong></span></p>"
+        );
+        // colouring may also ride on other tags and on <font color>
+        assert_eq!(
+            sanitize_rich_html("<h2 style=\"color:yellow;\">Note</h2><p style=\"color:red;\">x</p>"),
+            "<h2 style=\"color:yellow\">Note</h2><p style=\"color:red\">x</p>"
+        );
+        assert_eq!(
+            sanitize_rich_html("<font color=\"#ff5722\">orange</font>"),
+            "<p><font color=\"#ff5722\">orange</font></p>"
+        );
+        // scripts, unknown tags and attributes are stripped or escaped
+        assert_eq!(sanitize_rich_html("<script>alert(1)</script>Hi"), "<p>Hi</p>");
+        assert_eq!(
+            sanitize_rich_html("<a href=\"javascript:alert(1)\">x</a>"),
+            "<p><a rel=\"noopener noreferrer\">x</a></p>"
+        );
+        // hand-typed plain text becomes paragraphs, entities stay visible
+        assert_eq!(sanitize_rich_html("First line\n\nSecond line"), "<p>First line</p><p>Second line</p>");
+        assert_eq!(sanitize_rich_html("Fish &amp; <b>chips</b>"), "<p>Fish &amp; <b>chips</b></p>");
+        assert_eq!(sanitize_rich_html("   \n  "), "");
     }
 
     #[test]
@@ -1011,3 +1038,4 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 }
+

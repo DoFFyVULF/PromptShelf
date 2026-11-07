@@ -593,3 +593,196 @@ kbd.kbd {
 .no-drag {
   -webkit-user-drag: none;
 }
+
+/* ------------------------------------------------------------------ */
+/* Rich lora descriptions — CivitAI markdown rendered with the shelf's */
+/* tokens: one violet accent for links (echoing the trigger chips),    */
+/* kbd-grammar code chips, hairline-h tables, no shadows, no gradients */
+/* ------------------------------------------------------------------ */
+.rich-text {
+  font-size: 13px;
+  line-height: 1.62;
+  color: var(--color-body);
+  overflow-wrap: break-word;
+}
+.rich-text > *:first-child {
+  margin-top: 0;
+}
+.rich-text > *:last-child {
+  margin-bottom: 0;
+}
+.rich-text p {
+  margin: 0;
+}
+.rich-text p + p {
+  margin-top: 6px;
+}
+.rich-text h1,
+.rich-text h2,
+.rich-text h3,
+.rich-text h4,
+.rich-text h5,
+.rich-text h6 {
+  margin: 16px 0 6px;
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: -0.012em;
+  color: var(--color-ink);
+}
+.rich-text strong,
+.rich-text b {
+  font-weight: 600;
+  /* inherit — the author's colour on a styled span must survive our ink */
+  color: inherit;
+}
+.rich-text em,
+.rich-text i {
+  font-style: italic;
+}
+.rich-text small {
+  color: var(--color-muted);
+}
+.rich-text sup,
+.rich-text sub {
+  font-size: 10px;
+}
+.rich-text center {
+  text-align: center;
+}
+
+/* links: highlighted like the trigger-word chips — violet, soft underline,
+   hover lights up with the same violet-soft wash the shelf uses */
+.rich-text a {
+  color: var(--color-violet);
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 5px;
+  text-decoration: underline;
+  text-decoration-thickness: 1.5px;
+  text-decoration-color: color-mix(in oklab, var(--color-violet) 32%, transparent);
+  text-underline-offset: 3px;
+  transition:
+    color 0.15s var(--ease-apple),
+    background-color 0.15s var(--ease-apple),
+    text-decoration-color 0.15s var(--ease-apple);
+}
+.rich-text a:hover {
+  color: var(--color-violet-hover);
+  background: var(--color-violet-soft);
+  text-decoration-color: currentColor;
+}
+
+/* inline code / kbd share the kbd-chip grammar of the rest of the app */
+.rich-text code,
+.rich-text kbd {
+  padding: 1.5px 5px;
+  border-radius: 6px;
+  border: 1px solid var(--color-hairline);
+  background: var(--color-parchment);
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--color-ink);
+  overflow-wrap: anywhere;
+}
+.rich-text pre {
+  margin: 8px 0;
+  padding: 10px 14px;
+  border: 1px solid var(--color-hairline);
+  border-radius: 12px;
+  background: var(--color-parchment);
+  overflow-x: auto;
+  font-size: 11.5px;
+  line-height: 1.55;
+  white-space: pre;
+}
+.rich-text pre code {
+  padding: 0;
+  border: 0;
+  background: none;
+  overflow-wrap: normal;
+}
+
+/* lists — quiet markers, CivitAI-style bullet rhythm */
+.rich-text ul {
+  margin: 6px 0;
+  padding-left: 20px;
+  list-style: disc;
+}
+.rich-text ol {
+  margin: 6px 0;
+  padding-left: 22px;
+  list-style: decimal;
+}
+.rich-text li {
+  margin: 3.5px 0;
+}
+.rich-text li::marker {
+  color: var(--color-faint);
+}
+.rich-text li > p {
+  margin: 0;
+}
+
+.rich-text blockquote {
+  margin: 10px 0;
+  padding: 2px 14px;
+  border-left: 3px solid var(--color-violet-edge);
+  border-radius: 0 10px 10px 0;
+  color: var(--color-muted);
+}
+.rich-text blockquote p {
+  margin: 4px 0;
+}
+
+.rich-text hr {
+  margin: 14px 0;
+  border: 0;
+  border-top: 1px solid var(--color-hairline);
+}
+.rich-text mark {
+  padding: 0 3px;
+  border-radius: 4px;
+  background: var(--color-violet-soft);
+  color: var(--color-ink);
+}
+.rich-text summary {
+  cursor: pointer;
+  font-weight: 500;
+  color: var(--color-ink);
+}
+
+.rich-text table {
+  display: block;
+  margin: 10px 0;
+  border-collapse: collapse;
+  overflow-x: auto;
+  font-size: 12px;
+}
+.rich-text th,
+.rich-text td {
+  padding: 4px 10px;
+  border: 1px solid var(--color-hairline);
+  text-align: left;
+}
+.rich-text th {
+  font-weight: 600;
+  color: var(--color-ink);
+  background: var(--color-parchment);
+}
+.rich-text td {
+  color: var(--color-body);
+}
+
+/* embedded images from the description markdown ride on the hairline
+   card look; the product shadow is reserved for the shelf's previews */
+.rich-text img {
+  display: block;
+  margin: 8px 0;
+  max-width: min(100%, 360px);
+  max-height: 300px;
+  object-fit: contain;
+  border: 1px solid var(--color-hairline);
+  border-radius: 12px;
+}

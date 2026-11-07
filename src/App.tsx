@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ImageDown } from "lucide-react";
-import { I18nProvider, useI18n } from "./i18n";
+import { I18nProvider, useI18n, type DictKey } from "./i18n";
 import { api, setLibraryDir } from "./lib/api";
 import type {
   AppSettings,
@@ -417,13 +417,13 @@ function Shell() {
   );
 
   const copyPromptText = useCallback(
-    async (text: string) => {
+    async (text: string, copiedKey: DictKey = "toast.copied") => {
       try {
         await navigator.clipboard.writeText(text);
       } catch {
         await api.copyText(text).catch(() => undefined);
       }
-      toast(t("toast.copied"));
+      toast(t(copiedKey));
     },
     [t, toast]
   );
@@ -918,7 +918,7 @@ function Shell() {
           // ⌘C on a lora copies its trigger words (comma-separated)
           if (loraDetail.trigger_words.length > 0) {
             e.preventDefault();
-            void copyPromptText(loraDetail.trigger_words.join(", "));
+            void copyPromptText(loraDetail.trigger_words.join(", "), "lora.triggerCopied");
           }
         }
       } else if (meta && key === "v") {

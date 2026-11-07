@@ -363,7 +363,7 @@ pub fn create_lora_inner(dir: &Path, input: NewLoraInput) -> Result<LoraDetail, 
     let published_at = input.published_at.trim().to_string();
     let usage_tips = strings_json(&input.usage_tips);
     let trigger_words = strings_json(&input.trigger_words);
-    let description = input.description.trim().to_string();
+    let description = crate::civitai::sanitize_rich_html(&input.description.trim());
     let primary_tag = input
         .primary_tag
         .as_deref()
@@ -439,7 +439,7 @@ pub fn update_lora_inner(dir: &Path, input: UpdateLoraInput) -> Result<LoraDetai
     let base_model = input.base_model.trim().to_string();
     let usage_tips = strings_json(&input.usage_tips);
     let trigger_words = strings_json(&input.trigger_words);
-    let description = input.description.trim().to_string();
+    let description = crate::civitai::sanitize_rich_html(&input.description.trim());
     let primary_tag = input
         .primary_tag
         .as_deref()

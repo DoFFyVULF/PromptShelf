@@ -1,6 +1,6 @@
 use crate::dedup;
 use crate::models::{app_settings_default, es, AppSettings, SettingsPatch};
-use rusqlite::{Connection, OptionalExtension};
+use rusqlite::{params, Connection, OptionalExtension};
 use std::path::Path;
 
 pub const SCHEMA: &str = r#"
@@ -126,6 +126,7 @@ pub fn init_schema(conn: &Connection) -> Result<(), String> {
     ensure_columns(conn)?;
     // after ensure_columns: the index needs the migrated column to exist
     dedup::backfill_once(conn);
+    migrate_lora_rich_descriptions(conn);
     conn.execute_batch(
         "CREATE INDEX IF NOT EXISTS idx_cards_group ON cards(group_id);
          CREATE INDEX IF NOT EXISTS idx_cards_source_key ON cards(source_key) WHERE source_key IS NOT NULL;
@@ -181,6 +182,55 @@ fn ensure_columns(conn: &Connection) -> Result<(), String> {
         conn.execute("ALTER TABLE cards ADD COLUMN text_hash TEXT", []).map_err(es)?;
     }
     Ok(())
+}
+
+/// One-time migration: lora descriptions written before the rich renderer
+/// came in as CivitAI HTML stripped down to plain text with newlines —
+/// the renderer sees markup now, so those lines would collapse into one
+/// space. Re-run them through the sanitizer (escapes stray HTML, wraps
+/// plain lines into paragraphs). Soft-fails and retries on next open.
+fn migrate_lora_rich_descriptions(conn: &Connection) {
+    let flag: Option<String> = conn
+        .query_row(
+            "SELECT value FROM settings WHERE key = 'lora_desc_rich_v1'",
+            [],
+            |r| r.get(0),
+        )
+        .optional()
+        .ok()
+        .flatten();
+    if flag.is_some() {
+        return;
+    }
+
+    let done = (|| -> Result<(), String> {
+        let mut stmt = conn
+            .prepare("SELECT id, description FROM loras WHERE description <> ''")
+            .map_err(es)?;
+        let rows: Vec<(String, String)> = stmt
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+            .map_err(es)?
+            .filter_map(|r| r.ok())
+            .collect();
+        drop(stmt);
+        for (id, description) in rows {
+            if description.contains('<') {
+                continue; // already rich HTML
+            }
+            conn.execute(
+                "UPDATE loras SET description = ?1 WHERE id = ?2",
+                params![crate::civitai::sanitize_rich_html(&description), id],
+            )
+            .map_err(es)?;
+        }
+        conn.execute(
+            "INSERT OR REPLACE INTO settings(key, value) VALUES('lora_desc_rich_v1', '1')",
+            [],
+        )
+        .map_err(es)?;
+        Ok(())
+    })();
+    let _ = done; // failing migration retries on the next open
 }
 
 /// Id of the default group; creates it (and backfills cards) when missing.

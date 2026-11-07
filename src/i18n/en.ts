@@ -151,6 +151,8 @@ export const en = {
   "lora.triggerCopied": "Trigger words copied",
   "lora.description": "Description",
   "lora.note": "Note",
+  "lora.showMore": "Show more",
+  "lora.showLess": "Show less",
   "lora.deleteTitle": "Delete lora",
   "lora.copyTriggers": "Copy trigger words",
   "lora.emptyTriggers": "No trigger words",

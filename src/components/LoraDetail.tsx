@@ -22,6 +22,7 @@ import { useI18n } from "../i18n";
 import { api, assetUrl } from "../lib/api";
 import { modKey } from "../lib/platform";
 import type { ImageInfo, LoraDetail as LoraDetailData } from "../lib/types";
+import { RichText } from "./RichText";
 import { Stars } from "./Stars";
 import { useToast } from "./Toasts";
 import { IMAGE_EXTS } from "./Editor";
@@ -417,7 +418,7 @@ export function LoraDetail({
             {lora.description && (
               <section>
                 <p className="text-[10.5px] font-semibold tracking-[0.07em] text-faint uppercase select-none">{t("lora.description")}</p>
-                <p className="mt-2 text-[13px] leading-relaxed whitespace-pre-line text-muted select-text">{lora.description}</p>
+                <RichText html={lora.description} className="mt-2" />
               </section>
             )}
 
