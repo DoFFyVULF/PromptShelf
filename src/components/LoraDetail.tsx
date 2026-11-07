@@ -313,7 +313,7 @@ export function LoraDetail({
           type="button"
           aria-label="Previous"
           onClick={onPrev}
-          className="press absolute top-1/2 left-4 z-10 flex h-11 w-11 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full bg-white/90 text-ink shadow-chip backdrop-blur transition hover:bg-white"
+          className="press absolute top-1/2 left-4 z-10 flex h-11 w-11 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full bg-white/90 text-zinc-900 shadow-chip backdrop-blur transition hover:bg-white"
         >
           <ChevronLeft size={19} />
         </button>
@@ -323,7 +323,7 @@ export function LoraDetail({
           type="button"
           aria-label="Next"
           onClick={onNext}
-          className="press absolute top-1/2 right-4 z-10 flex h-11 w-11 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full bg-white/90 text-ink shadow-chip backdrop-blur transition hover:bg-white"
+          className="press absolute top-1/2 right-4 z-10 flex h-11 w-11 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full bg-white/90 text-zinc-900 shadow-chip backdrop-blur transition hover:bg-white"
         >
           <ChevronRight size={19} />
         </button>
@@ -351,7 +351,7 @@ export function LoraDetail({
                   draggable={false}
                   className="no-drag max-h-full max-w-full rounded-tile object-contain shadow-product"
                 />
-                <span className="absolute right-2 bottom-2 flex h-8 w-8 items-center justify-center rounded-full bg-white/85 text-muted opacity-0 backdrop-blur transition-opacity group-hover:opacity-100">
+                <span className="absolute right-2 bottom-2 flex h-8 w-8 items-center justify-center rounded-full bg-white/85 text-zinc-600 opacity-0 backdrop-blur transition-opacity group-hover:opacity-100">
                   <Maximize2 size={14} />
                 </span>
               </button>
