@@ -20,6 +20,7 @@ import { useI18n } from "../i18n";
 import { api, assetUrl } from "../lib/api";
 import { modKey } from "../lib/platform";
 import type { CardDetail as CardDetailType, ImageInfo, LoraItem, TagCount } from "../lib/types";
+import { useImagePaste } from "../lib/useImagePaste";
 import { Stars } from "./Stars";
 import { TagInput } from "./TagInput";
 import { useToast } from "./Toasts";
@@ -308,6 +309,14 @@ export function CardDetail({ card, suggestions, hasPrev, hasNext, onPrev, onNext
       toast(t("toast.error"), "error");
     }
   }, [card.id, confirmDelete, onDeleted, t, toast]);
+
+  // ⌘V/Ctrl+V drops clipboard images straight onto this card while editing
+  useImagePaste({
+    active: editing,
+    addImage: useCallback((p: string) => api.addCardImage(card.id, p), [card.id]),
+    afterAdd: refresh,
+    onBusy: useCallback((d: number) => setAdding((n) => Math.max(0, n + d)), [])
+  });
 
   const main = card.images[Math.min(mainIdx, card.images.length - 1)];
 

@@ -22,6 +22,7 @@ import { useI18n } from "../i18n";
 import { api, assetUrl } from "../lib/api";
 import { modKey } from "../lib/platform";
 import type { ImageInfo, LoraDetail as LoraDetailData, TagCount } from "../lib/types";
+import { useImagePaste } from "../lib/useImagePaste";
 import { RichText } from "./RichText";
 import { Stars } from "./Stars";
 import { TagInput } from "./TagInput";
@@ -292,6 +293,14 @@ export function LoraDetail({
       toast(t("toast.error"), "error");
     }
   }, [confirmDelete, lora.id, onDeleted, t, toast]);
+
+  // ⌘V/Ctrl+V drops clipboard images straight onto this lora while editing
+  useImagePaste({
+    active: editing,
+    addImage: useCallback((p: string) => api.addLoraImage(lora.id, p).then(() => undefined), [lora.id]),
+    afterAdd: refresh,
+    onBusy: useCallback((d: number) => setAdding((n) => Math.max(0, n + d)), [])
+  });
 
   const main = lora.images[Math.min(mainIdx, lora.images.length - 1)];
 
