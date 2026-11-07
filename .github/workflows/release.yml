@@ -58,25 +58,26 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: "PromptShelf ${{ github.ref_name }}"
           releaseBody: |
-            **What's new in v0.2.0**
+            **What's fixed in v0.2.1**
 
-            **Lora shelf** — a second, dedicated library next to your prompts:
+            **The logo switch, for real this time**
 
-            - One click on the logo flips between the prompt and lora shelves, each with its own groups, tags and detail panel.
-            - Import Lora models straight from CivitAI model pages: preview images, base model, trigger words, usage tips and descriptions land as a rich card with highlighted links.
-            - Inline editing — rename, tag and annotate loras right in the detail panel.
+            - Switching between the prompt and lora shelves now rolls only the word — Prompt ↔ Lora — while "Shelf" glides along: no indent, no horizontal jump, no blank frame. It behaves the same in packaged builds as in dev.
+            - The stray dot that lingered above the logo after a switch is gone.
 
-            **Self-updating**
+            **Bring your own library**
 
-            - PromptShelf now checks GitHub releases in the background at launch. Don't want it? There's a toggle in Settings → Updates.
-            - When a new version is found, the logo plays a slot-drum tease and turns into "Update Shelf" — click it to review and install. Cancelling keeps things quiet until the next launch, and the Updates section in Settings always shows the pending version.
-            - Release notes are now typeset: headings, bullets, filenames and links render the way they were written.
+            - Settings → Storage → the folder button now connects an existing library. Pick a folder that already contains `library.db` and `images/` and PromptShelf switches to it in place — nothing is copied over, nothing is overwritten.
+            - The confirmation shows what was found (prompt and lora counts) before anything changes. Picking a folder without a library still copies the current one there.
+            - If the folder's `library.db` is not a PromptShelf library, the app refuses instead of touching it.
 
-            **Editing & polish**
+            **Dark theme readability**
 
-            - Tag suggestions in every editor; paste images from the clipboard straight into card / lora detail while editing.
-            - Animated boot loader, a typewriter empty state for the prompt shelf and a before/after comparison card for the lora shelf.
-            - Smoother mode-switch transitions in the header, softer focus rings, and a ⌘C hint on the lora copy button.
+            - The card navigation arrows and the zoom badge on previews were white icons on white pills in the dark theme; they stay dark now.
+
+            **Small things**
+
+            - The update dialog has its own "Restarting the app…" label instead of borrowing the library-move copy.
 
             Installers, built from this tag with the updater signing key:
 
