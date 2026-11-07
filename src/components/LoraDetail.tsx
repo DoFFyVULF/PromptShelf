@@ -20,6 +20,7 @@ import {
 import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
 import { useI18n } from "../i18n";
 import { api, assetUrl } from "../lib/api";
+import { modKey } from "../lib/platform";
 import type { ImageInfo, LoraDetail as LoraDetailData } from "../lib/types";
 import { Stars } from "./Stars";
 import { useToast } from "./Toasts";
@@ -454,6 +455,7 @@ export function LoraDetail({
             >
               {copiedTriggers ? <Check size={15} /> : <Copy size={14.5} />}
               <span className="truncate">{copiedTriggers ? t("lora.triggerCopied") : t("lora.copyTriggers")}</span>
+              <kbd className="kbd hidden border-on-ink/30 bg-transparent text-on-ink/70 xl:flex">{modKey}C</kbd>
             </button>
             <button type="button" className="btn-ghost press cursor-pointer" onClick={() => onEdit(lora)}>
               <Pencil size={14.5} />

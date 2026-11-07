@@ -81,7 +81,7 @@ export function ImportDialog({ open, onClose, onSubmit, lora }: ImportDialogProp
         </div>
 
         <div className="flex items-center justify-end gap-2 border-t border-line-soft px-7 py-4">
-          <button type="submit" className="btn-primary press min-w-[104px] cursor-pointer" disabled={!url.trim()}>
+          <button type="submit" className="btn-primary press min-w-[104px] cursor-pointer justify-center" disabled={!url.trim()}>
             <CloudDownload size={14.5} strokeWidth={2} />
             {t("import.civitai.go")}
           </button>

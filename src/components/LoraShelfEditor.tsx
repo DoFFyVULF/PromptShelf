@@ -310,7 +310,7 @@ export function LoraShelfEditor({ lora, staged, onStaged, onClose, onSaved }: Lo
         <button type="button" className="btn-ghost press cursor-pointer" onClick={discard}>
           {t("action.cancel")}
         </button>
-        <button type="button" className="btn-primary press min-w-[104px] cursor-pointer" onClick={save} disabled={saving || !name.trim()}>
+        <button type="button" className="btn-primary press min-w-[104px] cursor-pointer justify-center" onClick={save} disabled={saving || !name.trim()}>
           {saving && <Loader2 size={14} className="spin" />}
           {t("action.save")}
         </button>
