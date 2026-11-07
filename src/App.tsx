@@ -1064,6 +1064,8 @@ function Shell() {
 
   const filterEmpty =
     !anyFilter && activeCards.length === 0 && activeJobs.length === 0 && !loading && !loadError;
+  const overlayOpen =
+    editorOpen || loraEditorOpen || importOpen || settingsOpen || groupsOpen || tagsOpen;
 
   return (
     <div className="flex h-full flex-col">
@@ -1119,6 +1121,7 @@ function Shell() {
           <EmptyState
             hasFilters={false}
             lora={mode === "lora"}
+            paused={overlayOpen}
             onImport={() => setImportOpen(true)}
             onNew={mode === "prompt" ? openEditorNew : openLoraEditorNew}
             onPaste={() => void pasteGlobally()}

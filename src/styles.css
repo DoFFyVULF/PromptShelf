@@ -343,6 +343,40 @@ body {
   background: linear-gradient(100deg, transparent 25%, rgb(255 255 255 / 0.08) 50%, transparent 75%);
 }
 
+/* Empty lora shelf: the comparison divider glides between the baseline and
+   lora renditions of the mini scene. Pure CSS so the browser owns the loop;
+   the glyph pauses it (data-sweep="paused") when it is offscreen, the window
+   is hidden, or a dialog covers the shelf. Reduced motion rests both layers
+   at the 50% split. */
+@keyframes lora-sweep-clip {
+  from {
+    clip-path: inset(0 0 0 36%);
+  }
+  to {
+    clip-path: inset(0 0 0 64%);
+  }
+}
+@keyframes lora-sweep-left {
+  from {
+    left: 36%;
+  }
+  to {
+    left: 64%;
+  }
+}
+.lora-sweep-pane {
+  clip-path: inset(0 0 0 50%);
+  animation: lora-sweep-clip 5s ease-in-out infinite alternate;
+}
+.lora-sweep-line {
+  left: 50%;
+  animation: lora-sweep-left 5s ease-in-out infinite alternate;
+}
+.lora-split[data-sweep="paused"] .lora-sweep-pane,
+.lora-split[data-sweep="paused"] .lora-sweep-line {
+  animation-play-state: paused;
+}
+
 /* Import from CivitAI: reveals below the New Prompt button on hover with a
    spring overshoot. The wrapper's padding keeps the cursor connected across
    the gap so the highlight doesn't flicker off. */
@@ -353,7 +387,9 @@ body {
   .anim-toast,
   .spin,
   .import-sweep,
-  .animate-pulse {
+  .animate-pulse,
+  .lora-sweep-pane,
+  .lora-sweep-line {
     animation: none !important;
   }
 }
