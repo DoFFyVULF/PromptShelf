@@ -1,5 +1,6 @@
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { useMemo } from "react";
+import { animate, AnimatePresence, motion, useMotionValue, useReducedMotion, useTransform } from "motion/react";
+import type { MotionValue } from "motion/react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Search, Plus, Settings2, ChevronDown, CloudDownload } from "lucide-react";
 import { useI18n } from "../i18n";
 import { modKey } from "../lib/platform";
@@ -21,22 +22,69 @@ interface TopBarProps {
 
 /** Word/label swaps are soft blur-crossfades; size/position changes ride on
  * `layout`, so the header glides instead of snapping when the mode flips.
- * Layout-animated buttons use `press-bg` + whileTap: a CSS transform
- * transition would fight Motion's per-frame transform writes. */
+ * The logo rolls only its word vertically while the slot width tweens and
+ * "Shelf" rides along in flow. The width is a plain motion value and every word
+ * fills the slot via a computed `scaleX = slot/word` — the same edge-to-edge
+ * look `layout` projection gives in dev, but deterministic: projection measures
+ * the DOM, and in release builds (fast commits, WKWebView/WebView2) it measured
+ * mid-flight and produced the indent/stretch artifacts. A center-origin press
+ * scale would read as the logo jumping right, so the button has no press
+ * transform at all — the roll is the press feedback. */
 const LABEL_TWEEN = { duration: 0.26, ease: [0.32, 0.72, 0, 1] } as const;
 const LAYOUT_SPRING = { type: "spring", stiffness: 520, damping: 40, mass: 1 } as const;
 const REDUCE_TWEEN = { duration: 0.12, ease: "easeOut" } as const;
-/** The logo roll: slow, matched easing on enter AND exit so the two words
- * move as one conveyor — the new word visibly pushes the old one out.
- * Travel is 150%: far enough that a word fully clears the ±10% clip window
- * (108% would leave its tail inside the window, popping out of existence). */
-const WORD_ROLL_TWEEN = { duration: 0.52, ease: [0.32, 0.72, 0, 1] } as const;
+/** The logo roll: one strip holding both words, slid by exactly one slot.
+ * Nothing mounts or unmounts, so the words cannot "disappear" mid-toggle —
+ * the cells tile the window at every frame. Kept brisk: a longer tween reads
+ * as sluggish because the squish/stretch holds attention. */
+const WORD_ROLL_TWEEN = { duration: 0.35, ease: [0.32, 0.72, 0, 1] } as const;
 
-const WORD_ROLL_VARIANTS = {
-  enter: (dir: Mode) => ({ y: dir === "lora" ? "150%" : "-150%" }),
-  center: { y: "0%" },
-  exit: (dir: Mode) => ({ y: dir === "lora" ? "-150%" : "150%" }),
-};
+/** Every word fills the slot edge to edge while its width tweens: scaleX is
+ * derived from the slot width and the word's own measured width, so no layout
+ * measurement is ever needed mid-animation. */
+function useFillWindow(slot: MotionValue<number>, word: string, onWidth: (word: string, px: number) => void) {
+  const ref = useRef<HTMLSpanElement | null>(null);
+  const wordWidth = useMotionValue(0);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const report = () => {
+      wordWidth.jump(el.offsetWidth);
+      onWidth(word, el.offsetWidth);
+    };
+    report();
+    document.fonts.ready.then(report);
+  }, []);
+  const scaleX = useTransform([slot, wordWidth], (latest) => {
+    const [s, w] = latest as [number, number];
+    return w ? s / w : 1;
+  });
+  return { ref, scaleX };
+}
+
+function SlotCell({
+  word,
+  slot,
+  onWidth,
+  className = "",
+}: {
+  word: string;
+  slot: MotionValue<number>;
+  onWidth: (word: string, px: number) => void;
+  className?: string;
+}) {
+  const { ref, scaleX } = useFillWindow(slot, word, onWidth);
+  return (
+    <motion.span
+      ref={ref}
+      data-word={word}
+      style={{ scaleX, transformOrigin: "left center" }}
+      className={`block h-4 whitespace-nowrap leading-none ${className}`}
+    >
+      {word}
+    </motion.span>
+  );
+}
 
 /** The update tease: a real slot drum. Instead of swapping single words, a
  * continuous strip of Prompt/Lora/Update cells scrolls through the window —
@@ -131,6 +179,45 @@ export function TopBar({ mode, onToggleMode, query, onQuery, sort, onSort, onNew
   // While an update is pending the wordmark slot shows "Update" and clicking
   // the logo opens the update dialog.
   const label = updateAvailable ? "Update" : mode === "prompt" ? "Prompt" : "Lora";
+  // Index of the active word in the resting strip (the drum has its own strip).
+  const roll = updateAvailable ? 2 : mode === "lora" ? 1 : 0;
+
+  // The slot width tweens between word widths; "Shelf" sits in flow right
+  // after it, so it glides instead of jumping. Words report their measured
+  // width once (and again after webfonts settle).
+  const slot = useMotionValue(0);
+  const widths = useRef<Record<string, number>>({});
+  const windowRef = useRef<HTMLSpanElement | null>(null);
+  const slotted = useRef(false);
+  const [fontsReady, setFontsReady] = useState(false);
+  useEffect(() => {
+    let on = true;
+    document.fonts.ready.then(() => {
+      if (on) setFontsReady(true);
+    });
+    return () => {
+      on = false;
+    };
+  }, []);
+  useLayoutEffect(() => {
+    // Cells report their widths from their own layout effects; measuring the
+    // active cell directly is the safety net for the first commit in a
+    // production build, where a missed report must never leave the window at
+    // width 0 (which would hide the whole word).
+    const measured =
+      widths.current[label] ??
+      windowRef.current?.querySelector<HTMLElement>(`[data-word="${label}"]`)?.offsetWidth;
+    if (!measured) return;
+    if (!slotted.current || reduce) {
+      slotted.current = true;
+      slot.jump(measured);
+    } else {
+      animate(slot, measured, WORD_ROLL_TWEEN);
+    }
+  }, [label, reduce, fontsReady]);
+  const onWidth = (word: string, px: number) => {
+    widths.current[word] = px;
+  };
 
   return (
     <header className="relative z-40 flex h-14 shrink-0 items-center gap-3 border-b border-hairline bg-canvas/85 px-4 backdrop-blur-xl">
@@ -140,61 +227,58 @@ export function TopBar({ mode, onToggleMode, query, onQuery, sort, onSort, onNew
           onClick={updateAvailable ? onUpdateOpen : onToggleMode}
           aria-label={updateAvailable ? t("settings.updates.badge") : t("app.mode.toggle")}
           title={updateAvailable ? t("settings.updates.badge") : t("app.mode.toggle")}
-          className="press group flex cursor-pointer items-baseline rounded-md outline-offset-4"
+          className="group flex cursor-pointer items-baseline rounded-md outline-offset-4"
         >
           <span className="wordmark flex items-baseline text-[16px] leading-none text-ink">
             {/* clip-path, not overflow-hidden: keeps the inline-block baseline.
-                The window hugs the word box (±10% slack for glyph overflow), so
-                both roll directions slice words out at the edges instead of
-                leaving them stranded outside. */}
+                The window is exactly one line tall and clipped flush: any
+                vertical slack would leave the neighbouring word's descenders
+                (the "p" of Prompt) peeking through as dots at the edge. */}
             <motion.span
-              layout={layout}
-              style={{ clipPath: "inset(-10% 0 -10% 0)" }}
-              className="relative inline-block"
+              ref={windowRef}
+              style={{ width: slot, clipPath: "inset(0)" }}
+              className="relative inline-block h-4 text-left"
             >
-              {drum ? (
-                <>
-                  {/* invisible sizer: the window keeps the width of the final
-                      word, so "Shelf" doesn't wander while the drum spins */}
-                  <span className="invisible block whitespace-nowrap">Update</span>
+              {/* invisible line box: gives the inline-block its baseline */}
+              <span aria-hidden className="invisible">
+                &nbsp;
+              </span>
+              <span className="absolute top-0 left-0 flex flex-col items-start">
+                {drum ? (
                   <motion.span
                     aria-hidden
-                    className="absolute top-0 left-0 flex flex-col items-start"
+                    className="flex flex-col items-start"
                     initial={false}
                     animate={{ y: drum.keys }}
                     transition={{ duration: drum.total, times: drum.times, ease: drum.eases }}
                   >
                     {drum.words.map((w, i) => (
-                      <span
+                      <SlotCell
                         key={i}
-                        className={`block h-4 whitespace-nowrap leading-none ${w === "Update" ? "text-action" : ""}`}
-                      >
-                        {w}
-                      </span>
+                        word={w}
+                        slot={slot}
+                        onWidth={onWidth}
+                        className={w === "Update" ? "text-action" : ""}
+                      />
                     ))}
                   </motion.span>
-                </>
-              ) : (
-                <AnimatePresence mode="popLayout" initial={false} custom={updateAvailable ? "lora" : mode}>
+                ) : (
                   <motion.span
-                    key={updateAvailable ? "update" : mode}
-                    custom={updateAvailable ? "lora" : mode}
-                    variants={WORD_ROLL_VARIANTS}
-                    initial={reduce ? { opacity: 0 } : "enter"}
-                    animate={reduce ? { opacity: 1 } : "center"}
-                    exit={reduce ? { opacity: 0 } : "exit"}
+                    aria-hidden
+                    className="flex flex-col items-start"
+                    initial={false}
+                    animate={{ y: -roll * DRUM_SLOT }}
                     transition={reduce ? REDUCE_TWEEN : WORD_ROLL_TWEEN}
-                    className={`wordmark-word inline-block whitespace-nowrap ${label === "Update" || mode === "lora" ? "text-action" : ""}`}
                   >
-                    {/* brand wordmark — deliberately not localized, like "Shelf" */}
-                    {label}
+                    <SlotCell word="Prompt" slot={slot} onWidth={onWidth} className="wordmark-word" />
+                    <SlotCell word="Lora" slot={slot} onWidth={onWidth} className="wordmark-word text-action" />
+                    <SlotCell word="Update" slot={slot} onWidth={onWidth} className="wordmark-word text-action" />
                   </motion.span>
-                </AnimatePresence>
-              )}
+                )}
+              </span>
             </motion.span>
-            <motion.span layout={layout} className="inline-block text-faint">
-              Shelf
-            </motion.span>
+            {/* brand wordmark tail — deliberately not localized */}
+            <span className="inline-block text-faint">Shelf</span>
           </span>
         </button>
       </div>
