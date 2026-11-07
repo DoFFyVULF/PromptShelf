@@ -4,18 +4,31 @@ import { ChevronsLeftRight, ClipboardPaste, ImagePlus, Import, Plus, SearchX } f
 import { useI18n } from "../i18n";
 import { modKey } from "../lib/platform";
 
-/** A single static miniature of the boot-loader card — the empty shelf
- * previews the grid to come. */
-function PromptCardGlyph() {
+/** Empty prompt shelf: a miniature card — the generated scene as its cover
+ * and its prompt typing itself into the caption strip below (CSS loop, calm
+ * cadence, same pause scheme as the lora glyph). The cover is deliberately
+ * the same baseline lighthouse the lora glyph re-renders with a lora — the
+ * two shelves preview one continuous story. */
+function PromptCardGlyph({ paused }: { paused?: boolean }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const inView = useInView(ref, { amount: 0.5 });
+  const pageInView = usePageInView();
+  const sweep = inView && pageInView && !paused ? "run" : "paused";
+
   return (
     <div
+      ref={ref}
+      data-sweep={sweep}
       aria-hidden
-      className="w-[56px] rounded-[10px] border border-hairline bg-card p-[7px] shadow-chip"
+      className="sweep-glyph w-[224px] rounded-[12px] border border-hairline bg-card p-2 shadow-chip"
     >
-      <div className="h-[36px] rounded-[6px] bg-parchment" />
-      <div className="mt-2 space-y-1 px-0.5">
-        <div className="h-[4px] w-4/5 rounded-full bg-line-hover" />
-        <div className="h-[4px] w-3/5 rounded-full bg-line-hover opacity-60" />
+      <div className="relative h-[104px] overflow-hidden rounded-[8px]">
+        <LoraSceneArt applied={false} />
+      </div>
+      <div className="mt-2 rounded-[6px] bg-parchment px-2 py-1.5">
+        <div className="prompt-type overflow-hidden whitespace-nowrap font-mono text-[10.5px] leading-tight text-muted">
+          a lighthouse at dusk, calm sea
+        </div>
       </div>
     </div>
   );
@@ -103,20 +116,20 @@ function LoraCardGlyph({ paused }: { paused?: boolean }) {
       ref={ref}
       data-sweep={sweep}
       aria-hidden
-      className="lora-split w-[224px] rounded-[12px] border border-hairline bg-card p-2 shadow-chip"
+      className="sweep-glyph w-[224px] rounded-[12px] border border-hairline bg-card p-2 shadow-chip"
     >
       <div className="relative h-[104px] overflow-hidden rounded-[8px]">
         <LoraSceneArt applied={false} />
         <div className="absolute left-2 top-2 rounded-[5px] border border-hairline bg-card/80 px-1.5 py-0.5 font-mono text-[8.5px] uppercase tracking-wide text-muted backdrop-blur-sm">
           base
         </div>
-        <div className="lora-sweep-pane absolute inset-0">
+        <div className="sweep-pane absolute inset-0">
           <LoraSceneArt applied />
           <div className="absolute right-2 top-2 rounded-[5px] border border-violet-edge bg-violet-soft/80 px-1.5 py-0.5 font-mono text-[8.5px] uppercase tracking-wide text-violet backdrop-blur-sm">
             with lora
           </div>
         </div>
-        <div className="lora-sweep-line absolute inset-y-0 w-[2px] -translate-x-1/2">
+        <div className="sweep-line absolute inset-y-0 w-[2px] -translate-x-1/2">
           <div className="h-full w-full bg-violet opacity-80" />
           <div className="absolute left-1/2 top-1/2 flex h-[18px] w-[18px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-hairline bg-card shadow-chip">
             <ChevronsLeftRight size={10} className="text-violet" />
@@ -138,7 +151,7 @@ interface EmptyStateProps {
   /** Lora shelf: the shelf CTA becomes "add lora", the second button imports. */
   lora?: boolean;
   onImport?: () => void;
-  /** True while a dialog/panel covers the shelf — pauses the lora sweep. */
+  /** True while a dialog/panel covers the shelf — pauses the glyph motion. */
   paused?: boolean;
 }
 
@@ -185,7 +198,7 @@ export function EmptyState({ hasFilters, onNew, onPaste, onClear, lora, onImport
 
   return (
     <div className="anim-fade flex h-full flex-col items-center justify-center gap-5 pb-16 text-center">
-      <PromptCardGlyph />
+      <PromptCardGlyph paused={paused} />
       <div>
         <h2 className="t-display text-[24px] text-ink">{t("empty.title")}</h2>
         <p className="mx-auto mt-2 max-w-[380px] text-[14px] leading-relaxed text-muted">{t("empty.sub")}</p>
