@@ -325,6 +325,15 @@ pub struct LibraryPaths {
     pub db_path: String,
 }
 
+/// What a user-picked folder contains, so the UI can offer "use this library"
+/// instead of "copy my library here" when a `library.db` is already there.
+#[derive(Serialize)]
+pub struct LibraryInspection {
+    pub library: bool,
+    pub cards: i64,
+    pub loras: i64,
+}
+
 #[derive(Deserialize)]
 pub struct DroppedFileInput {
     /// Original file name (only for diagnostics; format is sniffed from bytes).

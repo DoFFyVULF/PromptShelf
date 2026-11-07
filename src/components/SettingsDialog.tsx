@@ -219,22 +219,34 @@ export function SettingsDialog({ open, settings, paths, lang, onLang, theme, onT
         multiple: false
       });
       if (!picked || typeof picked !== "string") return;
-      const yes = await message(t("settings.location.moveConfirm"), {
-        title: t("settings.location.change"),
-        kind: "info",
-        okLabel: t("settings.location.change")
-      });
+      const dir = picked.trim();
+      // A folder that already holds library.db is an existing library: connect
+      // it instead of copying the current one over it.
+      const found = await api.inspectLibraryDir(dir);
+      const yes = await message(
+        found.library
+          ? t("settings.location.adoptConfirm", { cards: found.cards, loras: found.loras })
+          : t("settings.location.copyConfirm"),
+        {
+          title: t("settings.location.change"),
+          kind: found.library ? "info" : "warning",
+          okLabel: t(found.library ? "settings.location.adopt" : "settings.location.change")
+        }
+      );
       if (!yes) return;
       setMoving(true);
-      await api.moveLibrary(picked.trim());
-      toast(t("settings.location.moved"));
+      const mode = await api.moveLibrary(dir);
+      toast(t(mode === "adopted" ? "settings.location.adopted" : "settings.location.moved"));
       // Apply on the next start: everything (db, images, asset paths) reads
       // the library from the manifest-resolved dir.
       window.setTimeout(() => {
         void relaunch().catch(() => undefined);
       }, 900);
-    } catch {
-      toast(t("settings.location.moveError"), "error");
+    } catch (e) {
+      toast(
+        t(String(e).includes("LIBRARY_INVALID") ? "settings.location.invalid" : "settings.location.moveError"),
+        "error"
+      );
     } finally {
       setMoving(false);
     }
@@ -531,6 +543,7 @@ export function SettingsDialog({ open, settings, paths, lang, onLang, theme, onT
                   <FolderOpen size={15} />
                 </button>
               </div>
+              <p className="mt-1.5 text-[11.5px] text-faint">{t("settings.location.hint")}</p>
             </div>
 
             <div className="flex gap-2">

@@ -141,6 +141,13 @@ export interface LibraryPaths {
   db_path: string;
 }
 
+/** Contents of a folder picked as the library location. */
+export interface LibraryInspection {
+  library: boolean;
+  cards: number;
+  loras: number;
+}
+
 export interface PasteImageResult {
   temp_path: string;
   preview: string;

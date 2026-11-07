@@ -8,6 +8,7 @@ import type {
   DuplicateHit,
   GroupInfo,
   ImageInfo,
+  LibraryInspection,
   LibraryPaths,
   ListFilter,
   LoraDetail,
@@ -93,7 +94,10 @@ export const api = {
   importLibrary: (path: string) => invoke<void>("import_library", { path }),
 
   getLibraryPaths: () => invoke<LibraryPaths>("get_library_paths"),
-  moveLibrary: (newDir: string) => invoke<void>("move_library", { newDir }),
+  inspectLibraryDir: (path: string) => invoke<LibraryInspection>("inspect_library_dir", { path }),
+  /** Resolves to "adopted" when an existing library was connected, "copied"
+   * when the current library was copied into an empty folder. */
+  moveLibrary: (newDir: string) => invoke<string>("move_library", { newDir }),
   revealFile: (path: string) => invoke<void>("reveal_file", { path }),
   openUrl: (url: string) => invoke<void>("open_url", { url }),
   copyText: (text: string) => invoke<void>("copy_text", { text })

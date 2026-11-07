@@ -14,6 +14,8 @@ mod tests_cards;
 mod tests_dedup;
 #[cfg(test)]
 mod tests_images;
+#[cfg(test)]
+mod tests_util;
 
 use std::path::PathBuf;
 use tauri::Manager;
@@ -90,6 +92,7 @@ pub fn run() {
             transfer::export_library,
             transfer::import_library,
             util::get_library_paths,
+            util::inspect_library_dir,
             util::move_library,
             util::reveal_file,
             util::open_url,

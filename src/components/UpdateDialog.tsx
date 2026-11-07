@@ -283,7 +283,7 @@ export function UpdateDialog({ open, onClose, known, onDismissed, onFound }: Upd
         {phase === "restarting" && (
           <p className="mt-3 flex items-center gap-2 text-[13.5px] text-muted">
             <Loader2 size={14} className="spin" />
-            {t("settings.location.moved")}
+            {t("settings.updates.restarting")}
           </p>
         )}
 

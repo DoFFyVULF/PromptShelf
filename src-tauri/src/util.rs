@@ -1,4 +1,5 @@
-use crate::models::{es, LibraryPaths};
+use crate::models::{es, LibraryInspection, LibraryPaths};
+use rusqlite::Connection;
 use serde_json::Value;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -11,28 +12,92 @@ pub fn get_library_paths(state: tauri::State<'_, crate::AppState>) -> LibraryPat
     }
 }
 
+/// Reads what sits in a folder the user picked for the library location:
+/// an existing `library.db` means "connect this library", anything else means
+/// "copy the current library here".
+#[tauri::command]
+pub fn inspect_library_dir(path: String) -> LibraryInspection {
+    match library_counts(&PathBuf::from(path.trim())) {
+        Some((cards, loras)) => LibraryInspection {
+            library: true,
+            cards,
+            loras,
+        },
+        None => LibraryInspection {
+            library: false,
+            cards: 0,
+            loras: 0,
+        },
+    }
+}
+
+/// `(cards, loras)` when `dir` holds a PromptShelf database, `None` otherwise.
+fn library_counts(dir: &Path) -> Option<(i64, i64)> {
+    let db = dir.join("library.db");
+    if !db.is_file() {
+        return None;
+    }
+    let conn = Connection::open(&db).ok()?;
+    let has_cards: bool = conn
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'cards')",
+            [],
+            |r| r.get(0),
+        )
+        .ok()?;
+    if !has_cards {
+        return None;
+    }
+    let cards = conn
+        .query_row("SELECT COUNT(*) FROM cards", [], |r| r.get(0))
+        .unwrap_or(0);
+    let loras = conn
+        .query_row("SELECT COUNT(*) FROM loras", [], |r| r.get(0))
+        .unwrap_or(0);
+    Some((cards, loras))
+}
+
 #[tauri::command]
 pub async fn move_library(
     state: tauri::State<'_, crate::AppState>,
     new_dir: String,
-) -> Result<(), String> {
+) -> Result<String, String> {
     let from = state.dir.clone();
     let default_dir = state.default_dir.clone();
     let handle = tauri::async_runtime::spawn_blocking(move || {
         move_library_blocking(&from, &default_dir, &new_dir)
     });
-    let res = handle
+    handle
         .await
-        .map_err(|e| format!("LIBRARY_MOVE: {e}"))?;
-    res
+        .map_err(|e| format!("LIBRARY_MOVE: {e}"))?
 }
 
-/// Copy the whole library to `new_dir` and record the location in the
-/// manifest by the app's default data dir (read next start). The old copy is
-/// left in place, so the switch is never destructive.
-fn move_library_blocking(from: &Path, default_dir: &Path, new_dir_raw: &str) -> Result<(), String> {
+/// Connect the library already in `new_dir`, or copy the current one there
+/// when the folder is empty. Adopting is what the settings dialog does when
+/// the user points at an older install: the db and images stay where they are
+/// (the db is opened and migrated on the next start), the manifest only
+/// records the new active dir. Returns "adopted" or "copied".
+pub(crate) fn move_library_blocking(
+    from: &Path,
+    default_dir: &Path,
+    new_dir_raw: &str,
+) -> Result<String, String> {
     let new_rel_err = || "LIBRARY_MOVE".to_string();
     let new_dir = PathBuf::from(new_dir_raw.trim());
+    if new_dir.as_os_str().is_empty() {
+        return Err(new_rel_err());
+    }
+
+    if new_dir.join("library.db").is_file() {
+        // Never overwrite a database the user pointed us at: if it is not a
+        // PromptShelf library the move must fail instead of clobbering it.
+        if library_counts(&new_dir).is_none() {
+            return Err("LIBRARY_INVALID".to_string());
+        }
+        write_manifest(default_dir, &new_dir)?;
+        return Ok("adopted".to_string());
+    }
+
     if from == new_dir {
         return Err(new_rel_err());
     }
@@ -76,7 +141,7 @@ fn move_library_blocking(from: &Path, default_dir: &Path, new_dir_raw: &str) -> 
     // custom location is known.
     write_manifest(default_dir, &new_dir)?;
 
-    Ok(())
+    Ok("copied".to_string())
 }
 
 fn write_manifest(default_dir: &Path, dir: &Path) -> Result<(), String> {
