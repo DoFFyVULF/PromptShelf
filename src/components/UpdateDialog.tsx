@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { getVersion } from "@tauri-apps/api/app";
 import { check } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
@@ -8,6 +8,118 @@ import type { UpdateAvailability } from "../lib/useUpdateCheck";
 import { Dialog, DialogCloseButton } from "./Dialog";
 
 type Phase = "checking" | "latest" | "available" | "downloading" | "restarting" | "error";
+
+const INLINE_MD = /(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\(\S+\))/g;
+
+/** GitHub release bodies are markdown. Render the subset they actually use —
+ * headings, bullets, bold, inline code, links — into quiet, readable rows
+ * instead of a gray wall of asterisks. */
+function renderInline(text: string, keyBase: string): ReactNode[] {
+  const out: ReactNode[] = [];
+  let last = 0;
+  let k = 0;
+  for (const m of text.matchAll(INLINE_MD)) {
+    if (m.index > last) out.push(text.slice(last, m.index));
+    const tok = m[0];
+    if (tok.startsWith("**")) {
+      out.push(
+        <strong key={`${keyBase}-${k++}`} className="font-semibold text-ink">
+          {tok.slice(2, -2)}
+        </strong>,
+      );
+    } else if (tok.startsWith("`")) {
+      out.push(
+        <code
+          key={`${keyBase}-${k++}`}
+          className="rounded-md border border-hairline bg-card px-1.5 py-[1px] font-mono text-[11px] text-ink"
+        >
+          {tok.slice(1, -1)}
+        </code>,
+      );
+    } else {
+      const label = tok.slice(1, tok.indexOf("]"));
+      const href = tok.slice(tok.indexOf("(") + 1, -1);
+      out.push(
+        /^https?:\/\//.test(href) ? (
+          <a
+            key={`${keyBase}-${k++}`}
+            href={href}
+            target="_blank"
+            rel="noreferrer"
+            className="text-action hover:underline"
+          >
+            {label}
+          </a>
+        ) : (
+          label
+        ),
+      );
+    }
+    last = m.index + tok.length;
+  }
+  if (last < text.length) out.push(text.slice(last));
+  return out;
+}
+
+function ReleaseNotes({ body }: { body: string }) {
+  const blocks: ReactNode[] = [];
+  let bullets: ReactNode[][] = [];
+  let para: string[] = [];
+  let k = 0;
+
+  const flushPara = () => {
+    if (para.length === 0) return;
+    blocks.push(<p key={`p-${k++}`}>{renderInline(para.join(" "), `p${k}`)}</p>);
+    para = [];
+  };
+  const flushBullets = () => {
+    if (bullets.length === 0) return;
+    const items = bullets;
+    blocks.push(
+      <ul key={`ul-${k++}`} className="space-y-1.5">
+        {items.map((node, i) => (
+          <li key={i} className="flex gap-2">
+            <span aria-hidden className="mt-[8px] h-1 w-1 shrink-0 rounded-full bg-faint" />
+            <span className="min-w-0">{node}</span>
+          </li>
+        ))}
+      </ul>,
+    );
+    bullets = [];
+  };
+
+  for (const raw of body.split("\n")) {
+    const line = raw.trim();
+    if (/^[-*]\s+/.test(line)) {
+      flushPara();
+      bullets.push(renderInline(line.replace(/^[-*]\s+/, ""), `b${k}-${bullets.length}`));
+    } else if (line === "") {
+      flushPara();
+      flushBullets();
+    } else if (/^#{1,6}\s+/.test(line)) {
+      flushPara();
+      flushBullets();
+      blocks.push(
+        <p key={`h-${k++}`} className="text-[13px] font-semibold text-ink">
+          {renderInline(line.replace(/^#+\s+/, ""), `h${k}`)}
+        </p>,
+      );
+    } else {
+      flushBullets();
+      para.push(line);
+    }
+  }
+  flushPara();
+  flushBullets();
+
+  return (
+    <div className="mt-3 max-h-56 w-full overflow-y-auto rounded-xl bg-parchment px-4 py-3.5 text-left">
+      <div className="space-y-2.5 text-[12.5px] leading-relaxed text-body">
+        {blocks}
+      </div>
+    </div>
+  );
+}
 
 interface UpdateDialogProps {
   open: boolean;
@@ -144,11 +256,7 @@ export function UpdateDialog({ open, onClose, known, onDismissed, onFound }: Upd
             <p className="mt-3 text-[15px] font-semibold text-ink">
               {t("settings.updates.available").replace("{version}", available.version)}
             </p>
-            {available.body && (
-              <p className="mt-2 max-h-28 overflow-y-auto text-[12.5px] leading-relaxed whitespace-pre-wrap text-muted select-text">
-                {available.body}
-              </p>
-            )}
+            {available.body && <ReleaseNotes body={available.body} />}
             <div className="mt-5 flex items-center gap-2">
               <button
                 type="button"
