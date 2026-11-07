@@ -33,9 +33,13 @@ import { LoraDetail } from "./components/LoraDetail";
 import { LoraShelfEditor } from "./components/LoraShelfEditor";
 import { Editor } from "./components/Editor";
 import { ImportDialog } from "./components/ImportDialog";
-import { ImportReceipts, type ImportReceipt } from "./components/ImportReceipts";
+import {
+  ImportReceipts,
+  type ImportReceipt,
+} from "./components/ImportReceipts";
 import { importErrorToKey, type ImportJob } from "./components/ImportJobs";
 import { SettingsDialog } from "./components/SettingsDialog";
+import { UpdateDialog } from "./components/UpdateDialog";
 import { GroupsPanel } from "./components/GroupsPanel";
 import { TagsDialog } from "./components/TagsDialog";
 import { ToastProvider, useToast } from "./components/Toasts";
@@ -43,6 +47,7 @@ import { ScrollTopButton } from "./components/ScrollTopButton";
 import { DuplicateDialog } from "./components/DuplicateDialog";
 import { CornerDownRight, ListChecks, X } from "lucide-react";
 import { applyTheme, onSystemThemeChange, themeFromStorage } from "./lib/theme";
+import { useUpdateCheck } from "./lib/useUpdateCheck";
 
 function Shell() {
   const { t, lang, setLang } = useI18n();
@@ -114,13 +119,28 @@ function Shell() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [dragging, setDragging] = useState(false);
 
+  // ---------------------------------------------------------------- updates
+
+  // One shared availability state: the logo badge and the settings dialog
+  // both read from the same hook.
+  const update = useUpdateCheck();
+  const [updateOpen, setUpdateOpen] = useState(false);
+
+  // The background check runs once per launch, gated on the stored toggle;
+  // it defers itself (grace period + idle), so this only decides "if".
+  useEffect(() => {
+    if (settings) update.runBackgroundCheck(settings.update_auto_check);
+    // runBackgroundCheck is stable and self-guards against double runs
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings]);
+
   // ---------------------------------------------------------------- lora shelf
 
   // The logo toggles between the two shelves. Both have parallel state: grid,
   // tags, groups, detail, editor, imports and receipts — the prompt flows are
   // untouched, the lora flows mirror them.
   const [mode, setMode] = useState<Mode>(() =>
-    window.localStorage.getItem("ps-mode") === "lora" ? "lora" : "prompt"
+    window.localStorage.getItem("ps-mode") === "lora" ? "lora" : "prompt",
   );
 
   const [loras, setLoras] = useState<LoraSummary[]>([]);
@@ -1190,9 +1210,19 @@ function Shell() {
   const activeJobs = mode === "prompt" ? jobs : loraJobs;
 
   const filterEmpty =
-    !anyFilter && activeCards.length === 0 && activeJobs.length === 0 && !loading && !loadError;
+    !anyFilter &&
+    activeCards.length === 0 &&
+    activeJobs.length === 0 &&
+    !loading &&
+    !loadError;
   const overlayOpen =
-    editorOpen || loraEditorOpen || importOpen || settingsOpen || groupsOpen || tagsOpen;
+    editorOpen ||
+    loraEditorOpen ||
+    importOpen ||
+    settingsOpen ||
+    groupsOpen ||
+    tagsOpen ||
+    updateOpen;
 
   return (
     <div className="flex h-full flex-col">
@@ -1206,12 +1236,18 @@ function Shell() {
         onNew={mode === "prompt" ? openEditorNew : openLoraEditorNew}
         onImportCivitai={() => setImportOpen(true)}
         onSettings={() => setSettingsOpen(true)}
+        updateAvailable={update.available !== null}
+        onUpdateOpen={() => setUpdateOpen(true)}
       />
 
       <FilterBar
         tags={mode === "prompt" ? tags : loraTags}
         selected={selectedTags}
-        onToggle={(tag) => setSelectedTags((prev) => (prev.includes(tag) ? prev.filter((x) => x !== tag) : [...prev, tag]))}
+        onToggle={(tag) =>
+          setSelectedTags((prev) =>
+            prev.includes(tag) ? prev.filter((x) => x !== tag) : [...prev, tag],
+          )
+        }
         onClear={() => {
           setSelectedTags([]);
           setQuery("");
@@ -1450,14 +1486,33 @@ function Shell() {
           onClose={() => setSettingsOpen(false)}
           onSaved={setSettings}
           onImported={onImported}
+          updateVersion={update.hasUpdate ? update.version : null}
+          onUpdateOpen={() => setUpdateOpen(true)}
+          onUpdateDismissed={update.dismiss}
+          onUpdateFound={update.adoptFound}
         />
       )}
+
+      {/* logo-badge entry: opens instantly with the already-resolved
+          availability; after a dismissal the settings note still opens it
+          via `pending`, falling back to a fresh check when unknown */}
+      <UpdateDialog
+        open={updateOpen}
+        onClose={() => setUpdateOpen(false)}
+        known={update.available ?? update.pending}
+        onDismissed={update.dismiss}
+        onFound={update.adoptFound}
+      />
 
       <ImportDialog
         open={importOpen}
         onClose={() => setImportOpen(false)}
         lora={mode === "lora"}
-        onSubmit={(url) => void (mode === "prompt" ? startCivitaiImport(url) : startLoraImport(url))}
+        onSubmit={(url) =>
+          void (mode === "prompt"
+            ? startCivitaiImport(url)
+            : startLoraImport(url))
+        }
       />
       {mode === "prompt" && (
         <DuplicateDialog
