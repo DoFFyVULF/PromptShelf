@@ -296,6 +296,8 @@ pub struct AppSettings {
     pub civitai_api_key: String,
     /// Preview images imported per lora model page (0 = all; 1 by default).
     pub lora_previews: u32,
+    /// Check GitHub releases for a new version at startup (deferred to idle).
+    pub update_auto_check: bool,
 }
 
 #[derive(Deserialize, Default)]
@@ -309,6 +311,7 @@ pub struct SettingsPatch {
     pub theme: Option<String>,
     pub civitai_api_key: Option<String>,
     pub lora_previews: Option<u32>,
+    pub update_auto_check: Option<bool>,
 }
 
 /// Valid values for the persisted `theme` setting.
@@ -388,6 +391,7 @@ pub fn app_settings_default() -> AppSettings {
         theme: "system".to_string(),
         civitai_api_key: String::new(),
         lora_previews: 1,
+        update_auto_check: true,
     }
 }
 

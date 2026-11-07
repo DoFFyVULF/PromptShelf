@@ -119,6 +119,8 @@ export interface AppSettings {
   civitai_api_key: string | null;
   /** Preview images imported per lora model page (0 = all available). */
   lora_previews: number;
+  /** Check GitHub releases for a new version at startup. */
+  update_auto_check: boolean;
 }
 
 export interface SettingsPatch {
@@ -131,6 +133,7 @@ export interface SettingsPatch {
   theme?: Theme;
   civitai_api_key?: string | null;
   lora_previews?: number;
+  update_auto_check?: boolean;
 }
 
 export interface LibraryPaths {

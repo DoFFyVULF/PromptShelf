@@ -321,6 +321,7 @@ pub fn read_settings(conn: &Connection) -> Result<AppSettings, String> {
                     s.lora_previews = n.clamp(0, 24);
                 }
             }
+            "update_auto_check" => s.update_auto_check = v != "false", // absent → default true
             _ => {}
         }
     }
@@ -381,6 +382,9 @@ pub fn set_settings(
     }
     if let Some(v) = patch.lora_previews {
         put_setting(&conn, "lora_previews", &v.clamp(0, 24).to_string())?;
+    }
+    if let Some(v) = patch.update_auto_check {
+        put_setting(&conn, "update_auto_check", if v { "true" } else { "false" })?;
     }
     read_settings(&conn)
 }
