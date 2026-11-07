@@ -4,8 +4,9 @@ import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
 import { useI18n } from "../i18n";
 import { modKey } from "../lib/platform";
 import { api, assetUrl } from "../lib/api";
-import type { AppSettings, CardDetail, DuplicateHit, LoraItem, StagedImage } from "../lib/types";
+import type { AppSettings, CardDetail, DuplicateHit, LoraItem, StagedImage, TagCount } from "../lib/types";
 import { Stars } from "./Stars";
+import { TagInput } from "./TagInput";
 import { useToast } from "./Toasts";
 import { LoraEditor, applyLoraDraft, type LoraDraft } from "./LoraEditor";
 import { DuplicateDialog } from "./DuplicateDialog";
@@ -18,13 +19,15 @@ interface EditorProps {
   onStaged: (next: StagedImage[]) => void;
   settings: AppSettings | null;
   groupId: string;
+  /** Tags already used across the prompt shelf, for the tag field's hints. */
+  suggestions: TagCount[];
   onClose: () => void;
   onSaved: (detail: CardDetail) => void;
   /** Shown in the duplicate dialog: jump to the already-stored card. */
   onOpenExisting?: (id: string) => void;
 }
 
-export function Editor({ card, staged, onStaged, settings, groupId, onClose, onSaved, onOpenExisting }: EditorProps) {
+export function Editor({ card, staged, onStaged, settings, groupId, suggestions, onClose, onSaved, onOpenExisting }: EditorProps) {
   const { t } = useI18n();
   const { toast } = useToast();
 
@@ -32,7 +35,6 @@ export function Editor({ card, staged, onStaged, settings, groupId, onClose, onS
   const [negativePrompt, setNegativePrompt] = useState(card?.negative_prompt ?? "");
   const [note, setNote] = useState(card?.note ?? "");
   const [tags, setTags] = useState<string[]>(card?.tags ?? []);
-  const [tagDraft, setTagDraft] = useState("");
   const [rating, setRating] = useState(card?.rating ?? 0);
   const [loras, setLoras] = useState<LoraItem[]>(card?.loras ?? []);
   const [author, setAuthor] = useState(card?.author ?? "");
@@ -165,19 +167,6 @@ export function Editor({ card, staged, onStaged, settings, groupId, onClose, onS
     window.addEventListener("paste", onPaste);
     return () => window.removeEventListener("paste", onPaste);
   }, [onStaged, pasteFromClipboard, t, toast]);
-
-  const addTag = useCallback(() => {
-    const v = tagDraft.trim().replace(/^#/, "");
-    if (!v) return;
-    if (v.length > 32) {
-      toast(t("toast.error"), "error");
-      return;
-    }
-    if (!tags.some((x) => x.toLowerCase() === v.toLowerCase())) {
-      setTags([...tags, v]);
-    }
-    setTagDraft("");
-  }, [tagDraft, tags, t, toast]);
 
   // keep the draft readable from the Escape handler below
   const loraDraftRef = useRef(loraDraft);
@@ -482,42 +471,13 @@ export function Editor({ card, staged, onStaged, settings, groupId, onClose, onS
             <label className="t-section block" htmlFor="editor-tag-input">
               {t("editor.tags")}
             </label>
-            <div className="mt-2 flex flex-wrap items-center gap-1.5 rounded-xl border border-hairline bg-card px-2.5 py-2 transition-colors focus-within:border-line-active focus-within:shadow-focus">
-              {tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="flex items-center gap-1 rounded-full bg-parchment py-0.5 pr-1.5 pl-2.5 text-[12px] text-body"
-                >
-                  {tag}
-                  <button
-                    type="button"
-                    aria-label={`${t("action.delete")}: ${tag}`}
-                    onClick={() => setTags(tags.filter((x) => x !== tag))}
-                    className="cursor-pointer rounded-full text-faint transition-colors hover:text-ink"
-                  >
-                    <X size={11} />
-                  </button>
-                </span>
-              ))}
-              <input
-                id="editor-tag-input"
-                type="text"
-                value={tagDraft}
-                onChange={(e) => setTagDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === ",") {
-                    e.preventDefault();
-                    addTag();
-                  } else if (e.key === "Backspace" && tagDraft === "" && tags.length > 0) {
-                    setTags(tags.slice(0, -1));
-                  }
-                }}
-                onBlur={addTag}
-                placeholder={tags.length === 0 ? t("editor.tags.placeholder") : ""}
-                spellCheck={false}
-                className="min-w-[110px] flex-1 border-0 bg-transparent py-1 text-[13px] outline-none placeholder:text-faint"
-              />
-            </div>
+            <TagInput
+              id="editor-tag-input"
+              tags={tags}
+              onChange={setTags}
+              suggestions={suggestions}
+              placeholder={t("editor.tags.placeholder")}
+            />
           </section>
         </div>
 

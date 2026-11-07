@@ -91,7 +91,8 @@ export function TopBar({ mode, onToggleMode, query, onQuery, sort, onSort, onNew
                   transition={reduce ? REDUCE_TWEEN : WORD_ROLL_TWEEN}
                   className={`wordmark-word inline-block whitespace-nowrap ${mode === "lora" ? "text-action" : ""}`}
                 >
-                  {mode === "prompt" ? t("app.modePrompt") : t("app.modeLora")}
+                  {/* brand wordmark — deliberately not localized, like "Shelf" */}
+                  {mode === "prompt" ? "Prompt" : "Lora"}
                 </motion.span>
               </AnimatePresence>
             </motion.span>

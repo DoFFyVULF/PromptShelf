@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Calendar,
   Check,
@@ -21,33 +21,35 @@ import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
 import { useI18n } from "../i18n";
 import { api, assetUrl } from "../lib/api";
 import { modKey } from "../lib/platform";
-import type { ImageInfo, LoraDetail as LoraDetailData } from "../lib/types";
+import type { ImageInfo, LoraDetail as LoraDetailData, TagCount } from "../lib/types";
 import { RichText } from "./RichText";
 import { Stars } from "./Stars";
+import { TagInput } from "./TagInput";
 import { useToast } from "./Toasts";
 import { IMAGE_EXTS } from "./Editor";
 
 interface LoraDetailProps {
   lora: LoraDetailData;
+  /** Tags already used across the lora shelf, for the edit mode's tag hints. */
+  suggestions: TagCount[];
   hasPrev: boolean;
   hasNext: boolean;
   onPrev: () => void;
   onNext: () => void;
   onClose: () => void;
   onChanged: (lora: LoraDetailData) => void;
-  onEdit: (lora: LoraDetailData) => void;
   onDeleted: () => void;
 }
 
 export function LoraDetail({
   lora,
+  suggestions,
   hasPrev,
   hasNext,
   onPrev,
   onNext,
   onClose,
   onChanged,
-  onEdit,
   onDeleted
 }: LoraDetailProps) {
   const { t, formatDate } = useI18n();
@@ -59,13 +61,114 @@ export function LoraDetail({
   const [zoom, setZoom] = useState(false);
   const [adding, setAdding] = useState(0);
 
+  // ---------------------------------------------------------------- edit mode
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [name, setName] = useState(lora.name);
+  const [baseModel, setBaseModel] = useState(lora.base_model);
+  const [triggerDraft, setTriggerDraft] = useState(lora.trigger_words.join(", "));
+  const [tipsDraft, setTipsDraft] = useState(lora.usage_tips.join("\n"));
+  const [description, setDescription] = useState(lora.description);
+  const [note, setNote] = useState(lora.note ?? "");
+  const [rating, setRating] = useState(lora.rating);
+  const [tags, setTags] = useState<string[]>(lora.tags);
+  const nameRef = useRef<HTMLInputElement>(null);
+
+  const triggerWords = useMemo(
+    () => triggerDraft.split(",").map((w) => w.trim()).filter(Boolean),
+    [triggerDraft]
+  );
+  const usageTips = useMemo(
+    () => tipsDraft.split("\n").map((w) => w.trim()).filter(Boolean),
+    [tipsDraft]
+  );
+
   useEffect(() => {
     setMainIdx(0);
     setCopiedTriggers(false);
     setConfirmDelete(false);
     setArmImage(null);
     setZoom(false);
+    setEditing(false);
+    setSaving(false);
+    setName(lora.name);
+    setBaseModel(lora.base_model);
+    setTriggerDraft(lora.trigger_words.join(", "));
+    setTipsDraft(lora.usage_tips.join("\n"));
+    setDescription(lora.description);
+    setNote(lora.note ?? "");
+    setRating(lora.rating);
+    setTags(lora.tags);
   }, [lora.id]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (zoom) {
+        e.preventDefault();
+        e.stopPropagation();
+        setZoom(false);
+        return;
+      }
+      if (editing) {
+        // an open tag menu owns the first Esc — this listener is re-registered
+        // on every edit toggle, so it can end up ahead of the field's own
+        const el = document.activeElement;
+        if (el instanceof HTMLElement && el.getAttribute("role") === "combobox" && el.getAttribute("aria-expanded") === "true") return;
+        // preventDefault marks the event handled for App's global Esc handler
+        e.preventDefault();
+        e.stopPropagation();
+        setEditing(false);
+      }
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [zoom, editing]);
+
+  const startEdit = useCallback(() => {
+    setName(lora.name);
+    setBaseModel(lora.base_model);
+    setTriggerDraft(lora.trigger_words.join(", "));
+    setTipsDraft(lora.usage_tips.join("\n"));
+    setDescription(lora.description);
+    setNote(lora.note ?? "");
+    setRating(lora.rating);
+    setTags(lora.tags);
+    setEditing(true);
+    window.setTimeout(() => nameRef.current?.focus(), 60);
+  }, [lora]);
+
+  const saveEdit = useCallback(async () => {
+    const trimmed = name.trim();
+    if (!trimmed) {
+      toast(t("toast.loraRequired"), "error");
+      nameRef.current?.focus();
+      return;
+    }
+    setSaving(true);
+    try {
+      await api.updateLora({
+        id: lora.id,
+        name: trimmed,
+        base_model: baseModel.trim(),
+        usage_tips: usageTips,
+        trigger_words: triggerWords,
+        description,
+        primary_tag: lora.primary_tag,
+        note,
+        rating,
+        tags
+      });
+      const fresh = await api.getLora(lora.id);
+      onChanged(fresh);
+      setEditing(false);
+      toast(t("toast.updated"));
+    } catch {
+      toast(t("toast.error"), "error");
+    } finally {
+      setSaving(false);
+    }
+  }, [baseModel, description, lora, name, note, onChanged, rating, tags, t, toast, triggerWords, usageTips]);
 
   const copyText = useCallback(
     async (text: string) => {
@@ -103,6 +206,10 @@ export function LoraDetail({
 
   const rate = useCallback(
     async (v: number) => {
+      if (editing) {
+        setRating(v); // saved together with the edit
+        return;
+      }
       try {
         await api.updateLora({
           id: lora.id,
@@ -121,7 +228,7 @@ export function LoraDetail({
         toast(t("toast.error"), "error");
       }
     },
-    [lora, onChanged, t, toast]
+    [editing, lora, onChanged, t, toast]
   );
 
   const refresh = useCallback(async () => {
@@ -322,8 +429,8 @@ export function LoraDetail({
           <div className="flex items-start justify-between gap-3 px-7 pt-6 pb-4">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className="t-display text-[21px] leading-tight text-ink" title={lora.name}>
-                  {lora.name}
+                <h2 className="t-display text-[21px] leading-tight text-ink" title={editing ? name : lora.name}>
+                  {editing ? name.trim() || lora.name : lora.name}
                 </h2>
                 {lora.primary_tag && (
                   <span className="rounded-md bg-action px-1.5 py-[3px] text-[10px] font-bold tracking-wide text-white uppercase shadow-chip">
@@ -332,7 +439,7 @@ export function LoraDetail({
                 )}
               </div>
               <div className="mt-2 flex items-center gap-3">
-                <Stars value={lora.rating} size={16} onChange={rate} />
+                <Stars value={editing ? rating : lora.rating} size={16} onChange={rate} />
                 <span className="text-[11.5px] text-faint">{formatDate(lora.created_at)}</span>
               </div>
             </div>
@@ -342,139 +449,269 @@ export function LoraDetail({
           </div>
 
           <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-7 pb-2">
-            {/* facts row */}
-            {(lora.published_at || lora.base_model) && (
-              <section className="flex flex-wrap gap-x-5 gap-y-1.5">
-                {lora.published_at && (
-                  <span className="flex cursor-default items-center gap-1.5 text-[12.5px] text-muted" title={t("lora.published")}>
-                    <Calendar size={12.5} className="shrink-0 text-faint" />
-                    {t("lora.published")}: {formatDate(lora.published_at)}
-                  </span>
+            {editing ? (
+              <>
+                <section>
+                  <label className="t-section block" htmlFor="lora-detail-name">
+                    {t("loraeditor.name")}
+                  </label>
+                  <input
+                    ref={nameRef}
+                    id="lora-detail-name"
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder={t("loraeditor.name.placeholder")}
+                    spellCheck={false}
+                    maxLength={96}
+                    className="field mt-2 select-text"
+                  />
+                </section>
+
+                <section className="grid grid-cols-2 gap-5">
+                  <div>
+                    <label className="t-section block" htmlFor="lora-detail-base">
+                      {t("loraeditor.baseModel")}
+                    </label>
+                    <input
+                      id="lora-detail-base"
+                      type="text"
+                      value={baseModel}
+                      onChange={(e) => setBaseModel(e.target.value)}
+                      placeholder={t("loraeditor.baseModel.placeholder")}
+                      spellCheck={false}
+                      maxLength={64}
+                      className="field mt-2 select-text"
+                    />
+                  </div>
+                  <div>
+                    <label className="t-section block" htmlFor="lora-detail-triggers">
+                      {t("loraeditor.triggerWords")}
+                    </label>
+                    <input
+                      id="lora-detail-triggers"
+                      type="text"
+                      value={triggerDraft}
+                      onChange={(e) => setTriggerDraft(e.target.value)}
+                      placeholder={t("loraeditor.triggerWords.placeholder")}
+                      spellCheck={false}
+                      className="field mt-2 select-text"
+                    />
+                  </div>
+                </section>
+
+                <section>
+                  <label className="t-section block" htmlFor="lora-detail-tips">
+                    {t("loraeditor.usageTips")}
+                  </label>
+                  <textarea
+                    id="lora-detail-tips"
+                    value={tipsDraft}
+                    onChange={(e) => setTipsDraft(e.target.value)}
+                    placeholder={t("loraeditor.usageTips.placeholder")}
+                    spellCheck={false}
+                    rows={2}
+                    className="field mt-2 resize-none select-text"
+                  />
+                </section>
+
+                <section>
+                  <label className="t-section block" htmlFor="lora-detail-desc">
+                    {t("loraeditor.description")}
+                  </label>
+                  <textarea
+                    id="lora-detail-desc"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder={t("loraeditor.description.placeholder")}
+                    rows={4}
+                    className="field mt-2 resize-y select-text"
+                  />
+                </section>
+
+                <section>
+                  <label className="t-section block" htmlFor="lora-detail-note">
+                    {t("lora.note")}
+                  </label>
+                  <textarea
+                    id="lora-detail-note"
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    placeholder={t("editor.note.placeholder")}
+                    rows={2}
+                    className="field mt-2 resize-none select-text"
+                  />
+                </section>
+
+                <section>
+                  <label className="t-section block" htmlFor="lora-detail-tag-input">
+                    {t("editor.tags")}
+                  </label>
+                  <TagInput
+                    id="lora-detail-tag-input"
+                    tags={tags}
+                    onChange={setTags}
+                    suggestions={suggestions}
+                    placeholder={t("editor.tags.placeholder")}
+                  />
+                </section>
+              </>
+            ) : (
+              <>
+                {/* facts row */}
+                {(lora.published_at || lora.base_model) && (
+                  <section className="flex flex-wrap gap-x-5 gap-y-1.5">
+                    {lora.published_at && (
+                      <span className="flex cursor-default items-center gap-1.5 text-[12.5px] text-muted" title={t("lora.published")}>
+                        <Calendar size={12.5} className="shrink-0 text-faint" />
+                        {t("lora.published")}: {formatDate(lora.published_at)}
+                      </span>
+                    )}
+                    {lora.base_model && (
+                      <span className="flex cursor-default items-center gap-1.5 text-[12.5px] text-muted" title={t("lora.baseModel")}>
+                        <Cpu size={12.5} className="shrink-0 text-faint" />
+                        <span className="max-w-[240px] truncate">{lora.base_model}</span>
+                      </span>
+                    )}
+                    {lora.source_url && (
+                      <button
+                        type="button"
+                        onClick={() => void api.openUrl(lora.source_url).catch(() => toast(t("toast.error"), "error"))}
+                        title={lora.source_url}
+                        aria-label={t("lora.civitaiPage")}
+                        className="press -mx-1 flex cursor-pointer items-center gap-1.5 rounded-md px-1 text-[12.5px] text-action transition-opacity hover:opacity-80"
+                      >
+                        <ExternalLink size={12.5} className="shrink-0" />
+                        {t("lora.civitaiPage")}
+                      </button>
+                    )}
+                  </section>
                 )}
-                {lora.base_model && (
-                  <span className="flex cursor-default items-center gap-1.5 text-[12.5px] text-muted" title={t("lora.baseModel")}>
-                    <Cpu size={12.5} className="shrink-0 text-faint" />
-                    <span className="max-w-[240px] truncate">{lora.base_model}</span>
-                  </span>
+
+                {(lora.usage_tips.length ?? 0) > 0 && (
+                  <section>
+                    <p className="text-[10.5px] font-semibold tracking-[0.07em] text-faint uppercase select-none">{t("lora.usageTips")}</p>
+                    <div className="mt-2 rounded-xl bg-parchment px-4 py-3 text-[12.5px] text-body select-text">
+                      {lora.usage_tips.map((tip) => (
+                        <p key={tip}>{tip}</p>
+                      ))}
+                    </div>
+                  </section>
                 )}
-                {lora.source_url && (
-                  <button
-                    type="button"
-                    onClick={() => void api.openUrl(lora.source_url).catch(() => toast(t("toast.error"), "error"))}
-                    title={lora.source_url}
-                    aria-label={t("lora.civitaiPage")}
-                    className="press -mx-1 flex cursor-pointer items-center gap-1.5 rounded-md px-1 text-[12.5px] text-action transition-opacity hover:opacity-80"
-                  >
-                    <ExternalLink size={12.5} className="shrink-0" />
-                    {t("lora.civitaiPage")}
-                  </button>
+
+                {lora.trigger_words.length > 0 && (
+                  <section className="group/triggers relative">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[10.5px] font-semibold tracking-[0.07em] text-faint uppercase select-none">{t("lora.triggerWords")}</p>
+                      <button
+                        type="button"
+                        aria-label={t("lora.copyTriggers")}
+                        title={t("lora.copyTriggers")}
+                        onClick={copyAllTriggers}
+                        className="press -mr-1 flex h-6.5 w-6.5 cursor-pointer items-center justify-center rounded-md text-faint opacity-0 transition-opacity duration-150 group-hover/triggers:opacity-100 hover:bg-parchment hover:text-ink"
+                      >
+                        {copiedTriggers ? <Check size={12.5} /> : <Copy size={12.5} />}
+                      </button>
+                    </div>
+                    {/* violet chips with a copy icon, like the CivitAI page */}
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {lora.trigger_words.map((word) => (
+                        <button
+                          key={word}
+                          type="button"
+                          onClick={() => copyTrigger(word)}
+                          title={t("action.copy")}
+                          className="press flex cursor-pointer items-center gap-1.5 rounded-full bg-violet py-1 pl-3 pr-2 text-[12px] font-medium text-white transition-colors hover:bg-violet-hover"
+                        >
+                          <span className="max-w-[220px] truncate">{word}</span>
+                          <Copy size={10.5} className="opacity-60" />
+                        </button>
+                      ))}
+                    </div>
+                  </section>
                 )}
-              </section>
-            )}
 
-            {(lora.usage_tips.length ?? 0) > 0 && (
-              <section>
-                <p className="text-[10.5px] font-semibold tracking-[0.07em] text-faint uppercase select-none">{t("lora.usageTips")}</p>
-                <div className="mt-2 rounded-xl bg-parchment px-4 py-3 text-[12.5px] text-body select-text">
-                  {lora.usage_tips.map((tip) => (
-                    <p key={tip}>{tip}</p>
-                  ))}
-                </div>
-              </section>
-            )}
+                {lora.description && (
+                  <section>
+                    <p className="text-[10.5px] font-semibold tracking-[0.07em] text-faint uppercase select-none">{t("lora.description")}</p>
+                    <RichText html={lora.description} className="mt-2" />
+                  </section>
+                )}
 
-            {lora.trigger_words.length > 0 && (
-              <section className="group/triggers relative">
-                <div className="flex items-center justify-between">
-                  <p className="text-[10.5px] font-semibold tracking-[0.07em] text-faint uppercase select-none">{t("lora.triggerWords")}</p>
-                  <button
-                    type="button"
-                    aria-label={t("lora.copyTriggers")}
-                    title={t("lora.copyTriggers")}
-                    onClick={copyAllTriggers}
-                    className="press -mr-1 flex h-6.5 w-6.5 cursor-pointer items-center justify-center rounded-md text-faint opacity-0 transition-opacity duration-150 group-hover/triggers:opacity-100 hover:bg-parchment hover:text-ink"
-                  >
-                    {copiedTriggers ? <Check size={12.5} /> : <Copy size={12.5} />}
-                  </button>
-                </div>
-                {/* violet chips with a copy icon, like the CivitAI page */}
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {lora.trigger_words.map((word) => (
-                    <button
-                      key={word}
-                      type="button"
-                      onClick={() => copyTrigger(word)}
-                      title={t("action.copy")}
-                      className="press flex cursor-pointer items-center gap-1.5 rounded-full bg-violet py-1 pl-3 pr-2 text-[12px] font-medium text-white transition-colors hover:bg-violet-hover"
-                    >
-                      <span className="max-w-[220px] truncate">{word}</span>
-                      <Copy size={10.5} className="opacity-60" />
-                    </button>
-                  ))}
-                </div>
-              </section>
-            )}
+                {lora.note && (
+                  <section>
+                    <p className="text-[10.5px] font-semibold tracking-[0.07em] text-faint uppercase select-none">{t("lora.note")}</p>
+                    <p className="mt-1.5 text-[13px] leading-relaxed whitespace-pre-wrap text-muted select-text">{lora.note}</p>
+                  </section>
+                )}
 
-            {lora.description && (
-              <section>
-                <p className="text-[10.5px] font-semibold tracking-[0.07em] text-faint uppercase select-none">{t("lora.description")}</p>
-                <RichText html={lora.description} className="mt-2" />
-              </section>
-            )}
+                {lora.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {lora.tags.map((tag) => (
+                      <span key={tag} className="rounded-full border border-hairline bg-card px-2.5 py-0.5 text-[11.5px] text-muted">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
 
-            {lora.note && (
-              <section>
-                <p className="text-[10.5px] font-semibold tracking-[0.07em] text-faint uppercase select-none">{t("lora.note")}</p>
-                <p className="mt-1.5 text-[13px] leading-relaxed whitespace-pre-wrap text-muted select-text">{lora.note}</p>
-              </section>
-            )}
-
-            {lora.tags.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
-                {lora.tags.map((tag) => (
-                  <span key={tag} className="rounded-full border border-hairline bg-card px-2.5 py-0.5 text-[11.5px] text-muted">
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            )}
-
-            {!lora.trigger_words.length && !lora.description && !lora.usage_tips.length && !lora.tags.length && (
-              <div className="flex items-center gap-2 rounded-xl bg-parchment px-4 py-3 text-[12.5px] text-faint">
-                <Info size={13.5} />
-                {t("lora.emptyTriggers")}
-              </div>
+                {!lora.trigger_words.length && !lora.description && !lora.usage_tips.length && !lora.tags.length && (
+                  <div className="flex items-center gap-2 rounded-xl bg-parchment px-4 py-3 text-[12.5px] text-faint">
+                    <Info size={13.5} />
+                    {t("lora.emptyTriggers")}
+                  </div>
+                )}
+              </>
             )}
           </div>
 
           <div className="flex items-center gap-2 border-t border-line-soft px-7 py-4">
-            <button
-              type="button"
-              className="btn-primary press min-w-0 flex-1 cursor-pointer"
-              onClick={copyAllTriggers}
-              disabled={lora.trigger_words.length === 0}
-            >
-              {copiedTriggers ? <Check size={15} /> : <Copy size={14.5} />}
-              <span className="truncate">{copiedTriggers ? t("lora.triggerCopied") : t("lora.copyTriggers")}</span>
-              <kbd className="kbd hidden border-on-ink/30 bg-transparent text-on-ink/70 xl:flex">{modKey}C</kbd>
-            </button>
-            <button type="button" className="btn-ghost press cursor-pointer" onClick={() => onEdit(lora)}>
-              <Pencil size={14.5} />
-              <span className="hidden xl:inline">{t("action.edit")}</span>
-            </button>
-            <button
-              type="button"
-              aria-label={t("lora.deleteTitle")}
-              title={confirmDelete ? t("action.confirmDelete") : t("lora.deleteTitle")}
-              onClick={removeLora}
-              className={`press flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border transition-colors ${
-                confirmDelete
-                  ? "border-destructive/30 bg-destructive text-on-ink"
-                  : "border-hairline bg-card text-muted hover:bg-destructive-soft hover:text-destructive"
-              }`}
-            >
-              <Trash2 size={15} />
-            </button>
+            {editing ? (
+              <>
+                <button type="button" className="btn-ghost press cursor-pointer" onClick={() => setEditing(false)}>
+                  {t("action.cancel")}
+                </button>
+                <button
+                  type="button"
+                  className="btn-primary press min-w-0 flex-1 cursor-pointer"
+                  onClick={saveEdit}
+                  disabled={saving || !name.trim()}
+                >
+                  {saving && <Loader2 size={14} className="spin" />}
+                  <span className="truncate">{t("action.save")}</span>
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="btn-primary press min-w-0 flex-1 cursor-pointer"
+                  onClick={copyAllTriggers}
+                  disabled={lora.trigger_words.length === 0}
+                >
+                  {copiedTriggers ? <Check size={15} /> : <Copy size={14.5} />}
+                  <span className="truncate">{copiedTriggers ? t("lora.triggerCopied") : t("lora.copyTriggers")}</span>
+                  <kbd className="kbd hidden border-on-ink/30 bg-transparent text-on-ink/70 xl:flex">{modKey}C</kbd>
+                </button>
+                <button type="button" className="btn-ghost press cursor-pointer" onClick={startEdit}>
+                  <Pencil size={14.5} />
+                  <span className="hidden xl:inline">{t("action.edit")}</span>
+                </button>
+                <button
+                  type="button"
+                  aria-label={t("lora.deleteTitle")}
+                  title={confirmDelete ? t("action.confirmDelete") : t("lora.deleteTitle")}
+                  onClick={removeLora}
+                  className={`press flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border transition-colors ${
+                    confirmDelete
+                      ? "border-destructive/30 bg-destructive text-on-ink"
+                      : "border-hairline bg-card text-muted hover:bg-destructive-soft hover:text-destructive"
+                  }`}
+                >
+                  <Trash2 size={15} />
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>

@@ -128,7 +128,6 @@ function Shell() {
   const [loraDetail, setLoraDetail] = useState<LoraDetailData | null>(null);
 
   const [loraEditorOpen, setLoraEditorOpen] = useState(false);
-  const [loraEditorLora, setLoraEditorLora] = useState<LoraDetailData | null>(null);
   const [loraStaged, setLoraStaged] = useState<StagedImage[]>([]);
 
   const [loraJobs, setLoraJobs] = useState<ImportJob[]>([]);
@@ -517,18 +516,10 @@ function Shell() {
 
   const closeLoraEditor = useCallback(() => {
     setLoraEditorOpen(false);
-    setLoraEditorLora(null);
     clearLoraStaged();
   }, [clearLoraStaged]);
 
   const openLoraEditorNew = useCallback(() => {
-    setLoraEditorLora(null);
-    setLoraEditorOpen(true);
-  }, []);
-
-  const openLoraEditorEdit = useCallback((lora: LoraDetailData) => {
-    setLoraDetailId(null);
-    setLoraEditorLora(lora);
     setLoraEditorOpen(true);
   }, []);
 
@@ -544,7 +535,6 @@ function Shell() {
         loraStagedRef.current = next;
         return next;
       });
-      setLoraEditorLora(null);
       setLoraEditorOpen(true);
     } catch {
       toast(t("toast.error"), "error");
@@ -928,6 +918,9 @@ function Shell() {
           void (modeRef.current === "prompt" ? pasteGlobally() : pasteLoraGlobally());
         }
       } else if (!meta && e.key === "Escape") {
+        // detail panels handle their own Esc (zoom / edit mode) and mark the
+        // event via preventDefault, so the overlay must not close on top of it
+        if (e.defaultPrevented) return;
         if (groupsOpenRef.current) {
           setGroupsOpen(false);
         } else if (detailOpenRef.current && !editorOpenRef.current && !settingsOpen) {
@@ -1024,7 +1017,6 @@ function Shell() {
         const currentEditor = modeRef.current === "lora" ? loraEditorOpenRef.current : editorOpenRef.current;
         if (ok.length > 0 && !currentEditor) {
           if (modeRef.current === "lora") {
-            setLoraEditorLora(null);
             setLoraEditorOpen(true);
           } else {
             setEditorCard(null);
@@ -1255,6 +1247,7 @@ function Shell() {
       {detail && detailId && mode === "prompt" && (
         <CardDetail
           card={detail}
+          suggestions={tags}
           hasPrev={cards.findIndex((c) => c.id === detailId) > 0}
           hasNext={cards.findIndex((c) => c.id === detailId) < cards.length - 1}
           onPrev={() => navDetail(-1)}
@@ -1268,22 +1261,22 @@ function Shell() {
       {loraDetail && loraDetailId && mode === "lora" && (
         <LoraDetail
           lora={loraDetail}
+          suggestions={loraTags}
           hasPrev={loras.findIndex((c) => c.id === loraDetailId) > 0}
           hasNext={loras.findIndex((c) => c.id === loraDetailId) < loras.length - 1}
           onPrev={() => navLoraDetail(-1)}
           onNext={() => navLoraDetail(1)}
           onClose={() => setLoraDetailId(null)}
           onChanged={onLoraDetailChanged}
-          onEdit={openLoraEditorEdit}
           onDeleted={() => void handleDeleteLora()}
         />
       )}
 
       {loraEditorOpen && (
         <LoraShelfEditor
-          lora={loraEditorLora}
           staged={loraStaged}
           onStaged={setLoraStaged}
+          suggestions={loraTags}
           onClose={closeLoraEditor}
           onSaved={(fresh: LoraDetailData) => {
             closeLoraEditor();
@@ -1299,6 +1292,7 @@ function Shell() {
           onStaged={setStaged}
           settings={settings}
           groupId={groupId}
+          suggestions={tags}
           onClose={closeEditor}
           onSaved={(d) => void onEditorSaved(d)}
           onOpenExisting={(id) => {
