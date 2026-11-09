@@ -49,6 +49,12 @@ import { CornerDownRight, ListChecks, X } from "lucide-react";
 import { applyTheme, onSystemThemeChange, themeFromStorage } from "./lib/theme";
 import { useUpdateCheck } from "./lib/useUpdateCheck";
 
+// CivitAI links for clipboard auto-import, mirroring the Rust link parsers:
+// image/post links feed the prompt shelf, model links the lora shelf. The
+// lookahead keeps trailing text ("…/123abc") from matching.
+const CIVITAI_ITEM_LINK = /(?:https?:\/\/)?(?:www\.)?civitai\.(?:com|red)\/(?:images|posts)\/\d+(?=[/?#]|$)/i;
+const CIVITAI_MODEL_LINK = /(?:https?:\/\/)?(?:www\.)?civitai\.(?:com|red)\/models\/\d+(?=[/?#]|$)/i;
+
 function Shell() {
   const { t, lang, setLang } = useI18n();
   const { toast } = useToast();
@@ -930,6 +936,59 @@ function Shell() {
     }
   }, [t, toast]);
 
+  // ------------------------------------------------ clipboard paste router
+
+  /** ⌘V router: a CivitAI link on the clipboard imports straight into the
+   * active shelf (image/post link → prompt import, model link → lora
+   * import); everything else keeps the image-paste flow. Never fires while
+   * any dialog is up — field pastes inside the import dialog and the
+   * editors stay native, nothing intercepts them. */
+  const pasteFromClipboard = useCallback(async () => {
+    const modalOpen =
+      importOpen ||
+      settingsOpen ||
+      tagsOpen ||
+      updateOpen ||
+      groupsOpenRef.current ||
+      detailOpenRef.current ||
+      loraDetailOpenRef.current ||
+      dupHits !== null ||
+      loraDupHits !== null;
+    const text = modalOpen
+      ? null
+      : await api.pasteTextFromClipboard().catch(() => null);
+    const link = text?.trim() ?? "";
+    if (link) {
+      if (modeRef.current === "prompt") {
+        const hit = link.match(CIVITAI_ITEM_LINK)?.[0];
+        if (hit) {
+          void startCivitaiImport(hit);
+          return;
+        }
+      } else {
+        const hit = link.match(CIVITAI_MODEL_LINK)?.[0];
+        if (hit) {
+          void startLoraImport(hit);
+          return;
+        }
+      }
+    }
+    void (modeRef.current === "prompt"
+      ? pasteGlobally()
+      : pasteLoraGlobally());
+  }, [
+    dupHits,
+    importOpen,
+    loraDupHits,
+    pasteGlobally,
+    pasteLoraGlobally,
+    settingsOpen,
+    startCivitaiImport,
+    startLoraImport,
+    tagsOpen,
+    updateOpen,
+  ]);
+
   const handleDeleteCard = useCallback(async () => {
     setDetailId(null);
     await loadCards();
@@ -1018,9 +1077,7 @@ function Shell() {
             : loraEditorOpenRef.current;
         if (!inField && !editorBusy) {
           e.preventDefault();
-          void (modeRef.current === "prompt"
-            ? pasteGlobally()
-            : pasteLoraGlobally());
+          void pasteFromClipboard();
         }
       } else if (!meta && e.key === "Escape") {
         // detail panels handle their own Esc (zoom / edit mode) and mark the
@@ -1067,8 +1124,7 @@ function Shell() {
     navLoraDetail,
     openEditorNew,
     openLoraEditorNew,
-    pasteGlobally,
-    pasteLoraGlobally,
+    pasteFromClipboard,
     settingsOpen,
   ]);
 

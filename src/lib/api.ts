@@ -100,5 +100,6 @@ export const api = {
   moveLibrary: (newDir: string) => invoke<string>("move_library", { newDir }),
   revealFile: (path: string) => invoke<void>("reveal_file", { path }),
   openUrl: (url: string) => invoke<void>("open_url", { url }),
-  copyText: (text: string) => invoke<void>("copy_text", { text })
+  copyText: (text: string) => invoke<void>("copy_text", { text }),
+  pasteTextFromClipboard: () => invoke<string | null>("paste_text_from_clipboard")
 };

@@ -212,3 +212,16 @@ pub fn copy_text(state: tauri::State<'_, crate::AppState>, text: String) -> Resu
     let mut cb = arboard::Clipboard::new().map_err(es)?;
     cb.set_text(text).map_err(es)
 }
+
+/// Text behind ⌘V (CivitAI link auto-import); `None` when the clipboard holds
+/// no text (an image, for the image-paste fallback to pick up).
+#[tauri::command]
+pub fn paste_text_from_clipboard(state: tauri::State<'_, crate::AppState>) -> Result<Option<String>, String> {
+    let _ = &state;
+    let mut cb = arboard::Clipboard::new().map_err(es)?;
+    match cb.get_text() {
+        Ok(t) => Ok(Some(t)),
+        Err(arboard::Error::ContentNotAvailable) => Ok(None),
+        Err(e) => Err(es(e)),
+    }
+}

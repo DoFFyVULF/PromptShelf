@@ -96,7 +96,8 @@ pub fn run() {
             util::move_library,
             util::reveal_file,
             util::open_url,
-            util::copy_text
+            util::copy_text,
+            util::paste_text_from_clipboard
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
