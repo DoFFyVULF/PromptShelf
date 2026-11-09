@@ -58,26 +58,28 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: "PromptShelf ${{ github.ref_name }}"
           releaseBody: |
-            **What's fixed in v0.2.1**
+            **What's new in v0.2.2**
 
-            **The logo switch, for real this time**
+            **Paste a link, get a card**
 
-            - Switching between the prompt and lora shelves now rolls only the word — Prompt ↔ Lora — while "Shelf" glides along: no indent, no horizontal jump, no blank frame. It behaves the same in packaged builds as in dev.
-            - The stray dot that lingered above the logo after a switch is gone.
+            - Paste a CivitAI link anywhere in the app (Cmd/Ctrl+V) and it imports on its own: an image or post link becomes a prompt card, a model link becomes a LoraShelf import — same background jobs and duplicate handling as the import dialog. Pasting into an open dialog or an editor field still behaves normally.
+            - Imported cards now link back to their CivitAI page, next to the author and checkpoint. Cards you made by hand stay link-free.
+            - Lora chips in the card detail open a menu: copy the `<lora:name:weight>` tag, send it to LoraShelf, or open the model's CivitAI page. Links now resolve for lycoris/locon and on-site generations too.
+            - Upscalers, embeddings and workflows come along for the ride: a new "Other resources" section lists them as chips with a type badge and a page link.
+            - Fixed: embeddings and workflows were silently dropped from imports. The importer now reads the image page's full resource list, so nothing is lost — the old per-version lookup stays as a fallback for gated or deleted data.
 
-            **Bring your own library**
+            **A delete you can't miss**
 
-            - Settings → Storage → the folder button now connects an existing library. Pick a folder that already contains `library.db` and `images/` and PromptShelf switches to it in place — nothing is copied over, nothing is overwritten.
-            - The confirmation shows what was found (prompt and lora counts) before anything changes. Picking a folder without a library still copies the current one there.
-            - If the folder's `library.db` is not a PromptShelf library, the app refuses instead of touching it.
+            - The trash button in the card and lora footers springs open into a red "Are you sure?" pill while the edit action folds down to its icon, so the destructive second click is explicit instead of a hidden double-tap.
+            - Fixed: in the dark theme the armed pill kept its dark text on the bright red fill. It now uses the same ink color as the Edit button.
 
-            **Dark theme readability**
+            **One drag ghost for both shelves**
 
-            - The card navigation arrows and the zoom badge on previews were white icons on white pills in the dark theme; they stay dark now.
+            - Dragging a Lora used to fall back to the browser's default ghost, so the two shelves felt like different apps in flight. Both now paint the same lifted ghost — prompt text plus the selection count, or the Lora name with its tag and base-model pills. It renders a touch larger with a deeper, softer shadow while the source tile shrinks back, so it reads as picked up.
 
             **Small things**
 
-            - The update dialog has its own "Restarting the app…" label instead of borrowing the library-move copy.
+            - Fixed: the tail of the "p" in Prompt leaked into the Lora wordmark as a stray dot above the r and a on Windows. Each letter cell is now clipped on its parent, so the descender stays put without trimming the stretch.
 
             Installers, built from this tag with the updater signing key:
 
