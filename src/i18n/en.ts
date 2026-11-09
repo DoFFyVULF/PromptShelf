@@ -155,6 +155,10 @@ export const en = {
   "detail.added": "Added",
   "detail.deleteTitle": "Delete card",
   "detail.civitaiPage": "CivitAI page",
+  "detail.lora.copyTag": "Copy tag",
+  "detail.lora.import": "Import to LoraShelf",
+  "detail.lora.openPage": "Open CivitAI page",
+  "detail.lora.noLink": "No CivitAI link",
 
   "lora.published": "Published",
   "lora.baseModel": "Base model",
@@ -272,6 +276,7 @@ export const en = {
   "toast.promptRequired": "Add the prompt text first",
   "toast.loraRequired": "Add the lora name first",
   "toast.loraCopied": "LoRA copied",
+  "toast.importStarted": "Import started",
   "toast.moved": "Moved to {name}",
   "toast.groupCreated": "Group created",
   "toast.groupRenamed": "Group renamed",

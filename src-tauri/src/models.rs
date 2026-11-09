@@ -67,6 +67,10 @@ pub struct ListFilter {
 pub struct Lora {
     pub name: String,
     pub value: String,
+    /// CivitAI model page captured on import (the model-versions response
+    /// carries its model id); None for prompt-tag parses and manual entries.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
 }
 
 /// One "other metadata" row, e.g. k = "Seed", v = "557832969775936".

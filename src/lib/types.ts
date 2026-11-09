@@ -56,6 +56,8 @@ export interface MetaItem {
 export interface LoraItem {
   name: string;
   value: string;
+  /** CivitAI model page captured on import; null for manual entries. */
+  url?: string | null;
 }
 
 export interface GroupInfo {

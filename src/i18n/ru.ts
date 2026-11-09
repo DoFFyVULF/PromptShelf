@@ -157,6 +157,10 @@ export const ru: Record<DictKey, string> = {
   "detail.added": "Добавлено",
   "detail.deleteTitle": "Удалить карточку",
   "detail.civitaiPage": "Страница CivitAI",
+  "detail.lora.copyTag": "Копировать тег",
+  "detail.lora.import": "Импортировать в LoraShelf",
+  "detail.lora.openPage": "Открыть страницу CivitAI",
+  "detail.lora.noLink": "Нет ссылки CivitAI",
 
   "lora.published": "Опубликовано",
   "lora.baseModel": "База",
@@ -274,6 +278,7 @@ export const ru: Record<DictKey, string> = {
   "toast.promptRequired": "Сначала добавьте текст промпта",
   "toast.loraRequired": "Сначала добавьте название лоры",
   "toast.loraCopied": "LoRA скопирована",
+  "toast.importStarted": "Импорт запущен",
   "toast.moved": "Перемещено в «{name}»",
   "toast.groupCreated": "Группа создана",
   "toast.groupRenamed": "Группа переименована",

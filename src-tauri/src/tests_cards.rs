@@ -47,6 +47,7 @@ fn test_card_crud_cover_and_loras() {
         loras: vec![Lora {
             name: "add_detail_xl".to_string(),
             value: "0.7".to_string(),
+            url: None,
         }],
         group_id: None,
         author: None,
@@ -125,10 +126,12 @@ fn test_card_crud_cover_and_loras() {
                 Lora {
                     name: "x2".to_string(),
                     value: "1.2".to_string(),
+                    url: None,
                 },
                 Lora {
                     name: "X2".to_string(),
                     value: "0.5".to_string(),
+                    url: None,
                 },
             ],
             author: Some("  SomeAuthor  ".to_string()),

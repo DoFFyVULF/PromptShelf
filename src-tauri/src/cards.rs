@@ -38,9 +38,16 @@ fn clean_loras(loras: &[Lora]) -> Vec<Lora> {
         if name.is_empty() || name.len() > 64 || value.len() > 32 {
             continue;
         }
+        // only CivitAI pages survive the round-trip; anything else is junk
+        let url = l
+            .url
+            .as_deref()
+            .map(str::trim)
+            .filter(|u| u.starts_with("https://civitai.com/") || u.starts_with("https://civitai.red/"))
+            .map(str::to_string);
         let key = name.to_lowercase();
         if seen.insert(key) {
-            out.push(Lora { name, value });
+            out.push(Lora { name, value, url });
         }
         if out.len() >= 24 {
             break;

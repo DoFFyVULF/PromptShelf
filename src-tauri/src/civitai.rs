@@ -166,7 +166,7 @@ fn parse_lora_tags(prompt: &str) -> Vec<Lora> {
             if let Some(name) = parts.first().map(|n| n.trim()).filter(|n| !n.is_empty() && n.len() <= 64) {
                 let value = parts.iter().rev().find_map(|p| weight_of(p)).unwrap_or_else(|| "1".to_string());
                 if seen.insert(name.to_lowercase()) {
-                    out.push(Lora { name: name.to_string(), value });
+                    out.push(Lora { name: name.to_string(), value, url: None });
                 }
             }
             from = end + 1;
@@ -175,43 +175,120 @@ fn parse_lora_tags(prompt: &str) -> Vec<Lora> {
     out
 }
 
-/// Resolve a model-version id to its display name ("Grippy Pussy"), one
-/// small request each — only used when the prompt itself has no lora tags.
-fn resolve_name(agent: &ureq::Agent, api_key: Option<&str>, id: i64) -> Option<String> {
-    let v = get_json(agent, &format!("/api/v1/model-versions/{id}"), api_key).ok()??;
-    v.get("model")
-        .and_then(|m| m.get("name"))
-        .and_then(scalar)
-        .or_else(|| v.get("name").and_then(scalar))
+/// One model-version resolved through the API: what the model is ("lora",
+/// "lycoris", "checkpoint", …), its display name, the strength it was used
+/// with and the model page link behind it.
+struct ResolvedVersion {
+    id: i64,
+    kind: String,
+    name: String,
+    value: String,
+    url: Option<String>,
 }
 
-fn loras_from_civitai_resources(
+/// Resolve a model-version id: the response carries the model's type (which
+/// separates loras from checkpoints/upscalers — the current `civitaiResources`
+/// entries no longer say what they are), its display name and, via the
+/// top-level `modelId`, the page link. The nested `model` object has no `id`.
+/// One small request each.
+fn resolve_version(
     agent: &ureq::Agent,
     api_key: Option<&str>,
-    meta: &Value,
-) -> Vec<Lora> {
-    let mut out: Vec<Lora> = Vec::new();
-    let mut seen: HashSet<String> = HashSet::new();
-    let Some(arr) = meta.get("civitaiResources").and_then(|r| r.as_array()) else {
-        return out;
-    };
+    id: i64,
+    value: &str,
+) -> Option<ResolvedVersion> {
+    let v = get_json(agent, &format!("/api/v1/model-versions/{id}"), api_key).ok()??;
+    let model = v.get("model")?;
+    let kind = model.get("type").and_then(scalar).unwrap_or_default().to_lowercase();
+    let name = model
+        .get("name")
+        .and_then(scalar)
+        .or_else(|| v.get("name").and_then(scalar))?;
+    let mid = v
+        .get("modelId")
+        .and_then(|i| i.as_i64())
+        .or_else(|| model.get("id").and_then(|i| i.as_i64()));
+    let url = mid.map(|mid| format!("https://civitai.com/models/{mid}?modelVersionId={id}"));
+    Some(ResolvedVersion { id, kind, name, value: value.to_string(), url })
+}
+
+/// "urn:air:sdxl:lora:civitai:120723@145907" → ("lora", 120723, 145907).
+/// On-site generations name their Model/resources with these URNs; the type
+/// and both ids ride inside, zero extra requests.
+fn parse_resource_urn(urn: &str) -> Option<(&str, i64, i64)> {
+    let segs: Vec<&str> = urn.trim().split(':').collect();
+    if segs.len() != 6 || segs[0] != "urn" || segs[1] != "air" || segs[4] != "civitai" {
+        return None;
+    }
+    let (mid, vid) = segs[5].split_once('@')?;
+    Some((segs[3], mid.parse().ok()?, vid.parse().ok()?))
+}
+
+/// Every model-version id the image meta references, deduplicated, ordered so
+/// the likely loras resolve first (the request budget is limited): typed
+/// lora/lycoris entries, then untyped ones (the current CivitAI shape omits
+/// the type; the resolve response tells lora from checkpoint), then the rest
+/// (checkpoints, upscalers — needed for the checkpoint fallback).
+fn version_candidates(meta: &Value) -> Vec<(i64, Option<String>)> {
+    let mut typed: Vec<(i64, Option<String>)> = Vec::new();
+    let mut untyped: Vec<(i64, Option<String>)> = Vec::new();
+    let mut other: Vec<(i64, Option<String>)> = Vec::new();
+    let mut seen: HashSet<i64> = HashSet::new();
+    if let Some(arr) = meta.get("civitaiResources").and_then(|r| r.as_array()) {
+        for r in arr {
+            let Some(id) = r.get("modelVersionId").and_then(|v| v.as_i64()) else { continue };
+            let ty = r.get("type").and_then(|t| t.as_str()).map(|t| t.to_ascii_lowercase());
+            let slot = match ty.as_deref() {
+                None => &mut untyped,
+                Some(t) if matches!(t, "lora" | "lycoris" | "locon") => &mut typed,
+                Some(_) => &mut other,
+            };
+            if seen.insert(id) {
+                slot.push((id, r.get("weight").and_then(scalar)));
+            }
+        }
+    }
+    // additionalResources rides beside civitaiResources on on-site
+    // generations; its URN names carry type + ids for free
+    if let Some(arr) = meta.get("additionalResources").and_then(|r| r.as_array()) {
+        for r in arr {
+            let Some(urn) = r.get("name").and_then(|n| n.as_str()) else { continue };
+            let Some((ty, _, id)) = parse_resource_urn(urn) else { continue };
+            if !matches!(ty, "lora" | "lycoris" | "locon") {
+                continue;
+            }
+            if seen.insert(id) {
+                typed.push((id, r.get("strength").and_then(scalar)));
+            }
+        }
+    }
+    typed.extend(untyped);
+    typed.extend(other);
+    typed
+}
+
+/// Resolve every candidate through the model-versions API (budget-capped);
+/// entries that fail (deleted, gated) are skipped.
+fn resolve_versions(agent: &ureq::Agent, api_key: Option<&str>, meta: &Value) -> Vec<ResolvedVersion> {
+    let mut out: Vec<ResolvedVersion> = Vec::new();
     let mut requests = 0usize;
-    for r in arr {
-        if out.len() >= MAX_LORAS || requests >= MAX_RESOLVE_REQUESTS {
+    for (id, weight) in version_candidates(meta) {
+        if requests >= MAX_RESOLVE_REQUESTS {
             break;
         }
-        if r.get("type").and_then(|t| t.as_str()) != Some("lora") {
-            continue;
-        }
-        let Some(id) = r.get("modelVersionId").and_then(|v| v.as_i64()) else { continue };
-        let value = r.get("weight").and_then(scalar).unwrap_or_else(|| "1".to_string());
         requests += 1;
-        let Some(name) = resolve_name(agent, api_key, id) else { continue };
-        if seen.insert(name.to_lowercase()) {
-            out.push(Lora { name, value });
+        let Some(r) = resolve_version(agent, api_key, id, weight.as_deref().unwrap_or("1")) else {
+            continue;
+        };
+        if !out.iter().any(|e| e.name.eq_ignore_ascii_case(&r.name)) {
+            out.push(r);
         }
     }
     out
+}
+
+fn is_lora_kind(kind: &str) -> bool {
+    matches!(kind, "lora" | "lycoris" | "locon")
 }
 
 fn loras_from_resources(meta: &Value) -> Vec<Lora> {
@@ -232,6 +309,7 @@ fn loras_from_resources(meta: &Value) -> Vec<Lora> {
                 out.push(Lora {
                     name,
                     value: r.get("weight").and_then(scalar).unwrap_or_else(|| "1".to_string()),
+                    url: None,
                 });
             }
         }
@@ -434,27 +512,63 @@ fn run(data_dir: &std::path::Path, url: &str) -> Result<CivitaiImport, String> {
     .map(|s| s.trim().to_string())
     .unwrap_or_default();
 
-    // LoRAs: prompt tags first (no requests), then civitaiResources → API lookup,
-    // finally the legacy "resources" name/weight list.
+    // LoRAs: prompt tags first (no requests), then the resolved resource list
+    // (the resolve response tells lora from checkpoint — the meta entries no
+    // longer carry a reliable type), finally the legacy "resources" list. When
+    // the tags came from the prompt, the resolved resources are still used to
+    // attach page links — names are the join key.
+    let resolved = resolve_versions(&agent, option_key(&api_key), meta);
     let mut loras = parse_lora_tags(&prompt);
     if loras.is_empty() {
-        loras = loras_from_civitai_resources(&agent, option_key(&api_key), meta);
+        loras = resolved
+            .iter()
+            .filter(|r| is_lora_kind(&r.kind))
+            .map(|r| Lora { name: r.name.clone(), value: r.value.clone(), url: r.url.clone() })
+            .collect();
         if loras.is_empty() {
             loras = loras_from_resources(meta);
         }
+    } else {
+        for l in loras.iter_mut() {
+            let tag = l.name.to_lowercase();
+            for r in resolved.iter().filter(|r| is_lora_kind(&r.kind)) {
+                let Some(url) = &r.url else { continue };
+                let key = r.name.to_lowercase();
+                // exact, or containment on the shorter side (file names carry
+                // the model name plus version suffixes)
+                let joined = tag.contains(&key) || key.contains(&tag);
+                if tag == key || (joined && key.len().min(tag.len()) >= 4) {
+                    l.url = Some(url.clone());
+                    break;
+                }
+            }
+        }
     }
 
-    // Checkpoint: A1111-style meta "Model", else resolve the checkpoint version.
-    let mut checkpoint = meta.get("Model").and_then(scalar).unwrap_or_default();
+    // Checkpoint: A1111-style meta "Model" — a plain name, or a URN on on-site
+    // generations ("urn:air:sdxl:checkpoint:civitai:140272@1697082") which
+    // resolves to the display name; the URN's checkpoint is normally among the
+    // resources, so this usually costs nothing extra.
+    let model_field = meta.get("Model").and_then(scalar).unwrap_or_default();
+    let mut checkpoint = match parse_resource_urn(&model_field) {
+        Some(("checkpoint", _, vid)) => resolved
+            .iter()
+            .find(|r| r.id == vid && r.kind == "checkpoint")
+            .map(|r| r.name.clone())
+            .unwrap_or_else(|| {
+                resolve_version(&agent, option_key(&api_key), vid, "1")
+                    .filter(|r| r.kind == "checkpoint")
+                    .map(|r| r.name)
+                    .unwrap_or_default()
+            }),
+        _ => model_field,
+    };
     if checkpoint.is_empty() {
-        if let Some(vid) = meta
-            .get("civitaiResources")
-            .and_then(|r| r.as_array())
-            .and_then(|a| a.iter().find(|r| r.get("type").and_then(|t| t.as_str()) == Some("checkpoint")))
-            .and_then(|r| r.get("modelVersionId").and_then(|v| v.as_i64()))
-        {
-            checkpoint = resolve_name(&agent, option_key(&api_key), vid).unwrap_or_default();
-        }
+        checkpoint = resolved
+            .iter()
+            .find(|r| r.kind == "checkpoint")
+            .map(|r| r.name.clone())
+            .unwrap_or_default();
     }
 
     // Tags: the post carries the uploader's tags; the extra community-voted
@@ -998,6 +1112,71 @@ mod tests {
         assert!(!ks.contains(&"prompt"));
     }
 
+    #[test]
+    fn parses_resource_urns() {
+        assert_eq!(
+            parse_resource_urn("urn:air:sdxl:lora:civitai:120723@145907"),
+            Some(("lora", 120723, 145907))
+        );
+        assert_eq!(
+            parse_resource_urn("urn:air:sdxl:lycoris:civitai:846953@1219983"),
+            Some(("lycoris", 846953, 1219983))
+        );
+        assert_eq!(
+            parse_resource_urn("urn:air:sdxl:checkpoint:civitai:140272@1697082"),
+            Some(("checkpoint", 140272, 1697082))
+        );
+        assert_eq!(parse_resource_urn("DetailedEyes_XL"), None);
+        assert_eq!(parse_resource_urn("urn:air:sdxl:lora:other:1@2"), None);
+    }
+
+    #[test]
+    fn collects_version_candidates() {
+        // current CivitAI shape: untyped entries plus a typed tail; typed
+        // loras resolve first, untyped next, checkpoints/upscalers last
+        let meta: Value = serde_json::json!({
+            "civitaiResources": [
+                { "weight": 1, "modelVersionId": 100 },
+                { "weight": 1, "modelVersionId": 100 },
+                { "weight": 0.9, "modelVersionId": 101 },
+                { "type": "checkpoint", "modelVersionId": 102 },
+                { "type": "upscaler", "modelVersionId": 103 },
+                { "type": "lora", "weight": 1, "modelVersionId": 104 },
+                { "type": "lycoris", "weight": 0.5, "modelVersionId": 105 }
+            ],
+            "additionalResources": [
+                { "name": "urn:air:sdxl:lora:civitai:987736@1209350", "type": "lora", "strength": 0.3 }
+            ]
+        });
+        let got = version_candidates(&meta);
+        let ids: Vec<i64> = got.iter().map(|(id, _)| *id).collect();
+        assert_eq!(ids, vec![104, 105, 1209350, 100, 101, 102, 103]);
+        let weights: Vec<Option<String>> = got.iter().map(|(_, w)| w.clone()).collect();
+        assert_eq!(weights[0].as_deref(), Some("1"));
+        assert_eq!(weights[1].as_deref(), Some("0.5"));
+        assert_eq!(weights[2].as_deref(), Some("0.3"));
+        assert_eq!(weights[3].as_deref(), Some("1"));
+        assert_eq!(weights[5].as_deref(), None); // checkpoint carries no weight
+    }
+
+    /// Live regression: on-site generations whose civitaiResources carry no
+    /// `type` (resolved from the API response instead) and a URN "Model".
+    #[test]
+    #[ignore = "needs network"]
+    fn live_import_onsite_resources() {
+        let dir = std::env::temp_dir().join(format!("promptshelf-civitai-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let conn = crate::store::open(&dir).unwrap();
+        init_schema(&conn).unwrap();
+        let res = run(&dir, "https://civitai.red/images/82180349").expect("import should succeed");
+        println!("checkpoint: {:?}", res.checkpoint);
+        for l in &res.loras {
+            println!("lora: name={:?} value={:?} url={:?}", l.name, l.value, l.url);
+        }
+        let _ = std::fs::remove_file(&res.image.temp_path);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     /// Full live pipeline: real network. Run manually: cargo test -- --ignored
     #[test]
     #[ignore = "needs network"]
@@ -1011,7 +1190,7 @@ mod tests {
         assert!(!res.prompt.is_empty(), "prompt must be filled");
         assert!(std::path::Path::new(&res.image.temp_path).exists(), "temp file must exist");
         assert!(res.image.width > 0 && res.image.height > 0);
-        assert_eq!(res.author, "_GamerOne796");
+        assert_eq!(res.author, "_GamerOne");
         assert!(!res.checkpoint.is_empty(), "checkpoint from meta.Model");
         assert!(!res.loras.is_empty(), "lora tags parsed from prompt");
         assert!(!res.tags.is_empty(), "tags fetched from the post");

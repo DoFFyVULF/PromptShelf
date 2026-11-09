@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Copy,
@@ -25,6 +26,7 @@ import { useImagePaste } from "../lib/useImagePaste";
 import { Stars } from "./Stars";
 import { TagInput } from "./TagInput";
 import { useToast } from "./Toasts";
+import { LoraMenu } from "./LoraMenu";
 import { LoraEditor, applyLoraDraft, type LoraDraft } from "./LoraEditor";
 import { PromptPager } from "./PromptPager";
 import { IMAGE_EXTS } from "./Editor";
@@ -33,6 +35,8 @@ interface CardDetailProps {
   card: CardDetailType;
   /** Tags already used across the prompt shelf, for the edit mode's tag hints. */
   suggestions: TagCount[];
+  /** Starts a background CivitAI lora import from a model page link. */
+  onImportLora: (url: string) => void;
   hasPrev: boolean;
   hasNext: boolean;
   onPrev: () => void;
@@ -42,7 +46,7 @@ interface CardDetailProps {
   onDeleted: () => void;
 }
 
-export function CardDetail({ card, suggestions, hasPrev, hasNext, onPrev, onNext, onClose, onChanged, onDeleted }: CardDetailProps) {
+export function CardDetail({ card, suggestions, onImportLora, hasPrev, hasNext, onPrev, onNext, onClose, onChanged, onDeleted }: CardDetailProps) {
   const { t, formatDate } = useI18n();
   const { toast } = useToast();
   const [mainIdx, setMainIdx] = useState(0);
@@ -50,6 +54,8 @@ export function CardDetail({ card, suggestions, hasPrev, hasNext, onPrev, onNext
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [armImage, setArmImage] = useState<string | null>(null);
   const [zoom, setZoom] = useState(false);
+  /** Open lora action bubble: the chip it anchors to. */
+  const [loraMenu, setLoraMenu] = useState<{ lora: LoraItem; anchor: HTMLElement } | null>(null);
 
   // ---------------------------------------------------------------- edit mode
   const [editing, setEditing] = useState(false);
@@ -78,6 +84,7 @@ export function CardDetail({ card, suggestions, hasPrev, hasNext, onPrev, onNext
     setConfirmDelete(false);
     setArmImage(null);
     setZoom(false);
+    setLoraMenu(null);
     setEditing(false);
     setSaving(false);
     setPrompt(card.prompt);
@@ -95,6 +102,13 @@ export function CardDetail({ card, suggestions, hasPrev, hasNext, onPrev, onNext
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
+      if (loraMenu) {
+        // the bubble owns Esc first (its own capture listener dismisses it)
+        e.preventDefault();
+        e.stopPropagation();
+        setLoraMenu(null);
+        return;
+      }
       if (zoom) {
         e.preventDefault();
         e.stopPropagation();
@@ -119,7 +133,7 @@ export function CardDetail({ card, suggestions, hasPrev, hasNext, onPrev, onNext
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [zoom, editing]);
+  }, [zoom, editing, loraMenu]);
 
   const startEdit = useCallback(() => {
     setPrompt(card.prompt);
@@ -588,20 +602,28 @@ export function CardDetail({ card, suggestions, hasPrev, hasNext, onPrev, onNext
                   <section>
                     <p className="text-[10.5px] font-semibold tracking-[0.07em] text-faint uppercase select-none">{t("detail.loras")}</p>
                     <div className="mt-2 flex flex-wrap gap-1.5">
-                      {card.loras.map((lora) => (
-                        <button
-                          key={lora.name}
-                          type="button"
-                          onClick={() => copyLora(lora)}
-                          title={`<lora:${lora.name}:${lora.value || "1"}>`}
-                          className="press flex cursor-pointer items-center gap-2 rounded-full border border-hairline bg-card py-1 pl-3 pr-1.5 text-[12px] text-body transition-colors hover:border-line-hover"
-                        >
-                          <span className="max-w-[190px] truncate">{lora.name}</span>
-                          <span className="rounded-full bg-parchment px-2 py-0.5 text-[11px] leading-tight text-muted tabular-nums">
-                            {lora.value || "1"}
-                          </span>
-                        </button>
-                      ))}
+                      {card.loras.map((lora, i) => {
+                        const menuOpen = loraMenu?.lora.name === lora.name;
+                        return (
+                          <button
+                            key={`${lora.name}-${i}`}
+                            type="button"
+                            aria-haspopup="menu"
+                            aria-expanded={menuOpen}
+                            title={`<lora:${lora.name}:${lora.value || "1"}>`}
+                            onClick={(e) => setLoraMenu({ lora, anchor: e.currentTarget })}
+                            className={`press flex cursor-pointer items-center gap-2 rounded-full border bg-card py-1 pl-3 pr-1.5 text-[12px] text-body transition-colors ${
+                              menuOpen ? "border-line-active" : "border-hairline hover:border-line-hover"
+                            }`}
+                          >
+                            <span className="max-w-[190px] truncate">{lora.name}</span>
+                            <span className="flex items-center gap-1 rounded-full bg-parchment py-0.5 pr-1 pl-2 text-[11px] leading-tight text-muted tabular-nums">
+                              {lora.value || "1"}
+                              <ChevronDown size={10} className={`opacity-55 transition-transform duration-200 ${menuOpen ? "rotate-180" : ""}`} />
+                            </span>
+                          </button>
+                        );
+                      })}
                     </div>
                   </section>
                 )}
@@ -709,6 +731,20 @@ export function CardDetail({ card, suggestions, hasPrev, hasNext, onPrev, onNext
           </div>
         </div>
       </div>
+
+      {/* lora action bubble: copy the tag / import to LoraShelf / open the page.
+          Clicking elsewhere closes it — the backdrop sits under the portalled menu. */}
+      {loraMenu && <div className="fixed inset-0 z-[125]" onMouseDown={() => setLoraMenu(null)} aria-hidden />}
+      <LoraMenu
+        menu={loraMenu}
+        onClose={() => setLoraMenu(null)}
+        onCopy={copyLora}
+        onImport={(url) => {
+          onImportLora(url);
+          toast(t("toast.importStarted"));
+        }}
+        onOpenPage={(url) => void api.openUrl(url).catch(() => toast(t("toast.error"), "error"))}
+      />
 
       {zoom && main && (
         <div

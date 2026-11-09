@@ -1474,6 +1474,12 @@ function Shell() {
         <CardDetail
           card={detail}
           suggestions={tags}
+          onImportLora={(url) => {
+            // jump to the lora shelf so the background job tile is in view
+            setMode("lora");
+            window.localStorage.setItem("ps-mode", "lora");
+            void startLoraImport(url);
+          }}
           hasPrev={cards.findIndex((c) => c.id === detailId) > 0}
           hasNext={cards.findIndex((c) => c.id === detailId) < cards.length - 1}
           onPrev={() => navDetail(-1)}
