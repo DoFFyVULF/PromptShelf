@@ -414,6 +414,57 @@ fn other_meta(meta: &Value, item: &Value) -> Vec<MetaItem> {
 
 // ---------------------------------------------------------------- flow
 
+/// The image page's resource panel is served by tRPC `image.getGenerationData`:
+/// unlike the REST meta it lists EVERY resource — embeddings and workflows
+/// included — with display name, type and both ids already resolved. Map its
+/// entries onto ResolvedVersion; same name dedupe as the per-version resolve.
+fn parse_generation_resources(v: &Value) -> Vec<ResolvedVersion> {
+    let arr = v
+        .pointer("/result/data/json/resources")
+        .and_then(|r| r.as_array())
+        .or_else(|| v.pointer("/result/data/resources").and_then(|r| r.as_array()));
+    let Some(arr) = arr else { return Vec::new() };
+    let mut out: Vec<ResolvedVersion> = Vec::new();
+    for r in arr {
+        let Some(name) = r.get("modelName").and_then(scalar) else { continue };
+        let Some(id) = r
+            .get("modelVersionId")
+            .and_then(|v| v.as_i64())
+            .or_else(|| r.get("versionId").and_then(|v| v.as_i64()))
+        else {
+            continue;
+        };
+        let kind = r.get("modelType").and_then(scalar).unwrap_or_default().to_lowercase();
+        let url = r
+            .get("modelId")
+            .and_then(|v| v.as_i64())
+            .map(|mid| format!("https://civitai.com/models/{mid}?modelVersionId={id}"));
+        let value = r.get("strength").and_then(scalar).unwrap_or_else(|| "1".to_string());
+        if !out.iter().any(|e| e.name.eq_ignore_ascii_case(&name)) {
+            out.push(ResolvedVersion { id, kind, name, value, url });
+        }
+    }
+    out
+}
+
+/// One tRPC request for the full resource list; empty on any failure so the
+/// caller falls back to resolving the REST meta version ids.
+fn generation_resources(agent: &ureq::Agent, api_key: Option<&str>, image_id: &str) -> Vec<ResolvedVersion> {
+    // the tRPC input schema is `id: z.number()` — a string id fails validation
+    let Ok(id) = image_id.parse::<i64>() else {
+        return Vec::new();
+    };
+    let input = serde_json::json!({ "json": { "id": id } });
+    let Ok(input) = serde_json::to_string(&input) else {
+        return Vec::new();
+    };
+    let path = format!("/api/trpc/image.getGenerationData?input={}", pct_encode(&input));
+    match get_json(agent, &path, api_key) {
+        Ok(Some(v)) => parse_generation_resources(&v),
+        _ => Vec::new(),
+    }
+}
+
 /// `/images?withMeta=true` wraps the generation data one level deeper:
 ///   item.meta = { id: <imageId>, meta: { seed, prompt, resources, … } }
 /// Older payloads keep the flat shape, so unwrap only when the envelope is seen.
@@ -542,7 +593,13 @@ fn run(data_dir: &std::path::Path, url: &str) -> Result<CivitaiImport, String> {
     // longer carry a reliable type), finally the legacy "resources" list. When
     // the tags came from the prompt, the resolved resources are still used to
     // attach page links — names are the join key.
-    let resolved = resolve_versions(&agent, option_key(&api_key), meta);
+    // The page's own resource list (getGenerationData) is the primary source:
+    // it already carries embeddings and workflows, which the REST meta omits.
+    // The per-version meta resolve stays as the fallback for gated/deleted data.
+    let mut resolved = generation_resources(&agent, option_key(&api_key), &image_id);
+    if resolved.is_empty() {
+        resolved = resolve_versions(&agent, option_key(&api_key), meta);
+    }
     let mut loras = parse_lora_tags(&prompt);
     if loras.is_empty() {
         loras = resolved
@@ -1134,6 +1191,68 @@ mod tests {
         let more = vec![rv(6, "upscaler", "SOMELORA", false), rv(7, "upscaler", "Remacri", false)];
         push_other_resources(&mut loras, &more);
         assert_eq!(loras.len(), 4);
+    }
+
+    #[test]
+    fn parses_generation_resources() {
+        // the page's tRPC list: lora with strength, checkpoint, workflow and
+        // two versions of one embedding model (deduped by name)
+        let v: Value = serde_json::json!({ "result": { "data": { "json": { "resources": [
+            { "modelVersionId": 3079282, "strength": -1.75, "modelId": 2738333, "modelName": "Wetness Slider", "modelType": "LORA", "versionId": 3079282 },
+            { "modelVersionId": 3396269, "strength": null, "modelId": 2938537, "modelName": "VXP Krea2", "modelType": "Checkpoint" },
+            { "modelVersionId": 3459365, "strength": null, "modelId": 2807513, "modelName": "Gladas' Workflow", "modelType": "Workflows" },
+            { "modelVersionId": 1833157, "strength": null, "modelId": 1302719, "modelName": "Lazy Embeddings", "modelType": "TextualInversion" },
+            { "modelVersionId": 1860747, "strength": null, "modelId": 1302719, "modelName": "Lazy Embeddings", "modelType": "TextualInversion" }
+        ] } } } });
+        let got = parse_generation_resources(&v);
+        assert_eq!(got.len(), 4);
+        assert_eq!(got[0].kind, "lora");
+        assert_eq!(got[0].value, "-1.75");
+        assert_eq!(got[1].kind, "checkpoint");
+        assert_eq!(got[1].value, "1"); // null strength → default
+        assert_eq!(got[2].kind, "workflows");
+        assert_eq!(got[2].url.as_deref(), Some("https://civitai.com/models/2807513?modelVersionId=3459365"));
+        assert_eq!(got[3].kind, "textualinversion");
+        assert_eq!(got[3].id, 1833157); // first version wins the name dedupe
+
+        // plain (non-superjson) envelope and malformed entries
+        let v2: Value = serde_json::json!({ "result": { "data": { "resources": [
+            { "modelVersionId": 5, "modelId": 4, "modelName": "Remacri", "modelType": "Upscaler" },
+            { "modelName": "no ids" },
+            { "modelVersionId": 6 }
+        ] } } });
+        let got2 = parse_generation_resources(&v2);
+        assert_eq!(got2.len(), 1);
+        assert_eq!(got2[0].kind, "upscaler");
+        assert_eq!(got2[0].name, "Remacri");
+
+        assert!(parse_generation_resources(&serde_json::json!({})).is_empty());
+    }
+
+    /// Live regression: embeddings and workflows never ride in the REST meta —
+    /// the page's getGenerationData list must bring them in.
+    #[test]
+    #[ignore = "needs network"]
+    fn live_import_embedding_and_workflow() {
+        let dir = std::env::temp_dir().join(format!("promptshelf-civitai-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let conn = crate::store::open(&dir).unwrap();
+        init_schema(&conn).unwrap();
+
+        let res = run(&dir, "https://civitai.com/images/148412565").expect("import should succeed");
+        let wf = res.loras.iter().find(|l| l.kind.as_deref() == Some("workflows"));
+        let kinds: Vec<(&str, Option<&str>)> = res.loras.iter().map(|l| (l.name.as_str(), l.kind.as_deref())).collect();
+        assert!(wf.is_some(), "workflow must be imported: {kinds:?}");
+        assert!(wf.unwrap().url.is_some());
+        let _ = std::fs::remove_file(&res.image.temp_path);
+
+        let res2 = run(&dir, "https://civitai.com/images/117575954").expect("import should succeed");
+        let emb = res2.loras.iter().find(|l| l.kind.as_deref() == Some("textualinversion"));
+        let kinds2: Vec<(&str, Option<&str>)> = res2.loras.iter().map(|l| (l.name.as_str(), l.kind.as_deref())).collect();
+        assert!(emb.is_some(), "embedding must be imported: {kinds2:?}");
+        assert!(emb.unwrap().url.is_some());
+        let _ = std::fs::remove_file(&res2.image.temp_path);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
