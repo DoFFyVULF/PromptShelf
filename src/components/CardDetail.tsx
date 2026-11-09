@@ -22,11 +22,12 @@ import { useI18n } from "../i18n";
 import { api, assetUrl } from "../lib/api";
 import { modKey } from "../lib/platform";
 import type { CardDetail as CardDetailType, ImageInfo, LoraItem, TagCount } from "../lib/types";
+import { isLoraKind } from "../lib/types";
 import { useImagePaste } from "../lib/useImagePaste";
 import { Stars } from "./Stars";
 import { TagInput } from "./TagInput";
 import { useToast } from "./Toasts";
-import { LoraMenu } from "./LoraMenu";
+import { LoraMenu, resKindLabel } from "./LoraMenu";
 import { LoraEditor, applyLoraDraft, type LoraDraft } from "./LoraEditor";
 import { PromptPager } from "./PromptPager";
 import { IMAGE_EXTS } from "./Editor";
@@ -56,6 +57,12 @@ export function CardDetail({ card, suggestions, onImportLora, hasPrev, hasNext, 
   const [zoom, setZoom] = useState(false);
   /** Open lora action bubble: the chip it anchors to. */
   const [loraMenu, setLoraMenu] = useState<{ lora: LoraItem; anchor: HTMLElement } | null>(null);
+
+  // The import's loras list also carries other CivitAI resources (upscalers,
+  // embeddings, workflows) tagged with their kind; they render as plain links
+  // in their own section, no action bubble.
+  const loraEntries = (card.loras ?? []).filter((l) => isLoraKind(l.kind));
+  const otherRes = (card.loras ?? []).filter((l) => !isLoraKind(l.kind));
 
   // ---------------------------------------------------------------- edit mode
   const [editing, setEditing] = useState(false);
@@ -598,11 +605,11 @@ export function CardDetail({ card, suggestions, onImportLora, hasPrev, hasNext, 
                   </section>
                 )}
 
-                {card.loras.length > 0 && (
+                {loraEntries.length > 0 && (
                   <section>
                     <p className="text-[10.5px] font-semibold tracking-[0.07em] text-faint uppercase select-none">{t("detail.loras")}</p>
                     <div className="mt-2 flex flex-wrap gap-1.5">
-                      {card.loras.map((lora, i) => {
+                      {loraEntries.map((lora, i) => {
                         const menuOpen = loraMenu?.lora.name === lora.name;
                         return (
                           <button
@@ -622,6 +629,45 @@ export function CardDetail({ card, suggestions, onImportLora, hasPrev, hasNext, 
                               <ChevronDown size={10} className={`opacity-55 transition-transform duration-200 ${menuOpen ? "rotate-180" : ""}`} />
                             </span>
                           </button>
+                        );
+                      })}
+                    </div>
+                  </section>
+                )}
+
+                {otherRes.length > 0 && (
+                  <section>
+                    <p className="text-[10.5px] font-semibold tracking-[0.07em] text-faint uppercase select-none">{t("detail.otherRes")}</p>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {otherRes.map((res, i) => {
+                        const label = resKindLabel(res.kind as string, t);
+                        const cls = `flex items-center gap-2 rounded-full border bg-card py-1 pl-3 pr-2.5 text-[12px] text-body ${
+                          res.url ? "press cursor-pointer border-hairline transition-colors hover:border-line-hover" : "cursor-default border-hairline"
+                        }`;
+                        const inner = (
+                          <>
+                            <span className="max-w-[190px] truncate">{res.name}</span>
+                            <span className="rounded-full bg-parchment px-2 py-0.5 text-[10.5px] leading-tight text-muted">
+                              {label}
+                            </span>
+                            {res.url && <ExternalLink size={11} className="shrink-0 text-faint" />}
+                          </>
+                        );
+                        return res.url ? (
+                          <button
+                            key={`${res.name}-${i}`}
+                            type="button"
+                            title={res.url}
+                            aria-label={`${res.name} — ${label}`}
+                            onClick={() => void api.openUrl(res.url as string).catch(() => toast(t("toast.error"), "error"))}
+                            className={cls}
+                          >
+                            {inner}
+                          </button>
+                        ) : (
+                          <span key={`${res.name}-${i}`} title={res.name} className={cls}>
+                            {inner}
+                          </span>
                         );
                       })}
                     </div>

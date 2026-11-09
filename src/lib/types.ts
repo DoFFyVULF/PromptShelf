@@ -58,6 +58,15 @@ export interface LoraItem {
   value: string;
   /** CivitAI model page captured on import; null for manual entries. */
   url?: string | null;
+  /** CivitAI model type for non-lora resources ("upscaler",
+   * "textualinversion", "workflows", …); absent for plain loras. */
+  kind?: string;
+}
+
+/** Kinds that behave as loras (invocation tag, weight); anything else is an
+ * "other resource" — upscalers, embeddings, workflows. */
+export function isLoraKind(kind: string | undefined | null): boolean {
+  return !kind || ["lora", "lycoris", "locon"].includes(kind.toLowerCase());
 }
 
 export interface GroupInfo {

@@ -45,9 +45,15 @@ fn clean_loras(loras: &[Lora]) -> Vec<Lora> {
             .map(str::trim)
             .filter(|u| u.starts_with("https://civitai.com/") || u.starts_with("https://civitai.red/"))
             .map(str::to_string);
+        let kind = l
+            .kind
+            .as_deref()
+            .map(str::trim)
+            .filter(|k| !k.is_empty())
+            .map(str::to_string);
         let key = name.to_lowercase();
         if seen.insert(key) {
-            out.push(Lora { name, value, url });
+            out.push(Lora { name, value, url, kind });
         }
         if out.len() >= 24 {
             break;

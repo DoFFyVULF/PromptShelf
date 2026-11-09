@@ -166,7 +166,7 @@ fn parse_lora_tags(prompt: &str) -> Vec<Lora> {
             if let Some(name) = parts.first().map(|n| n.trim()).filter(|n| !n.is_empty() && n.len() <= 64) {
                 let value = parts.iter().rev().find_map(|p| weight_of(p)).unwrap_or_else(|| "1".to_string());
                 if seen.insert(name.to_lowercase()) {
-                    out.push(Lora { name: name.to_string(), value, url: None });
+                    out.push(Lora { name: name.to_string(), value, url: None, kind: None });
                 }
             }
             from = end + 1;
@@ -291,6 +291,30 @@ fn is_lora_kind(kind: &str) -> bool {
     matches!(kind, "lora" | "lycoris" | "locon")
 }
 
+/// Appends the non-lora resources (upscalers, embeddings, workflows, …) from
+/// the resolved list, skipping checkpoints (a card field of their own) and
+/// names already present. Kind travels on the entry so the UI can split the
+/// sections; the shared `loras` list keeps the stored shape unchanged.
+fn push_other_resources(loras: &mut Vec<Lora>, resolved: &[ResolvedVersion]) {
+    for r in resolved {
+        if loras.len() >= MAX_LORAS {
+            return;
+        }
+        if is_lora_kind(&r.kind) || r.kind == "checkpoint" {
+            continue;
+        }
+        if loras.iter().any(|l| l.name.eq_ignore_ascii_case(&r.name)) {
+            continue;
+        }
+        loras.push(Lora {
+            name: r.name.clone(),
+            value: r.value.clone(),
+            url: r.url.clone(),
+            kind: Some(r.kind.clone()),
+        });
+    }
+}
+
 fn loras_from_resources(meta: &Value) -> Vec<Lora> {
     let mut out: Vec<Lora> = Vec::new();
     let mut seen: HashSet<String> = HashSet::new();
@@ -310,6 +334,7 @@ fn loras_from_resources(meta: &Value) -> Vec<Lora> {
                     name,
                     value: r.get("weight").and_then(scalar).unwrap_or_else(|| "1".to_string()),
                     url: None,
+                    kind: None,
                 });
             }
         }
@@ -523,7 +548,7 @@ fn run(data_dir: &std::path::Path, url: &str) -> Result<CivitaiImport, String> {
         loras = resolved
             .iter()
             .filter(|r| is_lora_kind(&r.kind))
-            .map(|r| Lora { name: r.name.clone(), value: r.value.clone(), url: r.url.clone() })
+            .map(|r| Lora { name: r.name.clone(), value: r.value.clone(), url: r.url.clone(), kind: None })
             .collect();
         if loras.is_empty() {
             loras = loras_from_resources(meta);
@@ -544,6 +569,11 @@ fn run(data_dir: &std::path::Path, url: &str) -> Result<CivitaiImport, String> {
             }
         }
     }
+
+    // Other CivitAI resources (upscalers, embeddings, workflows, …) ride in
+    // the same list tagged with their type; the checkpoint is a card field of
+    // its own and is skipped.
+    push_other_resources(&mut loras, &resolved);
 
     // Checkpoint: A1111-style meta "Model" — a plain name, or a URN on on-site
     // generations ("urn:air:sdxl:checkpoint:civitai:140272@1697082") which
@@ -1071,6 +1101,42 @@ mod tests {
     }
 
     #[test]
+    fn collects_other_resources() {
+        // builds a ResolvedVersion with less ceremony
+        let rv = |id: i64, kind: &str, name: &str, url: bool| ResolvedVersion {
+            id,
+            kind: kind.to_string(),
+            name: name.to_string(),
+            value: "1".to_string(),
+            url: url.then(|| format!("https://civitai.com/models/{id}")),
+        };
+
+        let resolved = vec![
+            rv(1, "lora", "SomeLora", true),
+            rv(2, "checkpoint", "BigModel", false),
+            rv(3, "upscaler", "Remacri", true),
+            rv(4, "textualinversion", "Lazy Embeddings", true),
+            rv(5, "workflows", "Gladas Workflow", true),
+        ];
+        let mut loras = vec![Lora { name: "SomeLora".to_string(), value: "0.8".to_string(), url: None, kind: None }];
+        push_other_resources(&mut loras, &resolved);
+        // checkpoint is skipped (a card field of its own), loras keep no kind,
+        // the rest ride along tagged with their CivitAI type
+        assert_eq!(loras.len(), 4);
+        assert!(loras[0].kind.is_none());
+        assert_eq!(loras[1].name, "Remacri");
+        assert_eq!(loras[1].kind.as_deref(), Some("upscaler"));
+        assert_eq!(loras[2].kind.as_deref(), Some("textualinversion"));
+        assert_eq!(loras[3].kind.as_deref(), Some("workflows"));
+        assert_eq!(loras[3].url.as_deref(), Some("https://civitai.com/models/5"));
+
+        // dedupe against the names already in the list, case-insensitive
+        let more = vec![rv(6, "upscaler", "SOMELORA", false), rv(7, "upscaler", "Remacri", false)];
+        push_other_resources(&mut loras, &more);
+        assert_eq!(loras.len(), 4);
+    }
+
+    #[test]
     fn parses_lora_tags() {
         let p = "start <lora:Krea2_GrippyPussy_v1:1.0> mid <lora:Famegrid-Natural-V1-Krea-2:1> <lora:VectorKreaRaw_v1:0.85> end @wat";
         let ls = parse_lora_tags(p);
@@ -1171,7 +1237,7 @@ mod tests {
         let res = run(&dir, "https://civitai.red/images/82180349").expect("import should succeed");
         println!("checkpoint: {:?}", res.checkpoint);
         for l in &res.loras {
-            println!("lora: name={:?} value={:?} url={:?}", l.name, l.value, l.url);
+            println!("lora: name={:?} value={:?} kind={:?} url={:?}", l.name, l.value, l.kind, l.url);
         }
         let _ = std::fs::remove_file(&res.image.temp_path);
         let _ = std::fs::remove_dir_all(&dir);

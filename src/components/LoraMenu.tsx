@@ -3,11 +3,26 @@ import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Check, Copy, Download, ExternalLink, Link2Off } from "lucide-react";
-import { useI18n } from "../i18n";
-import type { LoraItem } from "../lib/types";
+import { useI18n, type DictKey } from "../i18n";
+import { isLoraKind, type LoraItem } from "../lib/types";
 
 const EASE = [0.32, 0.72, 0, 1] as const;
 const MENU_W = 240;
+
+/** Human label for a non-lora CivitAI resource kind ("upscaler" → "Upscaler",
+ * "textualinversion" → "Embedding"); unknown kinds fall back to the raw type. */
+export function resKindLabel(kind: string, t: (k: DictKey) => string): string {
+  const k = kind.toLowerCase();
+  const key: DictKey | null =
+    k === "upscaler"
+      ? "detail.res.upscaler"
+      : k === "textualinversion"
+        ? "detail.res.embedding"
+        : k === "workflows"
+          ? "detail.res.workflow"
+          : null;
+  return key ? t(key) : kind;
+}
 
 interface LoraMenuState {
   lora: LoraItem;
@@ -91,6 +106,9 @@ export function LoraMenu({ menu, onClose, onCopy, onImport, onOpenPage }: LoraMe
     onClose();
   };
 
+  const lora = menu?.lora;
+  const asLora = lora !== undefined && isLoraKind(lora.kind);
+
   const motionProps = reduce
     ? { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 }, transition: { duration: 0.12 } }
     : {
@@ -118,26 +136,28 @@ export function LoraMenu({ menu, onClose, onCopy, onImport, onOpenPage }: LoraMe
           }}
           className="overflow-hidden rounded-card border border-hairline bg-card/95 shadow-tile-hover backdrop-blur-xl"
         >
-          {/* header: the model name + its weight, like the chip it grew from */}
+          {/* header: the model name + its weight (or kind, for non-lora resources) */}
           <div className="flex items-center justify-between gap-2 border-b border-line-soft px-3.5 py-2.5">
             <span className="min-w-0 truncate text-[12.5px] font-medium text-ink">{menu.lora.name}</span>
             <span className="shrink-0 rounded-full bg-parchment px-2 py-0.5 text-[10.5px] leading-tight text-muted tabular-nums">
-              {menu.lora.value || "1"}
+              {asLora ? menu.lora.value || "1" : resKindLabel(menu.lora.kind as string, t)}
             </span>
           </div>
 
           <div className="px-1.5 py-1.5">
-            <MenuRow
-              icon={copied ? <Check size={13.5} /> : <Copy size={13.5} />}
-              label={t("detail.lora.copyTag")}
-              onClick={() =>
-                act(() => {
-                  onCopy(menu.lora);
-                  setCopied(true);
-                  window.setTimeout(() => setCopied(false), 1600);
-                })
-              }
-            />
+            {asLora && (
+              <MenuRow
+                icon={copied ? <Check size={13.5} /> : <Copy size={13.5} />}
+                label={t("detail.lora.copyTag")}
+                onClick={() =>
+                  act(() => {
+                    onCopy(menu.lora);
+                    setCopied(true);
+                    window.setTimeout(() => setCopied(false), 1600);
+                  })
+                }
+              />
+            )}
             {menu.lora.url ? (
               <>
                 <MenuRow

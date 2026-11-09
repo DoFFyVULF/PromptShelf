@@ -20,13 +20,19 @@ export function applyLoraDraft(list: LoraItem[], draft: LoraDraft | null): LoraI
   const value = draft.value.trim();
   if (!name || name.length > 64 || value.length > 32) return list;
   const at = draft.index ?? list.length;
+  // an edit keeps the import-captured fields of the row it touched
+  const prev = draft.index != null ? list[draft.index] : undefined;
   const out: LoraItem[] = [];
   for (let i = 0; i < list.length; i++) {
     if (i === at) continue;
     if (list[i].name.toLowerCase() === name.toLowerCase()) continue; // moved/merged
     out.push(list[i]);
   }
-  out.splice(Math.min(at, out.length), 0, { name, value });
+  out.splice(Math.min(at, out.length), 0, {
+    name,
+    value,
+    ...(prev ? { url: prev.url, kind: prev.kind } : {})
+  });
   return out.slice(0, MAX_LORAS);
 }
 

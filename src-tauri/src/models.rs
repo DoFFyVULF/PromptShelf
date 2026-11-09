@@ -71,6 +71,11 @@ pub struct Lora {
     /// carries its model id); None for prompt-tag parses and manual entries.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
+    /// CivitAI model type for non-lora resources ("upscaler",
+    /// "textualinversion", "workflows", …); None for plain loras (and legacy
+    /// entries) so they need no special casing on read.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
 }
 
 /// One "other metadata" row, e.g. k = "Seed", v = "557832969775936".
