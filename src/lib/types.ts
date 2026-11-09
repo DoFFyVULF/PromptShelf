@@ -44,6 +44,8 @@ export interface CardDetail {
   author: string | null;
   checkpoint: string | null;
   meta: MetaItem[];
+  /** CivitAI page link behind the import origin ("" → manual card). */
+  source_url: string;
 }
 
 export interface MetaItem {

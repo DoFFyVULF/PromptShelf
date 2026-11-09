@@ -44,6 +44,10 @@ pub struct CardDetail {
     pub checkpoint: Option<String>,
     /// Ordered "other metadata" rows (seed, steps, sampler…) from an import.
     pub meta: Vec<MetaItem>,
+    /// CivitAI page link behind `source_key` ("civitai:images:<id>" /
+    /// "civitai:posts:<id>" → the page); "" for manual cards — the detail
+    /// panel then hides the link.
+    pub source_url: String,
 }
 
 #[derive(Deserialize)]

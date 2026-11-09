@@ -156,6 +156,7 @@ export const ru: Record<DictKey, string> = {
   "detail.other": "Прочие параметры",
   "detail.added": "Добавлено",
   "detail.deleteTitle": "Удалить карточку",
+  "detail.civitaiPage": "Страница CivitAI",
 
   "lora.published": "Опубликовано",
   "lora.baseModel": "База",

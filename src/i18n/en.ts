@@ -154,6 +154,7 @@ export const en = {
   "detail.other": "Other metadata",
   "detail.added": "Added",
   "detail.deleteTitle": "Delete card",
+  "detail.civitaiPage": "CivitAI page",
 
   "lora.published": "Published",
   "lora.baseModel": "Base model",

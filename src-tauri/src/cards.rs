@@ -110,6 +110,21 @@ fn parse_meta(s: &str) -> Vec<crate::models::MetaItem> {
     serde_json::from_str(s).unwrap_or_default()
 }
 
+/// `civitai:images:<id>` / `civitai:posts:<id>` → the CivitAI page link behind
+/// the source key. Manual cards (no import origin) stay empty — the detail
+/// panel then hides the link.
+fn card_source_url(source_key: &str) -> String {
+    for prefix in ["civitai:images:", "civitai:posts:"] {
+        if let Some(id) = source_key.strip_prefix(prefix) {
+            if !id.is_empty() && id.chars().all(|c| c.is_ascii_digit()) {
+                let kind = prefix.trim_start_matches("civitai:").trim_end_matches(':');
+                return format!("https://civitai.com/{kind}/{id}");
+            }
+        }
+    }
+    String::new()
+}
+
 fn tag_id(conn: &Connection, name: &str) -> Result<i64, String> {
     conn.execute(
         "INSERT INTO tags(name) VALUES(?1) ON CONFLICT(name) DO NOTHING",
@@ -332,12 +347,13 @@ pub fn get_card_inner(dir: &Path, id: &str) -> Result<CardDetail, String> {
 
     let mut card = conn
         .query_row(
-            "SELECT id, prompt, negative_prompt, note, rating, created_at, updated_at, loras, group_id, author, checkpoint, meta_json, variants_json FROM cards WHERE id = ?1",
+            "SELECT id, prompt, negative_prompt, note, rating, created_at, updated_at, loras, group_id, author, checkpoint, meta_json, variants_json, source_key FROM cards WHERE id = ?1",
             params![id],
             |r| {
                 let loras_raw: String = r.get(7)?;
                 let meta_raw: String = r.get(11)?;
                 let variants_raw: String = r.get(12)?;
+                let source_key: Option<String> = r.get(13)?;
                 Ok(CardDetail {
                     id: r.get(0)?,
                     prompt: r.get(1)?,
@@ -354,6 +370,10 @@ pub fn get_card_inner(dir: &Path, id: &str) -> Result<CardDetail, String> {
                     meta: parse_meta(&meta_raw),
                     tags: Vec::new(),
                     images: Vec::new(),
+                    source_url: source_key
+                        .as_deref()
+                        .map(card_source_url)
+                        .unwrap_or_default(),
                 })
             },
         )

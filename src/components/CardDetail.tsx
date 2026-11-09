@@ -13,7 +13,8 @@ import {
   Star,
   Loader2,
   User,
-  Cpu
+  Cpu,
+  ExternalLink
 } from "lucide-react";
 import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
 import { useI18n } from "../i18n";
@@ -605,7 +606,7 @@ export function CardDetail({ card, suggestions, hasPrev, hasNext, onPrev, onNext
                   </section>
                 )}
 
-                {(card.author || card.checkpoint) && (
+                {(card.author || card.checkpoint || card.source_url) && (
                   <section className="flex flex-wrap gap-x-5 gap-y-1.5">
                     {card.author && (
                       <span className="flex cursor-default items-center gap-1.5 text-[12.5px] text-muted" title={t("editor.author")}>
@@ -618,6 +619,18 @@ export function CardDetail({ card, suggestions, hasPrev, hasNext, onPrev, onNext
                         <Cpu size={12.5} className="shrink-0 text-faint" />
                         <span className="max-w-[240px] truncate">{card.checkpoint}</span>
                       </span>
+                    )}
+                    {card.source_url && (
+                      <button
+                        type="button"
+                        onClick={() => void api.openUrl(card.source_url).catch(() => toast(t("toast.error"), "error"))}
+                        title={card.source_url}
+                        aria-label={t("detail.civitaiPage")}
+                        className="press -mx-1 flex cursor-pointer items-center gap-1.5 rounded-md px-1 text-[12.5px] text-action transition-opacity hover:opacity-80"
+                      >
+                        <ExternalLink size={12.5} className="shrink-0" />
+                        {t("detail.civitaiPage")}
+                      </button>
                     )}
                   </section>
                 )}
