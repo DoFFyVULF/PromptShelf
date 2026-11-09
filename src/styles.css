@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* The app flips themes with the `.dark` class on <html>, not the OS media
+   query — teach `dark:` utilities to follow that class. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* ------------------------------------------------------------------ fonts */
 
 @font-face {

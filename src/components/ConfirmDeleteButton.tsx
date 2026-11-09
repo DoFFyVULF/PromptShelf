@@ -55,7 +55,7 @@ export function ConfirmDeleteButton({
       whileTap={reduceMotion ? undefined : { scale: 0.96 }}
       className={`press-bg relative flex h-9 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full border ${
         armed
-          ? "border-destructive bg-destructive text-on-ink"
+          ? "border-destructive bg-destructive text-on-ink dark:text-ink"
           : "border-hairline bg-card text-muted hover:bg-destructive-soft hover:text-destructive"
       }`}
     >
