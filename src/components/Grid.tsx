@@ -3,6 +3,7 @@ import { AnimatePresence } from "motion/react";
 import { ImageOff, Images, Star } from "lucide-react";
 import { useI18n } from "../i18n";
 import { assetUrl } from "../lib/api";
+import { attachCardGhost } from "../lib/dragGhost";
 import { ImportJobTile, type ImportJob } from "./ImportJobs";
 import type { CardSummary } from "../lib/types";
 
@@ -59,152 +60,9 @@ function CardTile({
     }
     e.dataTransfer.effectAllowed = "move";
 
-    // The card that travels with the cursor is a shrunken painting of the
-    // tile on a canvas: the photo is drawn synchronously from the already
-    // decoded <img>, so it always makes it into the drag snapshot (a cloned
-    // <img> would still be decoding and render empty in WebKit). The canvas
-    // is parked behind the opaque source tile (z-index -1, centred on it) so
-    // WebKit can snapshot it while nothing flashes in the UI.
-    const tile = e.currentTarget as HTMLElement;
-    const tileRect = tile.getBoundingClientRect();
-    const box = tile.querySelector<HTMLElement>("[data-ghost-box]");
-    const img = box?.querySelector("img");
-    const boxRect = box?.getBoundingClientRect();
-    const S = 0.62;
-    const pad = 10;
-    const footH = 30;
-    const bw = boxRect?.width ?? tileRect.width - pad * 2;
-    const bh = boxRect?.height ?? bw * 0.75;
-    const W = Math.round(bw + pad * 2);
-    const H = Math.round(pad + bh + footH);
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const m = 18; // room for the soft shadow inside the bitmap
-    const cw = Math.round(W * S) + m * 2;
-    const ch = Math.round(H * S) + m * 2;
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.round(cw * dpr);
-    canvas.height = Math.round(ch * dpr);
-    canvas.style.cssText = `position:fixed;left:${Math.round(tileRect.left + tileRect.width / 2 - cw / 2)}px;top:${Math.round(
-      tileRect.top + tileRect.height / 2 - ch / 2
-    )}px;width:${cw}px;height:${ch}px;pointer-events:none;z-index:-1;`;
-    const ctx = canvas.getContext("2d");
-    if (ctx) {
-      // the ghost is painted from the live theme tokens so it matches the
-      // card in both light and dark mode
-      const cs = getComputedStyle(document.documentElement);
-      const token = (name: string, fallback: string) => cs.getPropertyValue(name).trim() || fallback;
-      const cardBg = token("--color-card", "#ffffff");
-      const imgBg = token("--color-parchment", "#f4f4f5");
-      const footText = token("--color-body", "#3f3f46");
-      const tileEdge = token("--color-hairline", "#e4e4e7");
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.translate(m, m);
-      ctx.scale(S, S);
-      // per-corner rounded rect in design coordinates
-      const path = (x: number, y: number, w: number, h: number, tl: number, tr: number, br: number, bl: number) => {
-        ctx.beginPath();
-        ctx.moveTo(x + tl, y);
-        ctx.lineTo(x + w - tr, y);
-        ctx.arcTo(x + w, y, x + w, y + tr, tr);
-        ctx.lineTo(x + w, y + h - br);
-        ctx.arcTo(x + w, y + h, x + w - br, y + h, br);
-        ctx.lineTo(x + bl, y + h);
-        ctx.arcTo(x, y + h, x, y + h - bl, bl);
-        ctx.lineTo(x, y + tl);
-        ctx.arcTo(x, y, x + tl, y, tl);
-        ctx.closePath();
-      };
-      // card body with a soft shadow (shadow metrics are device-space)
-      ctx.save();
-      ctx.shadowColor = "rgba(23,23,28,0.32)";
-      ctx.shadowBlur = 20 * dpr;
-      ctx.shadowOffsetY = 9 * dpr;
-      ctx.fillStyle = cardBg;
-      path(0, 0, W, H, 10, 10, 10, 10);
-      ctx.fill();
-      ctx.restore();
-      ctx.strokeStyle = tileEdge;
-      ctx.lineWidth = 1;
-      path(0.5, 0.5, W - 1, H - 1, 10, 10, 10, 10);
-      ctx.stroke();
-      // cover image, cover-cropped like object-cover, top corners rounded
-      const iw = W - pad * 2;
-      ctx.save();
-      path(pad, pad, iw, bh, 8, 8, 0, 0);
-      ctx.clip();
-      if (img && img.complete && img.naturalWidth > 0) {
-        const ir = img.naturalWidth / img.naturalHeight;
-        const br = iw / bh;
-        let sx = 0;
-        let sy = 0;
-        let sw = img.naturalWidth;
-        let sh = img.naturalHeight;
-        if (ir > br) {
-          sw = sh * br;
-          sx = (img.naturalWidth - sw) / 2;
-        } else {
-          sh = sw / br;
-          sy = (img.naturalHeight - sh) / 2;
-        }
-        ctx.drawImage(img, sx, sy, sw, sh, pad, pad, iw, bh);
-      } else {
-        ctx.fillStyle = imgBg;
-        ctx.fillRect(pad, pad, iw, bh);
-        ctx.fillStyle = token("--color-faint", "#a1a1aa");
-        ctx.font = "500 13px system-ui, sans-serif";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(card.prompt.trim().slice(0, 80) || "…", pad + iw / 2, pad + bh / 2);
-        ctx.textAlign = "left";
-      }
-      ctx.restore();
-      // footer: truncated prompt, like the tile's first line
-      const p = card.prompt.trim();
-      if (p) {
-        ctx.fillStyle = footText;
-        ctx.font = "500 12.5px system-ui, sans-serif";
-        ctx.textBaseline = "middle";
-        let txt = p;
-        if (ctx.measureText(txt).width > iw) {
-          while (txt.length > 1 && ctx.measureText(`${txt}…`).width > iw) txt = txt.slice(0, -1);
-          txt = `${txt}…`;
-        }
-        ctx.fillText(txt, pad, pad + bh + footH / 2 + 1);
-      }
-      // emerald count pill for multi-card drags
-      if (ids.length > 1) {
-        const cx = W - 16;
-        const cy = 16;
-        ctx.beginPath();
-        ctx.arc(cx, cy, 11, 0, Math.PI * 2);
-        ctx.fillStyle = "#059669";
-        ctx.fill();
-        ctx.fillStyle = "#ffffff";
-        ctx.font = "600 11px system-ui, sans-serif";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(String(ids.length), cx, cy + 0.5);
-        ctx.textAlign = "left";
-      }
-    }
-    document.body.appendChild(canvas);
-    try {
-      e.dataTransfer.setDragImage(canvas, Math.round(cw / 2), Math.round(ch / 2));
-    } catch {
-      /* fall back to the browser's default ghost */
-    }
-    // parked behind the tile (invisible); remove once the drag is over
-    let disposed = false;
-    const cleanup = () => {
-      if (disposed) return;
-      disposed = true;
-      canvas.remove();
-      window.removeEventListener("dragend", cleanup);
-      window.removeEventListener("drop", cleanup);
-    };
-    window.addEventListener("dragend", cleanup);
-    window.addEventListener("drop", cleanup);
-    window.setTimeout(cleanup, 15000);
+    attachCardGhost(e, { title: card.prompt.trim(), count: ids.length });
+    // the source tile "picks up" on a timeout so React doesn't re-render
+    // during the dragstart dispatch; the ghost is already captured.
     window.setTimeout(() => setDragging(true), 0);
   };
 

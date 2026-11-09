@@ -3,6 +3,7 @@ import { AnimatePresence } from "motion/react";
 import { Layers, Star } from "lucide-react";
 import { useI18n } from "../i18n";
 import { assetUrl } from "../lib/api";
+import { attachCardGhost } from "../lib/dragGhost";
 import { ImportJobTile, type ImportJob } from "./ImportJobs";
 import { CARD_DRAG_TYPE } from "./Grid";
 import type { LoraSummary } from "../lib/types";
@@ -51,6 +52,12 @@ function LoraTile({
       /* some engines restrict custom types */
     }
     e.dataTransfer.effectAllowed = "move";
+    attachCardGhost(e, {
+      title: lora.name,
+      strong: true,
+      badge: lora.primary_tag ?? undefined,
+      meta: lora.base_model ?? undefined
+    });
     window.setTimeout(() => setDragging(true), 0);
   };
 
@@ -87,7 +94,7 @@ function LoraTile({
       )}
 
       <div className={`p-2.5 pb-0 transition-opacity duration-200 ease-out ${dragging ? "opacity-35" : ""}`}>
-        <div className="relative aspect-[4/3] overflow-hidden rounded-tile bg-parchment">
+        <div data-ghost-box className="relative aspect-[4/3] overflow-hidden rounded-tile bg-parchment">
           {lora.cover ? (
             <img
               src={assetUrl(lora.cover.thumb)}
