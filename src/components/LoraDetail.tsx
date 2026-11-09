@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
   Calendar,
   Check,
@@ -14,7 +15,6 @@ import {
   Pencil,
   Plus,
   Star,
-  Trash2,
   X
 } from "lucide-react";
 import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
@@ -27,6 +27,7 @@ import { RichText } from "./RichText";
 import { Stars } from "./Stars";
 import { TagInput } from "./TagInput";
 import { useToast } from "./Toasts";
+import { ConfirmDeleteButton } from "./ConfirmDeleteButton";
 import { IMAGE_EXTS } from "./Editor";
 
 interface LoraDetailProps {
@@ -58,6 +59,7 @@ export function LoraDetail({
   const [mainIdx, setMainIdx] = useState(0);
   const [copiedTriggers, setCopiedTriggers] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const reduceMotion = useReducedMotion();
   const [armImage, setArmImage] = useState<string | null>(null);
   const [zoom, setZoom] = useState(false);
   const [adding, setAdding] = useState(0);
@@ -702,23 +704,40 @@ export function LoraDetail({
                   <span className="truncate">{copiedTriggers ? t("lora.triggerCopied") : t("lora.copyTriggers")}</span>
                   <kbd className="kbd hidden border-on-ink/30 bg-transparent text-on-ink/70 xl:flex">{modKey}C</kbd>
                 </button>
-                <button type="button" className="btn-ghost press cursor-pointer" onClick={startEdit}>
-                  <Pencil size={14.5} />
-                  <span className="hidden xl:inline">{t("action.edit")}</span>
-                </button>
-                <button
+                <motion.button
                   type="button"
-                  aria-label={t("lora.deleteTitle")}
-                  title={confirmDelete ? t("action.confirmDelete") : t("lora.deleteTitle")}
-                  onClick={removeLora}
-                  className={`press flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border transition-colors ${
-                    confirmDelete
-                      ? "border-destructive/30 bg-destructive text-on-ink"
-                      : "border-hairline bg-card text-muted hover:bg-destructive-soft hover:text-destructive"
-                  }`}
+                  onClick={startEdit}
+                  initial={false}
+                  animate={{ gap: confirmDelete ? "0px" : "7px", scale: confirmDelete ? 0.95 : 1 }}
+                  whileTap={reduceMotion ? undefined : { scale: 0.94 }}
+                  transition={
+                    reduceMotion
+                      ? { duration: 0 }
+                      : { type: "spring", visualDuration: 0.3, bounce: 0.1 }
+                  }
+                  className="btn-ghost press-bg cursor-pointer overflow-hidden"
                 >
-                  <Trash2 size={15} />
-                </button>
+                  <Pencil size={14.5} />
+                  <AnimatePresence initial={false}>
+                    {!confirmDelete && (
+                      <motion.span
+                        key="edit-label"
+                        initial={{ width: 0, opacity: 0 }}
+                        animate={{ width: "auto", opacity: 1 }}
+                        exit={{ width: 0, opacity: 0, transition: { duration: reduceMotion ? 0 : 0.16 } }}
+                        transition={{ duration: reduceMotion ? 0 : 0.24, ease: [0.22, 1, 0.36, 1] }}
+                        className="hidden overflow-hidden whitespace-nowrap xl:inline-block"
+                      >
+                        {t("action.edit")}
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
+                </motion.button>
+                <ConfirmDeleteButton
+                  armed={confirmDelete}
+                  title={t("lora.deleteTitle")}
+                  onClick={removeLora}
+                />
               </>
             )}
           </div>

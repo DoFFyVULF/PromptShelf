@@ -19,6 +19,7 @@ export const ru: Record<DictKey, string> = {
   "action.copy": "Копировать промпт",
   "action.close": "Закрыть",
   "action.confirmDelete": "Нажмите ещё раз для удаления",
+  "action.areYouSure": "Вы уверены?",
   "action.retry": "Повторить",
   "action.clear": "Сбросить",
 

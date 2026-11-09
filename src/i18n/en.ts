@@ -17,6 +17,7 @@ export const en = {
   "action.copy": "Copy prompt",
   "action.close": "Close",
   "action.confirmDelete": "Click again to delete",
+  "action.areYouSure": "Are you sure?",
   "action.retry": "Retry",
   "action.clear": "Clear",
 
