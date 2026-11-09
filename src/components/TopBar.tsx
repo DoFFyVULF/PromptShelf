@@ -74,15 +74,23 @@ function SlotCell({
   className?: string;
 }) {
   const { ref, scaleX } = useFillWindow(slot, word, onWidth);
+  // Clip each cell to its own line box. The clip has to live on a *parent*:
+  // WebView2 paints a background-clip:text gradient outside the painted box
+  // (the descender of "Prompt" reaches into the cell below), and neither the
+  // element's own overflow nor the window's clip catches it, so a stray dot
+  // floats above the next word. Horizontally the clip stays open (-9999px) so
+  // the scaleX stretch is never trimmed while the slot width tweens.
   return (
-    <motion.span
-      ref={ref}
-      data-word={word}
-      style={{ scaleX, transformOrigin: "left center" }}
-      className={`block h-4 whitespace-nowrap leading-none ${className}`}
-    >
-      {word}
-    </motion.span>
+    <span className="block h-4" style={{ clipPath: "inset(0 -9999px)" }}>
+      <motion.span
+        ref={ref}
+        data-word={word}
+        style={{ scaleX, transformOrigin: "left center" }}
+        className={`block h-4 whitespace-nowrap leading-none ${className}`}
+      >
+        {word}
+      </motion.span>
+    </span>
   );
 }
 
