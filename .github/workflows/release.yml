@@ -58,28 +58,26 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: "PromptShelf ${{ github.ref_name }}"
           releaseBody: |
-            **What's new in v0.2.2**
+            **What's new in v0.2.3**
 
-            **Paste a link, get a card**
+            **Variants you can see**
 
-            - Paste a CivitAI link anywhere in the app (Cmd/Ctrl+V) and it imports on its own: an image or post link becomes a prompt card, a model link becomes a LoraShelf import — same background jobs and duplicate handling as the import dialog. Pasting into an open dialog or an editor field still behaves normally.
-            - Imported cards now link back to their CivitAI page, next to the author and checkpoint. Cards you made by hand stay link-free.
-            - Lora chips in the card detail open a menu: copy the `<lora:name:weight>` tag, send it to LoraShelf, or open the model's CivitAI page. Links now resolve for lycoris/locon and on-site generations too.
-            - Upscalers, embeddings and workflows come along for the ride: a new "Other resources" section lists them as chips with a type badge and a page link.
-            - Fixed: embeddings and workflows were silently dropped from imports. The importer now reads the image page's full resource list, so nothing is lost — the old per-version lookup stays as a fallback for gated or deleted data.
+            - Cards holding more than one prompt now wear a subtle stack of text sheets, with an always-visible count under the excerpt — separate from the image counter, so alternates read at a glance. Hover or keyboard-focus a card and the sheets gently spread; opening, selecting and dragging work exactly as before, and reduced motion is respected. List summaries show variant counts too, without extra requests.
 
-            **A delete you can't miss**
+            **A calmer tag browser — with a choice of matching**
 
-            - The trash button in the card and lora footers springs open into a red "Are you sure?" pill while the edit action folds down to its icon, so the destructive second click is explicit instead of a hidden double-tap.
-            - Fixed: in the dark theme the armed pill kept its dark text on the bright red fill. It now uses the same ink color as the Edit button.
+            - The cramped tag grid is now a roomier, theme-aware dialog: search, a dedicated selection area, readable usage counts and helpful empty states, with native focus handling and keyboard shortcuts. Long tag names stay readable.
+            - Matching is now an explicit, animated switch: show cards with *any* selected tag or with *all* of them, on both the prompt and LoRA shelves. The rule survives reopening the dialog and stays independent from the shelf's text search.
+            - The transitions got care as well: chips fade and scale without fighting the reflow, the empty-selection hint crossfades, and the any/all labels roll past each other in a clipped track — rapid toggles reverse the motion instead of overlapping text.
 
-            **One drag ghost for both shelves**
+            **Delete the whole selection, still can't miss it**
 
-            - Dragging a Lora used to fall back to the browser's default ghost, so the two shelves felt like different apps in flight. Both now paint the same lifted ghost — prompt text plus the selection count, or the Lora name with its tag and base-model pills. It renders a touch larger with a deeper, softer shadow while the source tile shrinks back, so it reads as picked up.
+            - The floating selection bar now has a trash action for everything you've picked. It springs open into the same red "Are you sure?" pill as the single-item delete, re-skinned for the dark bar. Changing the selection or switching shelves disarms it, so a stale confirm can never fire on a different set.
 
             **Small things**
 
-            - Fixed: the tail of the "p" in Prompt leaked into the Lora wordmark as a stray dot above the r and a on Windows. Each letter cell is now clipped on its parent, so the descender stays put without trimming the stretch.
+            - Fixed: copy, paste and the other shortcuts (Cmd/Ctrl+C, V, N, F, ,) never fired on non-Latin keyboard layouts — on Russian, Ctrl+C arrives as the letter "с". Shortcuts now resolve through the physical key when the layout produces non-Latin characters, so they work on any layout while Dvorak-style remaps keep working.
+            - Fixed: a LoRA imported without trigger words showed a prominent copy button that did nothing. It now sits quiet in the row without the ⌘C hint, the trigger-words section shows a dashed note pointing at Edit, and clicking the inert button explains itself instead of failing silently.
 
             Installers, built from this tag with the updater signing key:
 
