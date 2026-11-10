@@ -21,6 +21,7 @@ pub struct CardSummary {
     pub updated_at: String,
     pub tags: Vec<String>,
     pub image_count: i64,
+    pub variant_count: usize,
     pub cover: Option<ImageInfo>,
     pub group_id: String,
 }

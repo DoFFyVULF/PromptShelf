@@ -197,6 +197,10 @@ export const ru: Record<DictKey, string> = {
   "loraeditor.description.placeholder": "Что делает эта лора…",
   "loraeditor.error.name": "Сначала добавьте название лоры",
 
+  "variant.more.one": "Ещё {n} вариант",
+  "variant.more.few": "Ещё {n} варианта",
+  "variant.more.many": "Ещё {n} вариантов",
+  "variant.more.other": "Ещё {n} вариантов",
   "variant.original": "Оригинал",
   "variant.of": "{i} из {n}",
   "variant.add": "Добавить вариант",
