@@ -37,6 +37,11 @@ your library on disk. One import of a model page — and its description, trigge
 usage tips stay too. The other person's page no longer matters: everything is local and
 nothing deletes it.
 
+<div align="center">
+  <img src="docs/PromptShelf_Card_preview.png" alt="Prompt card detail view: image, full prompt, LoRAs, author and generation parameters" width="100%">
+  <sub>An imported card: the photo, full prompt, LoRAs, author and generation parameters — all on your disk</sub>
+</div>
+
 ## Features
 
 - **Cards** — a multiline prompt, one or more images, a note, tags, a star rating, dates.
@@ -96,6 +101,16 @@ nothing deletes it.
 -  **Update check** — a button in settings tells you about a new version and installs it:
   download and restart, two clicks.
 - **Interface languages** — English and Russian, with a switcher in the header.
+
+## LoraShelf
+
+<div align="center">
+  <img src="docs/LoraShelf_preview.png" alt="LoraShelf: a grid of LoRA cards with base models, category badges and tags" width="100%">
+  <sub>The second shelf: LoRA cards with base model, category badge and tags</sub>
+
+  <img src="docs/PromptShelf_LoraCard_preview.png" alt="LoRA card detail view: trigger words, rich description and preview images" width="100%">
+  <sub>Inside a LoRA card: violet trigger-word chips, the author's description with original markup, previews and one-click copy</sub>
+</div>
 
 ## Installation
 
