@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useI18n } from "../i18n";
 import { api } from "./api";
 import { useToast } from "../components/Toasts";
+import { shortcutKey } from "./platform";
 
 interface UseImagePasteOptions {
   /** Paste handling is only wired while true (e.g. an edit mode is open). */
@@ -85,7 +86,7 @@ export function useImagePaste({ active, addImage, afterAdd, onBusy }: UseImagePa
     };
 
     const onKey = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "v") return;
+      if (!(e.metaKey || e.ctrlKey) || shortcutKey(e) !== "v") return;
       const target = e.target as HTMLElement | null;
       const inField = target?.tagName === "TEXTAREA" || target?.tagName === "INPUT" || target?.isContentEditable;
       // inside a field the DOM paste event handles it (and text must keep working)

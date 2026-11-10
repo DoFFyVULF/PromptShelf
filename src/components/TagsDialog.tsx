@@ -3,6 +3,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { ArrowLeftRight, Check, Hash, Search, Tag, X } from "lucide-react";
 import { useI18n } from "../i18n";
 import type { TagCount } from "../lib/types";
+import { shortcutKey } from "../lib/platform";
 
 interface TagsDialogProps {
   open: boolean;
@@ -63,7 +64,7 @@ function TagsPanel({ onClose, tags, selected, matchAll, onMatchAllChange, onTogg
       aria-describedby="tags-description"
       onKeyDown={(event) => {
         event.stopPropagation();
-        if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "f") {
+        if ((event.metaKey || event.ctrlKey) && shortcutKey(event) === "f") {
           event.preventDefault();
           inputRef.current?.focus();
         }

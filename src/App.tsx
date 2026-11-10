@@ -48,6 +48,7 @@ import { ScrollTopButton } from "./components/ScrollTopButton";
 import { DuplicateDialog } from "./components/DuplicateDialog";
 import { CornerDownRight, ListChecks, X } from "lucide-react";
 import { applyTheme, onSystemThemeChange, themeFromStorage } from "./lib/theme";
+import { shortcutKey } from "./lib/platform";
 import { useUpdateCheck } from "./lib/useUpdateCheck";
 
 // CivitAI links for clipboard auto-import, mirroring the Rust link parsers:
@@ -1077,7 +1078,7 @@ function Shell() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const meta = e.metaKey || e.ctrlKey;
-      const key = e.key.toLowerCase();
+      const key = shortcutKey(e);
       const target = e.target as HTMLElement | null;
       const inField =
         target?.tagName === "TEXTAREA" ||
@@ -1094,7 +1095,7 @@ function Shell() {
       } else if (meta && key === "f") {
         e.preventDefault();
         document.getElementById("global-search")?.focus();
-      } else if (meta && e.key === ",") {
+      } else if (meta && key === ",") {
         e.preventDefault();
         setSettingsOpen(true);
       } else if (meta && key === "c") {
