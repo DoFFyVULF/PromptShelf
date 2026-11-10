@@ -199,7 +199,11 @@ export function LoraDetail({
   );
 
   const copyAllTriggers = useCallback(async () => {
-    if (!lora.trigger_words.length) return;
+    if (!lora.trigger_words.length) {
+      // the source page listed none — say so instead of failing silently
+      toast(t("lora.triggersMissing"), "info");
+      return;
+    }
     if (await copyText(lora.trigger_words.join(", "))) {
       setCopiedTriggers(true);
       toast(t("lora.triggerCopied"));
@@ -305,6 +309,9 @@ export function LoraDetail({
   });
 
   const main = lora.images[Math.min(mainIdx, lora.images.length - 1)];
+  /** CivitAI pages without "trained words" import with an empty list — the
+   *  copy action then has nothing to act on and reads as inert. */
+  const hasTriggers = lora.trigger_words.length > 0;
 
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center p-5">
@@ -610,10 +617,13 @@ export function LoraDetail({
                   </section>
                 )}
 
-                {lora.trigger_words.length > 0 && (
-                  <section className="group/triggers relative">
-                    <div className="flex items-center justify-between">
-                      <p className="text-[10.5px] font-semibold tracking-[0.07em] text-faint uppercase select-none">{t("lora.triggerWords")}</p>
+                {/* CivitAI pages sometimes list no trigger words at all — the
+                    section stays in place and explains the gap, so the quiet
+                    copy button in the footer never reads as a broken action. */}
+                <section className="group/triggers relative">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10.5px] font-semibold tracking-[0.07em] text-faint uppercase select-none">{t("lora.triggerWords")}</p>
+                    {hasTriggers && (
                       <button
                         type="button"
                         aria-label={t("lora.copyTriggers")}
@@ -623,24 +633,50 @@ export function LoraDetail({
                       >
                         {copiedTriggers ? <Check size={12.5} /> : <Copy size={12.5} />}
                       </button>
-                    </div>
-                    {/* violet chips with a copy icon, like the CivitAI page */}
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      {lora.trigger_words.map((word) => (
-                        <button
-                          key={word}
-                          type="button"
-                          onClick={() => copyTrigger(word)}
-                          title={t("action.copy")}
-                          className="press flex cursor-pointer items-center gap-1.5 rounded-full bg-violet py-1 pl-3 pr-2 text-[12px] font-medium text-white transition-colors hover:bg-violet-hover"
-                        >
-                          <span className="max-w-[220px] truncate">{word}</span>
-                          <Copy size={10.5} className="opacity-60" />
-                        </button>
-                      ))}
-                    </div>
-                  </section>
-                )}
+                    )}
+                  </div>
+                  <AnimatePresence initial={false} mode="wait">
+                    {hasTriggers ? (
+                      <motion.div
+                        key="chips"
+                        initial={reduceMotion ? false : { opacity: 0, y: 4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -4 }}
+                        transition={{ duration: reduceMotion ? 0 : 0.18, ease: [0.32, 0.72, 0, 1] }}
+                        className="mt-2 flex flex-wrap gap-1.5"
+                      >
+                        {/* violet chips with a copy icon, like the CivitAI page */}
+                        {lora.trigger_words.map((word) => (
+                          <button
+                            key={word}
+                            type="button"
+                            onClick={() => copyTrigger(word)}
+                            title={t("action.copy")}
+                            className="press flex cursor-pointer items-center gap-1.5 rounded-full bg-violet py-1 pl-3 pr-2 text-[12px] font-medium text-white transition-colors hover:bg-violet-hover"
+                          >
+                            <span className="max-w-[220px] truncate">{word}</span>
+                            <Copy size={10.5} className="opacity-60" />
+                          </button>
+                        ))}
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="missing"
+                        initial={reduceMotion ? false : { opacity: 0, y: 4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -4 }}
+                        transition={{ duration: reduceMotion ? 0 : 0.18, ease: [0.32, 0.72, 0, 1] }}
+                        className="mt-2 flex items-start gap-2.5 rounded-xl border border-dashed border-hairline bg-parchment/50 px-4 py-3 select-text"
+                      >
+                        <Info size={13.5} className="mt-0.5 shrink-0 text-faint" />
+                        <p className="text-[12.5px] leading-relaxed text-body">
+                          {t("lora.triggersMissing")}
+                          <span className="block text-muted">{t("lora.triggersMissing.hint")}</span>
+                        </p>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </section>
 
                 {lora.description && (
                   <section>
@@ -666,10 +702,10 @@ export function LoraDetail({
                   </div>
                 )}
 
-                {!lora.trigger_words.length && !lora.description && !lora.usage_tips.length && !lora.tags.length && (
+                {!lora.description && !lora.usage_tips.length && !lora.tags.length && (
                   <div className="flex items-center gap-2 rounded-xl bg-parchment px-4 py-3 text-[12.5px] text-faint">
                     <Info size={13.5} />
-                    {t("lora.emptyTriggers")}
+                    {t("lora.noDetails")}
                   </div>
                 )}
               </>
@@ -694,15 +730,19 @@ export function LoraDetail({
               </>
             ) : (
               <>
+                {/* No trigger words to copy (the CivitAI page lists none): the
+                    button keeps its place but drops to the quiet fill, and the
+                    ⌘C hint is hidden — the shortcut stays inert too. */}
                 <button
                   type="button"
-                  className="btn-primary press min-w-0 flex-1 cursor-pointer"
+                  className={hasTriggers ? "btn-primary press min-w-0 flex-1 cursor-pointer" : "btn-inert min-w-0 flex-1"}
                   onClick={copyAllTriggers}
-                  disabled={lora.trigger_words.length === 0}
+                  aria-disabled={!hasTriggers}
+                  title={hasTriggers ? t("lora.copyTriggers") : t("lora.triggersMissing")}
                 >
                   {copiedTriggers ? <Check size={15} /> : <Copy size={14.5} />}
                   <span className="truncate">{copiedTriggers ? t("lora.triggerCopied") : t("lora.copyTriggers")}</span>
-                  <kbd className="kbd hidden border-on-ink/30 bg-transparent text-on-ink/70 xl:flex">{modKey}C</kbd>
+                  {hasTriggers && <kbd className="kbd hidden border-on-ink/30 bg-transparent text-on-ink/70 xl:flex">{modKey}C</kbd>}
                 </button>
                 <motion.button
                   type="button"

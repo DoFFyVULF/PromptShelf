@@ -177,7 +177,9 @@ export const en = {
   "lora.showLess": "Show less",
   "lora.deleteTitle": "Delete lora",
   "lora.copyTriggers": "Copy trigger words",
-  "lora.emptyTriggers": "No trigger words",
+  "lora.triggersMissing": "The CivitAI page lists no trigger words",
+  "lora.triggersMissing.hint": "Add them in Edit if the model needs them.",
+  "lora.noDetails": "No description, notes or tags yet",
   "lora.detail.noImages": "Lora without images",
 
   "loraeditor.new.title": "New lora",

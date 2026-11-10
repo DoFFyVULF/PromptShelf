@@ -472,6 +472,27 @@ body {
   background: var(--color-ink-hover);
 }
 
+/* The inert twin of .btn-primary: the action has nothing to act on (a lora
+   whose CivitAI page lists no trigger words). It keeps its place in the row
+   so the footer rhythm does not shift, but drops to a quiet parchment fill so
+   it never reads as the primary action. */
+.btn-inert {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 9999px;
+  background: var(--color-parchment);
+  color: var(--color-faint);
+  font-size: 13.5px;
+  font-weight: 500;
+  letter-spacing: -0.006em;
+  border: 1px solid var(--color-hairline);
+  white-space: nowrap;
+  cursor: default;
+}
+
 .btn-ghost {
   display: inline-flex;
   align-items: center;

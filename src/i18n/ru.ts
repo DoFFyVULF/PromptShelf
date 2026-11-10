@@ -179,7 +179,9 @@ export const ru: Record<DictKey, string> = {
   "lora.showLess": "Свернуть",
   "lora.deleteTitle": "Удалить лору",
   "lora.copyTriggers": "Копировать триггер-слова",
-  "lora.emptyTriggers": "Нет триггер-слов",
+  "lora.triggersMissing": "На странице CivitAI не указаны триггер-слова",
+  "lora.triggersMissing.hint": "Добавьте их в режиме редактирования, если они нужны.",
+  "lora.noDetails": "Пока нет описания, заметок и тегов",
   "lora.detail.noImages": "Лора без изображений",
 
   "loraeditor.new.title": "Новая лора",
