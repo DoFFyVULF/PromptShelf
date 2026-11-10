@@ -64,6 +64,7 @@ export const en = {
 
   "select.select": "Select cards",
   "select.move": "Move to…",
+  "select.delete": "Delete selected",
   "select.done": "Done",
   "select.clear": "Clear",
 
@@ -297,6 +298,7 @@ export const en = {
   "toast.saved": "Card saved",
   "toast.updated": "Card updated",
   "toast.deleted": "Card deleted",
+  "toast.deletedMany": "{n} deleted",
   "toast.exported": "Library exported",
   "toast.imported": "Library imported",
   "toast.settingsSaved": "Settings saved",

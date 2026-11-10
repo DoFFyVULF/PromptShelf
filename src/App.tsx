@@ -41,6 +41,7 @@ import { importErrorToKey, type ImportJob } from "./components/ImportJobs";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { UpdateDialog } from "./components/UpdateDialog";
 import { GroupsPanel } from "./components/GroupsPanel";
+import { ConfirmDeleteButton } from "./components/ConfirmDeleteButton";
 import { TagsDialog } from "./components/TagsDialog";
 import { ToastProvider, useToast } from "./components/Toasts";
 import { ScrollTopButton } from "./components/ScrollTopButton";
@@ -97,6 +98,8 @@ function Shell() {
 
   const [selectMode, setSelectMode] = useState(false);
   const [selection, setSelection] = useState<string[]>([]);
+  // armed state for the bulk-delete action in the floating selection bar
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
 
   const [detailId, setDetailId] = useState<string | null>(null);
   const [detail, setDetail] = useState<CardDetailData | null>(null);
@@ -517,6 +520,58 @@ function Shell() {
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     );
   }, []);
+
+  // any change to the selection (or a shelf switch) disarms a pending delete
+  useEffect(() => {
+    setConfirmBulkDelete(false);
+  }, [selection, selectMode, mode]);
+
+  const deleteSelection = useCallback(async () => {
+    if (selection.length === 0) return;
+    if (!confirmBulkDelete) {
+      setConfirmBulkDelete(true);
+      window.setTimeout(() => setConfirmBulkDelete(false), 3200);
+      return;
+    }
+
+    const ids = [...selection];
+    setConfirmBulkDelete(false);
+    const results = await Promise.allSettled(
+      ids.map((id) =>
+        mode === "prompt" ? api.deleteCard(id) : api.deleteLora(id),
+      ),
+    );
+    const failed = ids.filter((_, i) => results[i].status === "rejected");
+    const deleted = ids.length - failed.length;
+
+    if (deleted > 0) {
+      setSelection(failed);
+      setDetailId((cur) => (cur && ids.includes(cur) ? null : cur));
+      setLoraDetailId((cur) => (cur && ids.includes(cur) ? null : cur));
+    }
+    if (deleted === 0) {
+      toast(t("toast.error"), "error");
+    } else if (failed.length > 0) {
+      toast(t("toast.error"), "error");
+    } else {
+      toast(t("toast.deletedMany", { n: deleted }));
+    }
+
+    await Promise.all([
+      mode === "prompt" ? loadCards() : loadLoras(),
+      mode === "prompt" ? loadGroups() : loadLoraGroups(),
+    ]);
+  }, [
+    confirmBulkDelete,
+    loadCards,
+    loadGroups,
+    loadLoraGroups,
+    loadLoras,
+    mode,
+    selection,
+    t,
+    toast,
+  ]);
 
   const moveSelection = useCallback(
     async (toGroup: GroupInfo, ids: string[]) => {
@@ -1434,22 +1489,32 @@ function Shell() {
       />
 
       {selectMode && (
-        <div className="anim-panel fixed bottom-5 left-1/2 z-[80] flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-ink py-2 pr-2 pl-5 text-on-ink shadow-panel">
+        <div className="anim-panel fixed bottom-5 left-1/2 z-[80] flex max-w-[calc(100vw-16px)] -translate-x-1/2 items-center gap-1.5 rounded-full bg-ink py-2 pr-2 pl-5 text-on-ink shadow-panel">
           <span className="flex items-center gap-2 text-[13px] font-medium">
-            <ListChecks size={14.5} className="opacity-80" />
+            <ListChecks size={14.5} className="shrink-0 opacity-80" />
             {t("groups.selected", { n: selection.length })}
           </span>
           <span className="mx-1 h-4 w-px bg-on-ink/20" aria-hidden />
           <button
             type="button"
             data-groups-trigger
+            aria-label={t("select.move")}
             onClick={() => setGroupsOpen(true)}
             disabled={selection.length === 0}
             className="press flex h-8 cursor-pointer items-center gap-1.5 rounded-full bg-on-ink/15 px-3.5 text-[12.5px] font-semibold transition-colors hover:bg-on-ink/25 disabled:cursor-default disabled:opacity-40 disabled:hover:bg-on-ink/15"
           >
             <CornerDownRight size={13.5} />
-            {t("select.move")}
+            <span className="hidden sm:inline">{t("select.move")}</span>
           </button>
+          {selection.length > 0 && (
+            <ConfirmDeleteButton
+              compact
+              tone="on-dark"
+              armed={confirmBulkDelete}
+              title={t("select.delete")}
+              onClick={() => void deleteSelection()}
+            />
+          )}
           <button
             type="button"
             onClick={() => setSelection([])}

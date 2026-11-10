@@ -9,21 +9,29 @@ const SIZE = 36;
 const PAD_X = 13;
 
 /**
- * Trash action for the detail footers. The first click arms it: the round
- * icon button springs open into a red "Are you sure?" pill. A second click
- * deletes; the caller disarms it again after a short pause.
+ * Trash action for the detail footers and the floating selection bar. The
+ * first click arms it: the round icon button springs open into a red
+ * "Are you sure?" pill. A second click deletes; the caller disarms it again
+ * after a short pause.
  *
  * The armed width is measured from the label, so the pill fits any language
- * without a hard-coded size.
+ * without a hard-coded size. `tone="on-dark"` re-skins it for the ink-colored
+ * selection bar, `compact` matches that bar's 32px controls.
  */
 export function ConfirmDeleteButton({
   armed,
   title,
   onClick,
+  tone = "surface",
+  compact = false,
 }: {
   armed: boolean;
   title: string;
   onClick: () => void;
+  /** `on-dark` matches the floating selection bar's ink pill grammar. */
+  tone?: "surface" | "on-dark";
+  /** Slightly smaller hit box for the selection bar. */
+  compact?: boolean;
 }) {
   const { t } = useI18n();
   const label = t("action.areYouSure");
@@ -37,7 +45,8 @@ export function ConfirmDeleteButton({
     setLabelWidth(el.offsetWidth);
   }, [label]);
 
-  const width = armed ? Math.round(labelWidth + PAD_X * 2) : SIZE;
+  const idleWidth = compact ? 32 : SIZE;
+  const width = armed ? Math.round(labelWidth + PAD_X * 2) : idleWidth;
 
   return (
     <motion.button
@@ -53,10 +62,16 @@ export function ConfirmDeleteButton({
           : { type: "spring", visualDuration: 0.34, bounce: 0.14 }
       }
       whileTap={reduceMotion ? undefined : { scale: 0.96 }}
-      className={`press-bg relative flex h-9 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full border ${
+      className={`press-bg relative flex shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full border ${
+        compact ? "h-8" : "h-9"
+      } ${
         armed
-          ? "border-destructive bg-destructive text-on-ink dark:text-ink"
-          : "border-hairline bg-card text-muted hover:bg-destructive-soft hover:text-destructive"
+          ? tone === "on-dark"
+            ? "border-destructive bg-destructive text-on-ink"
+            : "border-destructive bg-destructive text-on-ink dark:text-ink"
+          : tone === "on-dark"
+            ? "border-transparent bg-on-ink/15 text-on-ink hover:bg-on-ink/25"
+            : "border-hairline bg-card text-muted hover:bg-destructive-soft hover:text-destructive"
       }`}
     >
       {/* invisible ruler: sizes the armed pill to the label in any language */}
@@ -89,7 +104,7 @@ export function ConfirmDeleteButton({
             transition={{ duration: reduceMotion ? 0 : 0.16, delay: 0.03, ease: "easeOut" }}
             className="absolute flex items-center justify-center"
           >
-            <Trash2 size={15} />
+            <Trash2 size={compact ? 14 : 15} />
           </motion.span>
         )}
       </AnimatePresence>

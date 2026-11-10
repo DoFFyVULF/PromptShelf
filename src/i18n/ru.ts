@@ -66,6 +66,7 @@ export const ru: Record<DictKey, string> = {
 
   "select.select": "Выбрать карточки",
   "select.move": "Переместить в…",
+  "select.delete": "Удалить выбранные",
   "select.done": "Готово",
   "select.clear": "Сбросить",
 
@@ -299,6 +300,7 @@ export const ru: Record<DictKey, string> = {
   "toast.saved": "Карточка сохранена",
   "toast.updated": "Карточка обновлена",
   "toast.deleted": "Карточка удалена",
+  "toast.deletedMany": "Удалено: {n}",
   "toast.exported": "Библиотека экспортирована",
   "toast.imported": "Библиотека импортирована",
   "toast.settingsSaved": "Настройки сохранены",
