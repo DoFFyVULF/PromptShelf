@@ -69,6 +69,7 @@ function Shell() {
   const [query, setQuery] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [matchAllTags, setMatchAllTags] = useState(false);
   const [sort, setSort] = useState<Sort>("newest");
 
   const [theme, setTheme] = useState<Theme>(themeFromStorage);
@@ -263,6 +264,7 @@ function Shell() {
     const filter: ListFilter = {
       q: debouncedQ.trim() || null,
       tags: selectedTags,
+      match_all_tags: matchAllTags,
       min_rating: 0,
       sort,
       group_id: groupId || null,
@@ -280,7 +282,7 @@ function Shell() {
     } finally {
       setLoading(false);
     }
-  }, [debouncedQ, groupId, selectedTags, sort]);
+  }, [debouncedQ, groupId, selectedTags, matchAllTags, sort]);
 
   const loadGroups = useCallback(async () => {
     try {
@@ -306,6 +308,7 @@ function Shell() {
     const filter: ListFilter = {
       q: debouncedQ.trim() || null,
       tags: selectedTags,
+      match_all_tags: matchAllTags,
       min_rating: 0,
       sort,
       group_id: loraGroupId || null,
@@ -323,7 +326,7 @@ function Shell() {
     } finally {
       setLoading(false);
     }
-  }, [debouncedQ, loraGroupId, selectedTags, sort]);
+  }, [debouncedQ, loraGroupId, selectedTags, matchAllTags, sort]);
 
   // keep groupId valid (e.g. the group was deleted or the library was replaced)
   useEffect(() => {
@@ -1417,6 +1420,8 @@ function Shell() {
 
       <TagsDialog
         open={tagsOpen}
+        matchAll={matchAllTags}
+        onMatchAllChange={setMatchAllTags}
         onClose={() => setTagsOpen(false)}
         tags={mode === "prompt" ? tags : loraTags}
         selected={selectedTags}
@@ -1425,11 +1430,7 @@ function Shell() {
             prev.includes(tag) ? prev.filter((x) => x !== tag) : [...prev, tag],
           )
         }
-        onClear={() => {
-          setSelectedTags([]);
-          setQuery("");
-          setDebouncedQ("");
-        }}
+        onClear={() => setSelectedTags([])}
       />
 
       {selectMode && (

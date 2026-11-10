@@ -57,6 +57,8 @@ pub struct ListFilter {
     #[serde(default)]
     pub tags: Vec<String>,
     #[serde(default)]
+    pub match_all_tags: bool,
+    #[serde(default)]
     pub min_rating: i64,
     #[serde(default)]
     pub sort: Option<String>,

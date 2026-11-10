@@ -25,9 +25,82 @@ fn no_filter() -> ListFilter {
     ListFilter {
         q: None,
         tags: vec![],
+        match_all_tags: false,
         min_rating: 0,
         sort: Some("newest".to_string()),
         group_id: None,
+    }
+}
+
+#[test]
+fn test_any_and_all_tag_filters_on_both_shelves() {
+    for lora in [false, true] {
+        let dir = tmp_dir(if lora { "lora-tag-match" } else { "card-tag-match" });
+        let conn = crate::store::open(&dir).unwrap();
+        crate::store::init_schema(&conn).unwrap();
+        let (table, tag_table, links, id_column, text_column) = if lora {
+            ("loras", "lora_tags", "lora_card_tags", "lora_id", "name")
+        } else {
+            ("cards", "tags", "card_tags", "card_id", "prompt")
+        };
+        conn.execute_batch(&format!(
+            "INSERT INTO {tag_table} (id, name) VALUES (1, 'portrait'), (2, 'film'), (3, 'extra');"
+        )).unwrap();
+        for (id, tag_ids, group, rating) in [
+            ("a", vec![1], "g1", 3),
+            ("b", vec![2], "g1", 3),
+            ("both", vec![1, 2], "g1", 4),
+            ("extra", vec![1, 2, 3], "g2", 5),
+            ("none", vec![], "g1", 0),
+        ] {
+            conn.execute(
+                &format!("INSERT INTO {table} (id, {text_column}, created_at, updated_at, group_id, rating, source_key) VALUES (?, 'sample', '2026-11-10', '2026-11-10', ?, ?, '')"),
+                rusqlite::params![id, group, rating],
+            ).unwrap();
+            for tag_id in tag_ids {
+                conn.execute(
+                    &format!("INSERT INTO {links} ({id_column}, tag_id) VALUES (?, ?)"),
+                    rusqlite::params![id, tag_id],
+                ).unwrap();
+            }
+        }
+        drop(conn);
+
+        let list_ids = |filter: &ListFilter| {
+            let mut ids: Vec<String> = if lora {
+                crate::loras::list_loras_inner(&dir, filter).unwrap().into_iter().map(|c| c.id).collect()
+            } else {
+                list_cards_inner(&dir, filter).unwrap().into_iter().map(|c| c.id).collect()
+            };
+            ids.sort();
+            ids
+        };
+        for (tags, any, all) in [
+            (vec!["portrait", "film"], vec!["a", "b", "both", "extra"], vec!["both", "extra"]),
+            (vec!["portrait"], vec!["a", "both", "extra"], vec!["a", "both", "extra"]),
+            (vec![], vec!["a", "b", "both", "extra", "none"], vec!["a", "b", "both", "extra", "none"]),
+            (vec![" portrait ", "#PORTRAIT", "film"], vec!["a", "b", "both", "extra"], vec!["both", "extra"]),
+            (vec!["portrait", "missing' OR 1=1 --"], vec!["a", "both", "extra"], vec![]),
+        ] {
+            for (match_all_tags, expected) in [(false, any), (true, all)] {
+                let filter = ListFilter {
+                    tags: tags.iter().map(|s| s.to_string()).collect(),
+                    match_all_tags,
+                    ..no_filter()
+                };
+                assert_eq!(list_ids(&filter), expected, "lora={lora}, all={match_all_tags}, tags={tags:?}");
+            }
+        }
+        let filter = ListFilter {
+            q: Some("sample".into()),
+            tags: vec!["portrait".into(), "film".into()],
+            match_all_tags: true,
+            min_rating: 4,
+            group_id: Some("g1".into()),
+            ..no_filter()
+        };
+        assert_eq!(list_ids(&filter), vec!["both"]);
+        std::fs::remove_dir_all(&dir).ok();
     }
 }
 
@@ -91,6 +164,7 @@ fn test_card_crud_cover_and_loras() {
             &ListFilter {
                 q: Some(q.to_string()),
                 tags: vec![],
+                match_all_tags: false,
                 min_rating: 0,
                 sort: None,
         group_id: None,
@@ -106,6 +180,7 @@ fn test_card_crud_cover_and_loras() {
         &ListFilter {
             q: None,
             tags: vec!["portrait".to_string()],
+            match_all_tags: false,
             min_rating: 0,
             sort: None,
         group_id: None,
@@ -333,6 +408,7 @@ fn test_groups_crud_move_and_default() {
         &ListFilter {
             q: None,
             tags: vec![],
+            match_all_tags: false,
             min_rating: 0,
             sort: None,
             group_id: Some(g.id.clone()),
@@ -396,6 +472,7 @@ fn test_prompt_variants_roundtrip_and_search() {
         &ListFilter {
             q: Some("variant two".to_string()),
             tags: vec![],
+            match_all_tags: false,
             min_rating: 0,
             sort: None,
             group_id: None,

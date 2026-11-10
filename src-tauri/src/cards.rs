@@ -237,11 +237,20 @@ fn build_filter_sql(filter: &ListFilter) -> (String, Vec<rusqlite::types::Value>
     let tags = clean_tags(&filter.tags);
     if !tags.is_empty() {
         let placeholders = vec!["?"; tags.len()].join(",");
+        let match_all = if filter.match_all_tags {
+            " GROUP BY ct.card_id HAVING COUNT(DISTINCT t.id) = ?"
+        } else {
+            ""
+        };
         clauses.push(format!(
-            "c.id IN (SELECT ct.card_id FROM card_tags ct JOIN tags t ON t.id = ct.tag_id WHERE t.name COLLATE NOCASE IN ({placeholders}))"
+            "c.id IN (SELECT ct.card_id FROM card_tags ct JOIN tags t ON t.id = ct.tag_id WHERE t.name COLLATE NOCASE IN ({placeholders}){match_all})"
         ));
+        let tag_count = tags.len() as i64;
         for t in tags {
             vals.push(Value::Text(t));
+        }
+        if filter.match_all_tags {
+            vals.push(Value::Integer(tag_count));
         }
     }
 

@@ -80,6 +80,7 @@ export interface GroupInfo {
 export interface ListFilter {
   q: string | null;
   tags: string[];
+  match_all_tags: boolean;
   min_rating: number;
   sort: Sort;
   group_id: string | null;
