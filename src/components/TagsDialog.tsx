@@ -132,32 +132,51 @@ function TagsPanel({ onClose, tags, selected, matchAll, onMatchAllChange, onTogg
               }}
             >{t("action.clear")}</button>
           </div>
-          <div className="tags-selected-chips">
-            {selected.length === 0 && <p className="py-2 text-[12px] leading-5 text-muted">{t("tags.selectionHint")}</p>}
-            <AnimatePresence initial={false} mode="popLayout">
+          <motion.div className="tags-selected-chips" layoutScroll>
+            <AnimatePresence initial={false}>
+              {selected.length === 0 && (
+                <motion.p
+                  key="selection-hint"
+                  className="tags-selection-hint text-[12px] leading-5 text-muted"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1, transition: { delay: reduce ? 0 : 0.18, duration: reduce ? 0.12 : 0.24 } }}
+                  exit={{ opacity: 0, transition: { duration: reduce ? 0.12 : 0.14 } }}
+                >{t("tags.selectionHint")}</motion.p>
+              )}
               {selected.map((name) => (
-                <motion.button
-                  key={name}
-                  type="button"
+                <motion.div
+                  key={`tag:${name}`}
+                  className="tags-selected-item"
                   layout={reduce ? false : "position"}
-                  initial={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.92 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.92 }}
-                  transition={{ duration: reduce ? 0.12 : 0.32, ease: EASE }}
-                  whileTap={reduce ? undefined : { scale: 0.96 }}
-                  className="tags-selected-chip press-bg"
-                  aria-label={t("tags.remove", { name })}
-                  onClick={() => {
-                    onToggle(name);
-                    inputRef.current?.focus();
-                  }}
+                  transition={{ layout: { duration: reduce ? 0 : 0.42, ease: EASE } }}
                 >
-                  <span className="min-w-0 [overflow-wrap:anywhere]">{name}</span>
-                  <X size={12} className="shrink-0 opacity-70" aria-hidden="true" />
-                </motion.button>
+                  <motion.button
+                    type="button"
+                    initial={{ opacity: 0, y: reduce ? 0 : 5, scale: reduce ? 1 : 0.96 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{
+                      opacity: 0, y: reduce ? 0 : -3, scale: reduce ? 1 : 0.96,
+                      transition: { duration: reduce ? 0.12 : 0.22, ease: "easeInOut" },
+                    }}
+                    transition={{
+                      duration: reduce ? 0.12 : 0.42, ease: EASE,
+                      opacity: { duration: reduce ? 0.12 : 0.28, ease: "easeOut" },
+                    }}
+                    whileTap={reduce ? undefined : { scale: 0.97 }}
+                    className="tags-selected-chip"
+                    aria-label={t("tags.remove", { name })}
+                    onClick={() => {
+                      onToggle(name);
+                      inputRef.current?.focus();
+                    }}
+                  >
+                    <span className="min-w-0 [overflow-wrap:anywhere]">{name}</span>
+                    <X size={12} className="shrink-0 opacity-70" aria-hidden="true" />
+                  </motion.button>
+                </motion.div>
               ))}
             </AnimatePresence>
-          </div>
+          </motion.div>
         </div>
 
         <div className="tags-list-heading">
@@ -223,17 +242,16 @@ function TagsPanel({ onClose, tags, selected, matchAll, onMatchAllChange, onTogg
               >
                 <ArrowLeftRight size={14} className="shrink-0" aria-hidden="true" />
                 <span className="tags-match-label" aria-hidden="true">
-                  <span className="tags-match-sizer">{t("tags.matchAny")}</span>
-                  <span className="tags-match-sizer">{t("tags.matchAll")}</span>
-                  <AnimatePresence initial={false}>
-                    <motion.span
-                      key={String(matchAll)}
-                      initial={{ opacity: 0, y: reduce ? 0 : 4 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: reduce ? 0 : -4 }}
-                      transition={{ duration: reduce ? 0.12 : 0.25, ease: EASE }}
-                    >{t(matchAll ? "tags.matchAll" : "tags.matchAny")}</motion.span>
-                  </AnimatePresence>
+                  <motion.span
+                    initial={false}
+                    animate={{ opacity: matchAll ? 0 : 1, y: reduce ? 0 : matchAll ? "-100%" : "0%" }}
+                    transition={{ duration: reduce ? 0.12 : 0.42, ease: EASE }}
+                  >{t("tags.matchAny")}</motion.span>
+                  <motion.span
+                    initial={false}
+                    animate={{ opacity: matchAll ? 1 : 0, y: reduce ? 0 : matchAll ? "0%" : "100%" }}
+                    transition={{ duration: reduce ? 0.12 : 0.42, ease: EASE }}
+                  >{t("tags.matchAll")}</motion.span>
                 </span>
               </motion.button>
             ) : <p className="text-[12px] leading-5 text-muted">{t("tags.unfiltered")}</p>}
