@@ -23,6 +23,7 @@ export interface CardSummary {
   updated_at: string;
   tags: string[];
   image_count: number;
+  variant_count: number;
   cover: ImageInfo | null;
   group_id: string;
 }

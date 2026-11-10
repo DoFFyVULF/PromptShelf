@@ -276,12 +276,12 @@ pub fn list_cards_inner(dir: &Path, filter: &ListFilter) -> Result<Vec<CardSumma
     store::init_schema(&conn)?;
 
     let (tail, vals) = build_filter_sql(filter);
-    // Columns: 0..=6 card, 7 image_count, 8..=14 cover image, 15 loras, 16 group.
+    // Columns: 0..=6 card, 7 image_count, 8..=14 cover image, 15 loras, 16 group, 17 variants.
     let sql = format!(
         "SELECT c.id, c.prompt, c.note, c.rating, c.created_at, c.updated_at, c.cover_image_id,
                 (SELECT COUNT(*) FROM card_images ci WHERE ci.card_id = c.id) AS image_count,
                 cv.id, cv.file, cv.thumb, cv.original, cv.width, cv.height, cv.bytes,
-                c.loras, c.group_id
+                c.loras, c.group_id, c.variants_json
          FROM cards c
          LEFT JOIN card_images cv ON cv.card_id = c.id
            AND cv.id = COALESCE(c.cover_image_id,
@@ -318,6 +318,7 @@ pub fn list_cards_inner(dir: &Path, filter: &ListFilter) -> Result<Vec<CardSumma
                     updated_at: r.get(5)?,
                     tags: Vec::new(),
                     image_count: r.get(7)?,
+                    variant_count: parse_variants(&r.get::<_, String>(17)?).len(),
                     cover,
                     group_id: r.get::<_, Option<String>>(16)?.unwrap_or_default(),
                 },

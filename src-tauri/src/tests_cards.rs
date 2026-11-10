@@ -71,6 +71,7 @@ fn test_card_crud_cover_and_loras() {
     let summary = &list[0];
     assert_eq!(summary.id, detail.id);
     assert_eq!(summary.image_count, 1);
+    assert_eq!(summary.variant_count, 0);
     assert_eq!(summary.tags, vec!["film", "portrait"]);
     let cover = summary.cover.as_ref().expect("cover must be present");
     assert_eq!((cover.width, cover.height), (1200, 675));
@@ -387,6 +388,7 @@ fn test_prompt_variants_roundtrip_and_search() {
     // creation trims and drops empties, order preserved
     let card = get_card_inner(&dir, &detail.id).unwrap();
     assert_eq!(card.variants, vec!["variant one", "variant two"]);
+    assert_eq!(list_cards_inner(&dir, &no_filter()).unwrap()[0].variant_count, 2);
 
     // search finds text inside a variant
     let found = list_cards_inner(
@@ -423,6 +425,7 @@ fn test_prompt_variants_roundtrip_and_search() {
     let updated = get_card_inner(&dir, &detail.id).unwrap();
     assert_eq!(updated.prompt, "main prompt");
     assert_eq!(updated.variants, vec!["rewritten variant"]);
+    assert_eq!(list_cards_inner(&dir, &no_filter()).unwrap()[0].variant_count, 1);
 
     // oversized variants (>8000 chars) are dropped on write
     let too_long = "x".repeat(8001);

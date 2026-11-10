@@ -195,6 +195,10 @@ export const en = {
   "loraeditor.description.placeholder": "What this lora does…",
   "loraeditor.error.name": "Add the lora name first",
 
+  "variant.more.one": "{n} more variant",
+  "variant.more.few": "{n} more variants",
+  "variant.more.many": "{n} more variants",
+  "variant.more.other": "{n} more variants",
   "variant.original": "Original",
   "variant.of": "{i} of {n}",
   "variant.add": "Add variant",

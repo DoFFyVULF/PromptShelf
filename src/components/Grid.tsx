@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { AnimatePresence } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { ImageOff, Images, Star } from "lucide-react";
 import { useI18n } from "../i18n";
 import { assetUrl } from "../lib/api";
@@ -39,7 +39,11 @@ function CardTile({
   onToggleSelect: (id: string) => void;
   selection: string[];
 }) {
-  const { formatDate, t } = useI18n();
+  const { formatDate, t, lang } = useI18n();
+  const reduced = useReducedMotion();
+  const plural = new Intl.PluralRules(lang).select(card.variant_count);
+  const variantLabel = t(`variant.more.${plural === "one" || plural === "few" || plural === "many" ? plural : "other"}`, { n: card.variant_count });
+  const sheetTransition = { duration: reduced ? 0 : 0.4, ease: [0.32, 0.72, 0, 1] as const };
   // the source tile "picks up": shrinks and fades while the card is dragged.
   // The state is set on a timeout so React doesn't re-render during the
   // dragstart dispatch; the ghost is already captured from the canvas.
@@ -67,7 +71,11 @@ function CardTile({
   };
 
   return (
-    <article
+    <motion.article
+      initial="rest"
+      animate="rest"
+      whileHover={reduced || selectMode || dragging ? "rest" : "spread"}
+      whileFocus={reduced || selectMode ? "rest" : "spread"}
       className={`anim-tile group relative flex cursor-pointer flex-col overflow-hidden rounded-card border bg-card transition-[border-color,transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-line-hover hover:shadow-tile-hover ${
         dragging
           ? "scale-[0.9] border-leaf-edge/80 shadow-none"
@@ -78,8 +86,8 @@ function CardTile({
       role="button"
       tabIndex={0}
       draggable={!selectMode}
-      onDragStart={onDragStart}
-      onDragEnd={() => setDragging(false)}
+      onDragStartCapture={onDragStart}
+      onDragEndCapture={() => setDragging(false)}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
@@ -128,6 +136,28 @@ function CardTile({
       <div className={`flex min-h-0 flex-1 flex-col px-3.5 pt-2.5 pb-3 transition-opacity duration-200 ease-out ${dragging ? "opacity-35" : ""}`}>
         <p className="line-clamp-2 min-h-[2.6em] text-[13.5px] leading-[1.42] text-ink">{card.prompt}</p>
 
+        {card.variant_count > 0 && (
+          <div className="mt-2 flex items-center gap-2.5 text-[11.5px] leading-5 text-muted">
+            <span aria-hidden="true" className="relative block h-7 w-7 shrink-0">
+              <motion.span
+                className="absolute top-0.5 left-0 h-5 w-[18px] rounded-[4px] border border-line-hover bg-parchment"
+                variants={{ rest: { x: 6, y: 4 }, spread: { x: 8, y: 6 } }}
+                transition={sheetTransition}
+              />
+              <motion.span
+                className="absolute top-0.5 left-0 h-5 w-[18px] rounded-[4px] border border-line-hover bg-parchment"
+                variants={{ rest: { x: 3, y: 2 }, spread: { x: 4, y: 3 } }}
+                transition={sheetTransition}
+              />
+              <span className="absolute top-0.5 left-0 flex h-5 w-[18px] flex-col justify-center gap-[3px] rounded-[4px] border border-line-hover bg-card px-1">
+                <span className="h-px w-full bg-muted" />
+                <span className="h-px w-2/3 bg-muted" />
+              </span>
+            </span>
+            <span className="whitespace-nowrap tabular-nums">{variantLabel}</span>
+          </div>
+        )}
+
         {/* tags row: show up to 10 tags, collapse the rest */}
         <div className="mt-2.5 flex min-h-[22px] flex-wrap items-center gap-1">
           {card.tags.slice(0, 10).map((tag) => (
@@ -159,7 +189,7 @@ function CardTile({
           )}
         </div>
       </div>
-    </article>
+    </motion.article>
   );
 }
 
