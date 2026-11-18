@@ -106,6 +106,40 @@ fn get_bytes(agent: &ureq::Agent, url: &str) -> Result<Vec<u8>, String> {
     Ok(bytes)
 }
 
+/// The parked-import download only ever receives photo URLs that came out of
+/// a CivitAI API response, but re-check the host anyway: the command must not
+/// become a generic "fetch anything" primitive for the webview.
+fn parse_image_url(raw: &str) -> Result<String, String> {
+    let s = raw.trim();
+    let secure = s.starts_with("https://");
+    let host = s
+        .split("://")
+        .nth(1)
+        .unwrap_or("")
+        .split(['/', '?', '#'])
+        .next()
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    let civitai = host == "civitai.com"
+        || host == "civitai.red"
+        || host.ends_with(".civitai.com")
+        || host.ends_with(".civitai.red");
+    if !secure || !civitai {
+        return Err("CIVITAI_NO_IMAGE".to_string());
+    }
+    Ok(s.to_string())
+}
+
+/// Downloads the photo of a promptless import once the user picks "save anyway".
+fn download_image(raw: &str) -> Result<PasteImageResult, String> {
+    let url = parse_image_url(raw)?;
+    let bytes = get_bytes(&agent(), &url)?;
+    if bytes.is_empty() {
+        return Err("CIVITAI_NO_IMAGE".to_string());
+    }
+    images::save_temp_image_dyn(&bytes)
+}
+
 // ---------------------------------------------------------------- json helpers
 
 /// Scalar → display string. Strings trimmed, numbers without float noise.
@@ -712,14 +746,25 @@ fn run(data_dir: &std::path::Path, url: &str) -> Result<CivitaiImport, String> {
         .get("url")
         .and_then(scalar)
         .ok_or_else(|| "CIVITAI_NO_IMAGE".to_string())?;
-    let bytes = get_bytes(&agent, &url_img)?;
-    if bytes.is_empty() {
-        return Err("CIVITAI_NO_IMAGE".to_string());
-    }
-    let image: PasteImageResult = images::save_temp_image_dyn(&bytes)?;
+
+    // A page without generation data has no prompt to offer. Keep the photo on
+    // the site for now: the import parks behind a "save anyway" choice in the
+    // UI, and only a confirmed save pays for the download.
+    let no_prompt = prompt.is_empty();
+    let image = if no_prompt {
+        None
+    } else {
+        let bytes = get_bytes(&agent, &url_img)?;
+        if bytes.is_empty() {
+            return Err("CIVITAI_NO_IMAGE".to_string());
+        }
+        Some(images::save_temp_image_dyn(&bytes)?)
+    };
 
     Ok(CivitaiImport {
         image,
+        preview_url: Some(url_img),
+        no_prompt,
         prompt,
         negative_prompt,
         author,
@@ -1052,6 +1097,18 @@ pub fn civitai_source_key(url: String) -> Option<String> {
     parse_link(&url).map(|(kind, id)| crate::dedup::civitai_key(kind, &id)).ok()
 }
 
+/// Second half of a promptless import: the page was parked with only its
+/// remote preview visible, and the photo is fetched only after the user
+/// decides to keep the card.
+#[tauri::command]
+pub async fn civitai_download(url: String) -> Result<PasteImageResult, String> {
+    let handle = tauri::async_runtime::spawn_blocking(move || download_image(&url));
+    match handle.await {
+        Ok(res) => res,
+        Err(e) => Err(format!("CIVITAI_NETWORK: {}", es(e))),
+    }
+}
+
 /// CivitAI **model page** import for the LoraShelf. Same background-thread
 /// pipeline as the image import.
 #[tauri::command]
@@ -1093,6 +1150,19 @@ mod tests {
         assert_eq!(parse_model_link("https://civitai.com/models/"), Err("CIVITAI_URL".into()));
         // classic model pages carry no version id
         assert_eq!(parse_model_link("https://civitai.com/models/2945627/bemyhero-finjax?notif=1&x=2"), Ok(("2945627".to_string(), None)));
+    }
+
+    #[test]
+    fn accepts_only_civitai_image_hosts() {
+        assert!(parse_image_url(
+            "https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/abc/original=true/385_00001_.jpeg"
+        )
+        .is_ok());
+        assert!(parse_image_url("https://civitai.red/pic.jpg").is_ok());
+        assert!(parse_image_url("https://example.com/pic.jpg").is_err());
+        assert!(parse_image_url("https://civitai.com.evil.example/pic.jpg").is_err());
+        assert!(parse_image_url("file:///etc/passwd").is_err());
+        assert!(parse_image_url("javascript:alert(1)").is_err());
     }
 
     #[test]
@@ -1244,14 +1314,18 @@ mod tests {
         let kinds: Vec<(&str, Option<&str>)> = res.loras.iter().map(|l| (l.name.as_str(), l.kind.as_deref())).collect();
         assert!(wf.is_some(), "workflow must be imported: {kinds:?}");
         assert!(wf.unwrap().url.is_some());
-        let _ = std::fs::remove_file(&res.image.temp_path);
+        if let Some(img) = &res.image {
+            let _ = std::fs::remove_file(&img.temp_path);
+        }
 
         let res2 = run(&dir, "https://civitai.com/images/117575954").expect("import should succeed");
         let emb = res2.loras.iter().find(|l| l.kind.as_deref() == Some("textualinversion"));
         let kinds2: Vec<(&str, Option<&str>)> = res2.loras.iter().map(|l| (l.name.as_str(), l.kind.as_deref())).collect();
         assert!(emb.is_some(), "embedding must be imported: {kinds2:?}");
         assert!(emb.unwrap().url.is_some());
-        let _ = std::fs::remove_file(&res2.image.temp_path);
+        if let Some(img) = &res2.image {
+            let _ = std::fs::remove_file(&img.temp_path);
+        }
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -1358,7 +1432,9 @@ mod tests {
         for l in &res.loras {
             println!("lora: name={:?} value={:?} kind={:?} url={:?}", l.name, l.value, l.kind, l.url);
         }
-        let _ = std::fs::remove_file(&res.image.temp_path);
+        if let Some(img) = &res.image {
+            let _ = std::fs::remove_file(&img.temp_path);
+        }
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -1373,8 +1449,9 @@ mod tests {
 
         let res = run(&dir, "https://civitai.com/images/146266112").expect("import should succeed");
         assert!(!res.prompt.is_empty(), "prompt must be filled");
-        assert!(std::path::Path::new(&res.image.temp_path).exists(), "temp file must exist");
-        assert!(res.image.width > 0 && res.image.height > 0);
+        let img = res.image.as_ref().expect("photo must be staged");
+        assert!(std::path::Path::new(&img.temp_path).exists(), "temp file must exist");
+        assert!(img.width > 0 && img.height > 0);
         assert_eq!(res.author, "_GamerOne");
         assert!(!res.checkpoint.is_empty(), "checkpoint from meta.Model");
         assert!(!res.loras.is_empty(), "lora tags parsed from prompt");
@@ -1398,7 +1475,9 @@ mod tests {
             "negativePrompt must be picked up: {:?}",
             res2.negative_prompt
         );
-        let _ = std::fs::remove_file(&res2.image.temp_path);
+        if let Some(img) = &res2.image {
+            let _ = std::fs::remove_file(&img.temp_path);
+        }
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

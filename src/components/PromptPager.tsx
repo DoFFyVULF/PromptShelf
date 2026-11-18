@@ -285,6 +285,7 @@ export function PromptPager({ card, onChanged, copyText }: PromptPagerProps) {
   );
 
   const copy = useCallback(async () => {
+    if (!pages[idx].trim()) return;
     if (await copyText(pages[idx])) {
       setCopied(true);
       if (copyTimer.current) window.clearTimeout(copyTimer.current);
@@ -419,7 +420,8 @@ export function PromptPager({ card, onChanged, copyText }: PromptPagerProps) {
             aria-label={t("action.copy")}
             title={t("action.copy")}
             onClick={copy}
-            className="press -mr-1 flex h-6.5 w-6.5 cursor-pointer items-center justify-center rounded-md text-faint hover:bg-parchment hover:text-ink"
+            disabled={!pages[idx].trim()}
+            className="press -mr-1 flex h-6.5 w-6.5 cursor-pointer items-center justify-center rounded-md text-faint hover:bg-parchment hover:text-ink disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-faint"
           >
             {copied ? <Check size={12.5} className="text-leaf-icon" /> : <Copy size={12.5} />}
           </button>
@@ -474,7 +476,11 @@ export function PromptPager({ card, onChanged, copyText }: PromptPagerProps) {
               transition={{ duration: reduced ? 0.14 : 0.3, ease: APPLE_EASE }}
               className="rounded-xl bg-parchment px-4 py-3.5 text-[13.5px] leading-[1.62] whitespace-pre-wrap text-body select-text"
             >
-              {pages[idx]}
+              {pages[idx].trim() ? (
+                pages[idx]
+              ) : (
+                <span className="text-faint italic">{t("detail.noPrompt")}</span>
+              )}
             </motion.div>
           ) : (
             <motion.div

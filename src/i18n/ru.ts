@@ -91,6 +91,15 @@ export const ru: Record<DictKey, string> = {
   "import.jobs.dup": "Возможный дубликат",
   "import.jobs.remove": "Скрыть",
 
+  "import.noPrompt.title": "На этой странице нет промпта",
+  "import.noPrompt.hint": "CivitAI опубликовал изображение без данных генерации, поэтому в поле промпта нечего импортировать. Всё равно сохранить фото как карточку? Промпт можно будет добавить позже.",
+  "import.noPrompt.preview": "Превью с CivitAI",
+  "import.noPrompt.save": "Всё равно сохранить",
+  "import.noPrompt.saving": "Сохраняем…",
+  "import.noPrompt.badge": "Без промпта",
+  "card.noPrompt": "Без промпта",
+  "detail.noPrompt": "Промпт не сохранён — можно добавить в любой момент.",
+
   "dup.title": "Такой промпт уже есть",
   "dup.hint": "Совпадения в вашей библиотеке:",
   "dup.open": "Открыть",

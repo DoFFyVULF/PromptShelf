@@ -1,11 +1,11 @@
 import { motion, useReducedMotion } from "motion/react";
-import { Check, CloudDownload, Copy, Loader2, RotateCcw, TriangleAlert, X } from "lucide-react";
+import { Check, CloudDownload, Copy, Loader2, RotateCcw, ScanText, TriangleAlert, X } from "lucide-react";
 import { useI18n, type DictKey } from "../i18n";
 import type { CivitaiImport, DuplicateHit } from "../lib/types";
 
 /** One background CivitAI import: lives as a placeholder card in the grid
  * until the fetch finishes, then dissolves into the real card. */
-export type ImportJobStatus = "running" | "dup" | "error" | "done";
+export type ImportJobStatus = "running" | "dup" | "noprompt" | "error" | "done";
 export type ImportJobError = "url" | "notfound" | "generic";
 
 export interface ImportJob {
@@ -112,6 +112,34 @@ export function ImportJobTile({ job, onRetry, onDismiss, lora }: ImportJobTilePr
             </div>
           )}
 
+          {job.status === "noprompt" && (
+            <>
+              {job.pre?.preview_url && (
+                <img
+                  src={job.pre.preview_url}
+                  alt=""
+                  draggable={false}
+                  className="no-drag h-full w-full scale-[1.04] object-cover blur-[2px] brightness-[0.78]"
+                />
+              )}
+              <div
+                aria-hidden
+                className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/5 to-black/20"
+              />
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-black/30 text-white/90 backdrop-blur-md">
+                  <ScanText size={17} strokeWidth={1.8} />
+                </span>
+                <span className="rounded-full bg-black/30 px-2.5 py-1 text-[11px] font-medium text-white/90 backdrop-blur-md">
+                  {t("import.noPrompt.badge")}
+                </span>
+              </div>
+              <span role="status" className="sr-only">
+                {t("import.noPrompt.title")}
+              </span>
+            </>
+          )}
+
           {job.status === "error" && (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-destructive">
               <TriangleAlert size={26} strokeWidth={1.4} />
@@ -153,6 +181,17 @@ export function ImportJobTile({ job, onRetry, onDismiss, lora }: ImportJobTilePr
           <>
             <p className="line-clamp-2 min-h-[2.6em] text-[13.5px] leading-[1.42] text-faint select-none">
               {t("import.jobs.running")}
+            </p>
+            <div className="mt-auto pt-2.5">
+              <span title={job.url} className="block truncate text-[11.5px] text-faint select-none">
+                {label}
+              </span>
+            </div>
+          </>
+        ) : job.status === "noprompt" ? (
+          <>
+            <p className="line-clamp-2 min-h-[2.6em] text-[13.5px] leading-[1.42] text-muted select-none">
+              {t("import.noPrompt.title")}
             </p>
             <div className="mt-auto pt-2.5">
               <span title={job.url} className="block truncate text-[11.5px] text-faint select-none">

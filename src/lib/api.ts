@@ -65,6 +65,8 @@ export const api = {
   importDroppedFile: (name: string, base64: string) => invoke<PasteImageResult>("import_dropped_file", { input: { name, data: base64 } }),
   civitaiImport: (url: string) => invoke<CivitaiImport>("civitai_import", { url }),
   civitaiSourceKey: (url: string) => invoke<string | null>("civitai_source_key", { url }),
+  /** Fetches the photo of a promptless import after the user confirms the save. */
+  civitaiDownload: (url: string) => invoke<PasteImageResult>("civitai_download", { url }),
   checkDuplicates: (input: { prompt?: string | null; source_key?: string | null }) =>
     invoke<DuplicateHit[]>("check_duplicates", { input }),
 

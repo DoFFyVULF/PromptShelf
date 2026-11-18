@@ -99,7 +99,7 @@ function ReceiptRow({
       onPointerLeave={resume}
       role="button"
       tabIndex={0}
-      aria-label={item.prompt}
+      aria-label={item.prompt || t("card.noPrompt")}
       onClick={() => {
         settle();
         onOpen(item.id);
@@ -132,7 +132,9 @@ function ReceiptRow({
             {t("import.receipt.ok")}
           </span>
         </div>
-        <p className="mt-0.5 line-clamp-2 text-[12.5px] leading-snug text-body">{item.prompt}</p>
+        <p className="mt-0.5 line-clamp-2 text-[12.5px] leading-snug text-body">
+          {item.prompt.trim() ? item.prompt : <span className="text-muted">{t("card.noPrompt")}</span>}
+        </p>
       </div>
       <button
         type="button"

@@ -89,6 +89,15 @@ export const en = {
   "import.jobs.dup": "Possible duplicate",
   "import.jobs.remove": "Dismiss",
 
+  "import.noPrompt.title": "This page has no prompt",
+  "import.noPrompt.hint": "CivitAI published the image without generation data, so there is nothing to import into the prompt field. Keep the photo as a card anyway? You can fill the prompt in later.",
+  "import.noPrompt.preview": "Preview from CivitAI",
+  "import.noPrompt.save": "Save anyway",
+  "import.noPrompt.saving": "Saving…",
+  "import.noPrompt.badge": "No prompt",
+  "card.noPrompt": "No prompt",
+  "detail.noPrompt": "No prompt saved — add one whenever you like.",
+
   "dup.title": "Duplicate prompt",
   "dup.hint": "Already in your library:",
   "dup.open": "Open existing",

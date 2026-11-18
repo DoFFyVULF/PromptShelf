@@ -158,7 +158,7 @@ export function CardDetail({ card, suggestions, onImportLora, hasPrev, hasNext, 
   }, [card]);
 
   const saveEdit = useCallback(async () => {
-    if (!prompt.trim()) {
+    if (!prompt.trim() && card.prompt.trim()) {
       toast(t("toast.promptRequired"), "error");
       return;
     }
@@ -752,7 +752,12 @@ export function CardDetail({ card, suggestions, onImportLora, hasPrev, hasNext, 
               </>
             ) : (
               <>
-                <button type="button" className="btn-primary press min-w-0 cursor-pointer flex-1" onClick={copyPrompt}>
+                <button
+                  type="button"
+                  className="btn-primary press min-w-0 cursor-pointer flex-1 disabled:cursor-default disabled:opacity-40"
+                  onClick={copyPrompt}
+                  disabled={!card.prompt.trim()}
+                >
                   {copied ? <Check size={15} /> : <Copy size={14.5} />}
                   <span className="truncate">{copied ? t("toast.copied") : t("action.copy")}</span>
                   <kbd className="kbd hidden border-on-ink/30 bg-transparent text-on-ink/70 xl:flex">{modKey}C</kbd>

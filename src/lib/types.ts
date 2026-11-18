@@ -101,6 +101,8 @@ export interface NewCardInput {
   meta: MetaItem[];
   /** Origin fingerprint for an imported card (dup detection). */
   source_key?: string | null;
+  /** Import flow: the user explicitly kept an image whose page had no prompt. */
+  allow_empty_prompt?: boolean;
 }
 
 export interface UpdateCardInput {
@@ -171,7 +173,13 @@ export interface PasteImageResult {
 }
 
 export interface CivitaiImport {
-  image: PasteImageResult;
+  /** Staged photo; null when the page has no prompt and the import is
+   * waiting for the "save anyway" choice. */
+  image: PasteImageResult | null;
+  /** Remote photo URL — the preview shown while nothing is downloaded. */
+  preview_url?: string | null;
+  /** CivitAI published no generation data: there is no prompt to import. */
+  no_prompt?: boolean;
   prompt: string;
   negative_prompt: string;
   author: string;

@@ -46,6 +46,7 @@ import { TagsDialog } from "./components/TagsDialog";
 import { ToastProvider, useToast } from "./components/Toasts";
 import { ScrollTopButton } from "./components/ScrollTopButton";
 import { DuplicateDialog } from "./components/DuplicateDialog";
+import { MissingPromptDialog } from "./components/MissingPromptDialog";
 import { CornerDownRight, ListChecks, X } from "lucide-react";
 import { applyTheme, onSystemThemeChange, themeFromStorage } from "./lib/theme";
 import { shortcutKey } from "./lib/platform";
@@ -118,6 +119,15 @@ function Shell() {
     jobId: string;
     url: string;
     pre: CivitaiImport | null;
+  } | null>(null);
+  // promptless CivitAI pages: the import is parked with just its remote
+  // preview — nothing is downloaded until the user keeps the photo
+  const [missingPrompt, setMissingPrompt] = useState<CivitaiImport | null>(null);
+  const [noPromptSaving, setNoPromptSaving] = useState(false);
+  const pendingNoPrompt = useRef<{
+    jobId: string;
+    url: string;
+    pre: CivitaiImport;
   } | null>(null);
   // background CivitAI imports: every submitted link parks a placeholder tile
   // in the grid until it lands on a card or fails — several run at once
@@ -745,7 +755,9 @@ function Shell() {
   // saved as a card immediately (no editor popup) and a floating receipt
   // confirms it — the dialog stays open for the next link.
   const createFromImport = useCallback(
-    async (res: CivitaiImport) => {
+    async (res: CivitaiImport, allowEmptyPrompt = false) => {
+      const image = res.image;
+      if (!image) throw new Error("CIVITAI_NO_IMAGE");
       try {
         const created = await api.createCard({
           prompt: res.prompt,
@@ -754,24 +766,25 @@ function Shell() {
           note: "",
           rating: 0,
           tags: res.tags,
-          images: [res.image.temp_path],
+          images: [image.temp_path],
           loras: res.loras,
           group_id: groupId,
           author: res.author || null,
           checkpoint: res.checkpoint || null,
           meta: res.meta,
           source_key: res.source_key,
+          allow_empty_prompt: allowEmptyPrompt,
         });
         pushReceipt({
           id: created.id,
-          thumb: res.image.preview,
+          thumb: image.preview,
           prompt: res.prompt,
         });
         await loadCards();
       } catch (e) {
         // the image was staged into the temp dir but never landed on a card —
         // don't leave the file behind
-        void api.discardTemp(res.image.temp_path).catch(() => undefined);
+        void api.discardTemp(image.temp_path).catch(() => undefined);
         throw e;
       }
     },
@@ -810,6 +823,13 @@ function Shell() {
           }
         }
         const res = await api.civitaiImport(v);
+        // The page published no generation data: there is no prompt to match
+        // or save. Park the job with only the remote photo and let the user
+        // decide whether the image itself is worth keeping.
+        if (res.no_prompt || !res.prompt.trim()) {
+          updateJob(id, { status: "noprompt", pre: res, hits: undefined });
+          return;
+        }
         // same-prompt-different-link protection: warn before creating; the
         // job keeps the full result, so "continue" doesn't re-download
         const hits = await api.checkDuplicates({
@@ -841,21 +861,68 @@ function Shell() {
 
   const dismissJob = useCallback((id: string) => removeJob(id), [removeJob]);
 
-  // while no duplicate dialog is up, promote the next parked duplicate job to
-  // it — several imports can hit duplicates while the dialog answered one
+  // Parked imports that need a decision queue behind whichever dialog is up.
+  // One effect owns both kinds so two dialogs can never open in one commit:
+  // duplicates first (they may still be saved), then promptless pages.
   useEffect(() => {
-    if (dupHits !== null) return;
-    const queued = jobs.find(
+    if (dupHits !== null || missingPrompt !== null) return;
+    const dupJob = jobs.find(
       (j) => j.status === "dup" && j.hits && j.hits.length > 0,
     );
-    if (!queued || !queued.hits) return;
-    pendingDup.current = {
-      jobId: queued.id,
-      url: queued.url,
-      pre: queued.pre ?? null,
+    if (dupJob?.hits) {
+      pendingDup.current = {
+        jobId: dupJob.id,
+        url: dupJob.url,
+        pre: dupJob.pre ?? null,
+      };
+      setDupHits(dupJob.hits);
+      return;
+    }
+    const noPromptJob = jobs.find((j) => j.status === "noprompt" && j.pre);
+    if (!noPromptJob?.pre) return;
+    pendingNoPrompt.current = {
+      jobId: noPromptJob.id,
+      url: noPromptJob.url,
+      pre: noPromptJob.pre,
     };
-    setDupHits(queued.hits);
-  }, [dupHits, jobs]);
+    setMissingPrompt(noPromptJob.pre);
+  }, [dupHits, jobs, missingPrompt]);
+
+  /** Keep the photo of a promptless page: only now is it downloaded. */
+  const saveWithoutPrompt = useCallback(() => {
+    const p = pendingNoPrompt.current;
+    if (!p || noPromptSaving) return;
+    setNoPromptSaving(true);
+    updateJob(p.jobId, { status: "running", hits: undefined, pre: undefined });
+    void (async () => {
+      const previewUrl = p.pre.preview_url;
+      if (!previewUrl) throw new Error("CIVITAI_NO_IMAGE");
+      const image = await api.civitaiDownload(previewUrl);
+      await createFromImport({ ...p.pre, image }, true);
+      updateJob(p.jobId, { status: "done" });
+      window.setTimeout(() => removeJob(p.jobId), 900);
+    })()
+      .catch((e) =>
+        updateJob(p.jobId, {
+          status: "error",
+          error: importErrorToKey(String(e)),
+        }),
+      )
+      .finally(() => {
+        setNoPromptSaving(false);
+        setMissingPrompt(null);
+        pendingNoPrompt.current = null;
+      });
+  }, [createFromImport, noPromptSaving, removeJob, updateJob]);
+
+  const cancelWithoutPrompt = useCallback(() => {
+    const p = pendingNoPrompt.current;
+    if (noPromptSaving) return;
+    setMissingPrompt(null);
+    pendingNoPrompt.current = null;
+    // nothing was downloaded, so the parked job simply disappears
+    if (p) removeJob(p.jobId);
+  }, [noPromptSaving, removeJob]);
 
   // ------------------------------------------------------- lora import flow
 
@@ -1012,6 +1079,7 @@ function Shell() {
       detailOpenRef.current ||
       loraDetailOpenRef.current ||
       dupHits !== null ||
+      missingPrompt !== null ||
       loraDupHits !== null;
     const text = modalOpen
       ? null
@@ -1039,6 +1107,7 @@ function Shell() {
     dupHits,
     importOpen,
     loraDupHits,
+    missingPrompt,
     pasteGlobally,
     pasteLoraGlobally,
     settingsOpen,
@@ -1661,6 +1730,16 @@ function Shell() {
             void (async () => {
               // the user approved the duplicate — create it without further checks
               const res = p.pre ?? (await api.civitaiImport(p.url));
+              // data can change between the warning and the refetch; a page
+              // that lost its prompt falls back to the save-anyway dialog
+              if (res.no_prompt || !res.prompt.trim()) {
+                updateJob(p.jobId, {
+                  status: "noprompt",
+                  pre: res,
+                  hits: undefined,
+                });
+                return;
+              }
               await createFromImport(res);
               updateJob(p.jobId, { status: "done" });
               window.setTimeout(() => removeJob(p.jobId), 900);
@@ -1673,7 +1752,7 @@ function Shell() {
           }}
           onOpen={(id) => {
             const p = pendingDup.current;
-            if (p?.pre)
+            if (p?.pre?.image)
               void api
                 .discardTemp(p.pre.image.temp_path)
                 .catch(() => undefined);
@@ -1686,7 +1765,7 @@ function Shell() {
           onClose={() => {
             const p = pendingDup.current;
             // leaving two hits without a decision must not leak the staged image
-            if (p?.pre)
+            if (p?.pre?.image)
               void api
                 .discardTemp(p.pre.image.temp_path)
                 .catch(() => undefined);
@@ -1694,6 +1773,17 @@ function Shell() {
             pendingDup.current = null;
             if (p) removeJob(p.jobId);
           }}
+        />
+      )}
+      {mode === "prompt" && (
+        <MissingPromptDialog
+          open={missingPrompt !== null}
+          previewUrl={missingPrompt?.preview_url ?? null}
+          author={missingPrompt?.author}
+          checkpoint={missingPrompt?.checkpoint}
+          saving={noPromptSaving}
+          onSave={saveWithoutPrompt}
+          onCancel={cancelWithoutPrompt}
         />
       )}
       {mode === "lora" && (

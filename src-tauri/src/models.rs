@@ -119,6 +119,10 @@ pub struct NewCardInput {
     /// detect a duplicate link on the next import. Set on create only.
     #[serde(default)]
     pub source_key: Option<String>,
+    /// The user explicitly chose to keep an imported image whose page had no
+    /// prompt, so the empty prompt is intentional (import flow only).
+    #[serde(default)]
+    pub allow_empty_prompt: bool,
 }
 
 #[derive(Deserialize)]
@@ -372,7 +376,16 @@ pub struct PasteImageResult {
 #[derive(Serialize, Clone)]
 pub struct CivitaiImport {
     /// The original photo saved to a temp file (field: temp_path, preview, width, height).
-    pub image: PasteImageResult,
+    /// Missing when the page has no prompt: the import is parked while the
+    /// user decides, and the photo is only downloaded on "save anyway".
+    pub image: Option<PasteImageResult>,
+    /// Remote photo URL from the page. The card preview uses it directly
+    /// (nothing is downloaded) until the user chooses to keep the card.
+    #[serde(default)]
+    pub preview_url: Option<String>,
+    /// True when CivitAI published no generation data for the image.
+    #[serde(default)]
+    pub no_prompt: bool,
     pub prompt: String,
     pub negative_prompt: String,
     pub author: String,

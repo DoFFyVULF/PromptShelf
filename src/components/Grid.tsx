@@ -64,7 +64,7 @@ function CardTile({
     }
     e.dataTransfer.effectAllowed = "move";
 
-    attachCardGhost(e, { title: card.prompt.trim(), count: ids.length });
+    attachCardGhost(e, { title: card.prompt.trim() || t("card.noPrompt"), count: ids.length });
     // the source tile "picks up" on a timeout so React doesn't re-render
     // during the dragstart dispatch; the ghost is already captured.
     window.setTimeout(() => setDragging(true), 0);
@@ -134,7 +134,9 @@ function CardTile({
       </div>
 
       <div className={`flex min-h-0 flex-1 flex-col px-3.5 pt-2.5 pb-3 transition-opacity duration-200 ease-out ${dragging ? "opacity-35" : ""}`}>
-        <p className="line-clamp-2 min-h-[2.6em] text-[13.5px] leading-[1.42] text-ink">{card.prompt}</p>
+        <p className="line-clamp-2 min-h-[2.6em] text-[13.5px] leading-[1.42] text-ink">
+          {card.prompt.trim() ? card.prompt : <span className="text-faint">{t("card.noPrompt")}</span>}
+        </p>
 
         {card.variant_count > 0 && (
           <div className="mt-2 flex items-center gap-2.5 text-[11.5px] leading-5 text-muted">

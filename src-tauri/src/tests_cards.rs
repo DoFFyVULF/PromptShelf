@@ -129,6 +129,7 @@ fn test_card_crud_cover_and_loras() {
         meta: vec![],
         source_key: None,
         variants: vec![],
+        allow_empty_prompt: false,
     };
 
     let detail = create_card_inner(&dir, input).unwrap();
@@ -306,6 +307,7 @@ fn test_add_image_sets_cover_and_sort() {    let dir = tmp_dir("addimg");
             meta: vec![],
             source_key: None,
             variants: vec![],
+            allow_empty_prompt: false,
         },
     )
     .unwrap();
@@ -375,6 +377,7 @@ fn test_groups_crud_move_and_default() {
             meta: vec![],
             source_key: None,
             variants: vec![],
+            allow_empty_prompt: false,
         },
     )
     .unwrap();
@@ -458,6 +461,7 @@ fn test_prompt_variants_roundtrip_and_search() {
                 String::new(), // dropped: empty
                 "variant two".to_string(),
             ],
+            allow_empty_prompt: false,
         },
     )
     .unwrap();
@@ -555,5 +559,83 @@ fn test_old_db_gets_groups_and_backfill() {
     assert_eq!(groups.len(), 1);
     let card = get_card_inner(&dir, "c1").unwrap();
     assert_eq!(card.group_id, groups[0].id);
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn promptless_imports_are_real_cards_and_stay_editable() {
+    let dir = tmp_dir("no-prompt");
+    let make = |allow: bool| NewCardInput {
+        prompt: String::new(),
+        negative_prompt: String::new(),
+        note: String::new(),
+        rating: 0,
+        tags: vec![],
+        images: vec![],
+        loras: vec![],
+        group_id: None,
+        author: None,
+        checkpoint: None,
+        meta: vec![],
+        source_key: None,
+        variants: vec![],
+        allow_empty_prompt: allow,
+    };
+
+    // the import flow must opt in explicitly
+    assert!(matches!(create_card_inner(&dir, make(false)), Err(e) if e == "PROMPT_REQUIRED"));
+    let card = create_card_inner(&dir, make(true)).unwrap();
+    assert!(card.prompt.is_empty());
+
+    // rating/tags/note edits no longer need a prompt that was never there
+    update_card_inner(
+        &dir,
+        UpdateCardInput {
+            id: card.id.clone(),
+            prompt: String::new(),
+            variants: vec![],
+            negative_prompt: String::new(),
+            note: "reference shot".to_string(),
+            rating: 5,
+            tags: vec!["reference".to_string()],
+            loras: vec![],
+            author: None,
+            checkpoint: None,
+            meta: vec![],
+        },
+    )
+    .unwrap();
+    let fresh = get_card_inner(&dir, &card.id).unwrap();
+    assert_eq!(fresh.rating, 5);
+    assert_eq!(fresh.note.as_deref(), Some("reference shot"));
+
+    // a card that has a prompt still can't be saved with it cleared
+    let prompted = create_card_inner(
+        &dir,
+        NewCardInput {
+            prompt: "a real prompt".to_string(),
+            ..make(true)
+        },
+    )
+    .unwrap();
+    assert!(matches!(
+        update_card_inner(
+            &dir,
+            UpdateCardInput {
+                id: prompted.id.clone(),
+                prompt: String::new(),
+                variants: vec![],
+                negative_prompt: String::new(),
+                note: String::new(),
+                rating: 0,
+                tags: vec![],
+                loras: vec![],
+                author: None,
+                checkpoint: None,
+                meta: vec![],
+            },
+        ),
+        Err(e) if e == "PROMPT_REQUIRED"
+    ));
     std::fs::remove_dir_all(&dir).ok();
 }

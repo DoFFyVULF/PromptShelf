@@ -440,7 +440,7 @@ pub fn get_card_inner(dir: &Path, id: &str) -> Result<CardDetail, String> {
 
 pub fn create_card_inner(dir: &Path, input: NewCardInput) -> Result<CardDetail, String> {
     let prompt = input.prompt.trim().to_string();
-    if prompt.is_empty() {
+    if prompt.is_empty() && !input.allow_empty_prompt {
         return Err("PROMPT_REQUIRED".to_string());
     }
     let conn = store::open(dir)?;
@@ -525,10 +525,19 @@ pub fn create_card_inner(dir: &Path, input: NewCardInput) -> Result<CardDetail, 
 
 pub fn update_card_inner(dir: &Path, input: UpdateCardInput) -> Result<(), String> {
     let prompt = input.prompt.trim().to_string();
-    if prompt.is_empty() {
-        return Err("PROMPT_REQUIRED".to_string());
-    }
     let conn = store::open(dir)?;
+    if prompt.is_empty() {
+        // Promptless imports are real cards: editing their rating, tags or
+        // note must not be blocked forever by the missing prompt. A card that
+        // does have a prompt still can't be saved with it cleared.
+        let current: Option<String> = conn
+            .query_row("SELECT prompt FROM cards WHERE id = ?1", params![input.id], |r| r.get(0))
+            .optional()
+            .map_err(es)?;
+        if current.map(|p| !p.trim().is_empty()).unwrap_or(true) {
+            return Err("PROMPT_REQUIRED".to_string());
+        }
+    }
     let rating = input.rating.clamp(0, 5);
     let tags = clean_tags(&input.tags);
     let note = input.note.trim().to_string();

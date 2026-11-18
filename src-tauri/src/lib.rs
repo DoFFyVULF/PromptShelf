@@ -65,6 +65,7 @@ pub fn run() {
             images::import_dropped_file,
             civitai::civitai_import,
             civitai::civitai_source_key,
+            civitai::civitai_download,
             loras::list_loras,
             loras::get_lora,
             loras::create_lora,

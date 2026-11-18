@@ -175,7 +175,7 @@ export function Editor({ card, staged, onStaged, settings, groupId, suggestions,
   }, [loraDraft]);
 
   const save = useCallback(async () => {
-    if (!prompt.trim()) {
+    if (!prompt.trim() && (!card || card.prompt.trim())) {
       setError(t("editor.error.prompt"));
       promptRef.current?.focus();
       return;
