@@ -316,7 +316,7 @@ export function TopBar({ mode, onToggleMode, query, onQuery, sort, onSort, onNew
           aria-label={t("sort.label")}
           value={sort}
           onChange={(e) => onSort(e.target.value as Sort)}
-          className="h-9 cursor-pointer appearance-none rounded-full border border-hairline bg-card pr-8 pl-3.5 text-[13px] font-medium text-body transition-colors hover:border-line-hover"
+          className="h-9 cursor-pointer appearance-none rounded-full border border-hairline bg-card pr-8 pl-3.5 text-[13px] font-medium text-body transition-[border-color,box-shadow] duration-200 ease-[cubic-bezier(0.32,0.72,0,1)] hover:border-line-hover focus:border-line-active focus:shadow-focus focus:outline-none"
         >
           <option value="newest">{t("sort.newest")}</option>
           <option value="oldest">{t("sort.oldest")}</option>
