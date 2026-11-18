@@ -13,6 +13,13 @@ pub fn civitai_key(kind: &str, id: &str) -> String {
     format!("civitai:{kind}:{id}")
 }
 
+/// CivitAI model-version origin, e.g. `civitai:model:2151066:3129534`. The
+/// version is part of the key so different base-model variants of one model
+/// (Moss, Krea 2, …) can live side by side instead of colliding as duplicates.
+pub fn civitai_model_key(model_id: &str, version_id: i64) -> String {
+    format!("civitai:model:{model_id}:{version_id}")
+}
+
 /// 16-char (8-byte) SHA-256 hex fingerprint of the normalized prompt text.
 /// Normalization: NFC → lowercase → collapse whitespace, so copy-pastes and
 /// retyped variants of the same text collide into one row.

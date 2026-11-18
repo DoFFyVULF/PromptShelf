@@ -965,7 +965,6 @@ fn primary_tag_of(model: &Value, tags: &[String]) -> Option<String> {
 
 fn run_model(data_dir: &std::path::Path, url: &str) -> Result<CivitaiLoraImport, String> {
     let (model_id, version_id) = parse_model_link(url)?;
-    let source_key = crate::dedup::civitai_key("model", &model_id);
     let agent = agent();
     let (api_key, lora_previews): (String, u32) = crate::store::open(data_dir)
         .and_then(|c| crate::store::read_settings(&c).map(|s| (s.civitai_api_key, s.lora_previews)))
@@ -992,6 +991,13 @@ fn run_model(data_dir: &std::path::Path, url: &str) -> Result<CivitaiLoraImport,
     let version = version_id
         .and_then(|vid| versions.iter().find(|v| v.get("id").and_then(|x| x.as_i64()) == Some(vid)))
         .unwrap_or(versions.first().unwrap());
+    // Origin key pins the exact version, not just the model: the same model
+    // may be imported once per base-model variant (Moss, Krea 2, …).
+    let source_key = version
+        .get("id")
+        .and_then(|x| x.as_i64())
+        .map(|vid| crate::dedup::civitai_model_key(&model_id, vid))
+        .unwrap_or_else(|| crate::dedup::civitai_key("model", &model_id));
 
     let name = model
         .get("name")
@@ -1124,10 +1130,15 @@ pub async fn civitai_lora_import(
     }
 }
 
-/// Link → origin key pre-check for the lora flow (models only).
+/// Link → origin key pre-check for the lora flow (models only). Only a pinned
+/// `?modelVersionId=` can be resolved without the network; an unpinned link
+/// gets its exact version key after the import fetch.
 #[tauri::command]
 pub fn civitai_lora_source_key(url: String) -> Option<String> {
-    parse_model_link(&url).map(|(id, _)| crate::dedup::civitai_key("model", &id)).ok()
+    match parse_model_link(&url) {
+        Ok((model_id, Some(version_id))) => Some(crate::dedup::civitai_model_key(&model_id, version_id)),
+        _ => None,
+    }
 }
 
 #[cfg(test)]
@@ -1150,6 +1161,22 @@ mod tests {
         assert_eq!(parse_model_link("https://civitai.com/models/"), Err("CIVITAI_URL".into()));
         // classic model pages carry no version id
         assert_eq!(parse_model_link("https://civitai.com/models/2945627/bemyhero-finjax?notif=1&x=2"), Ok(("2945627".to_string(), None)));
+    }
+
+    #[test]
+    fn lora_source_key_pins_the_version() {
+        // different versions of one model must not collide as duplicates
+        assert_eq!(
+            civitai_lora_source_key(
+                "https://civitai.red/models/2151066/hela?modelVersionId=3129534".into()
+            ),
+            Some("civitai:model:2151066:3129534".into())
+        );
+        assert_eq!(
+            civitai_lora_source_key("https://civitai.com/models/2151066/hela".into()),
+            None
+        );
+        assert_eq!(civitai_lora_source_key("https://civitai.com/images/5".into()), None);
     }
 
     #[test]
@@ -1476,6 +1503,33 @@ mod tests {
             res2.negative_prompt
         );
         if let Some(img) = &res2.image {
+            let _ = std::fs::remove_file(&img.temp_path);
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Live regression: `?modelVersionId=` must pin the imported version, not
+    /// silently fall back to the model page's default (first) version.
+    #[test]
+    #[ignore = "needs network"]
+    fn live_model_import_pins_requested_version() {
+        let dir = std::env::temp_dir().join(format!("promptshelf-civitai-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let conn = crate::store::open(&dir).unwrap();
+        init_schema(&conn).unwrap();
+
+        let res = run_model(
+            &dir,
+            "https://civitai.red/models/2151066/hela-deaths-elegant-daughter?modelVersionId=3129534",
+        )
+        .expect("import should succeed");
+        assert_eq!(res.base_model, "Krea 2", "pinned version must win");
+        assert_eq!(
+            res.source_key.as_deref(),
+            Some("civitai:model:2151066:3129534"),
+            "origin key must pin the version"
+        );
+        for img in &res.images {
             let _ = std::fs::remove_file(&img.temp_path);
         }
         let _ = std::fs::remove_dir_all(&dir);

@@ -82,14 +82,29 @@ fn abs(dir: &Path, rel_path: &str) -> String {
     dir.join(rel_path).to_string_lossy().into_owned()
 }
 
-/// `civitai:model:<id>` → the model page link behind the source key. Manual
-/// loras (no import origin) stay empty — the detail card then hides the link.
+/// `civitai:model:<id>` / `civitai:model:<id>:<version>` → the CivitAI page
+/// link behind the source key (pinned to the version when one is known).
+/// Manual loras (no import origin) stay empty — the detail card then hides the
+/// link.
 fn lora_source_url(source_key: &str) -> String {
-    source_key
-        .strip_prefix("civitai:model:")
-        .filter(|id| !id.is_empty() && id.chars().all(|c| c.is_ascii_digit()))
-        .map(|id| format!("https://civitai.com/models/{id}"))
-        .unwrap_or_default()
+    let Some(raw) = source_key.strip_prefix("civitai:model:") else {
+        return String::new();
+    };
+    let (model_id, version_id) = match raw.split_once(':') {
+        Some((model, version)) => (model, Some(version)),
+        None => (raw, None),
+    };
+    if model_id.is_empty() || !model_id.chars().all(|c| c.is_ascii_digit()) {
+        return String::new();
+    }
+    match version_id {
+        Some(v) => v
+            .parse::<i64>()
+            .ok()
+            .map(|v| format!("https://civitai.com/models/{model_id}?modelVersionId={v}"))
+            .unwrap_or_default(),
+        None => format!("https://civitai.com/models/{model_id}"),
+    }
 }
 
 fn tags_for_loras(conn: &Connection, ids: &[String]) -> Result<HashMap<String, Vec<String>>, String> {
@@ -865,6 +880,22 @@ mod tests {
         let v = clean_strings(&["a".into(), " A ".into(), "".into(), "b".into()], 96, 64);
         assert_eq!(v, vec!["a", "b"]);
         assert_eq!(clean_strings(&["x".into()], 96, 0), Vec::<String>::new());
+    }
+
+    #[test]
+    fn builds_source_urls_for_models_and_versions() {
+        assert_eq!(
+            lora_source_url("civitai:model:2151066:3129534"),
+            "https://civitai.com/models/2151066?modelVersionId=3129534"
+        );
+        // legacy keys imported before the version was part of the origin
+        assert_eq!(
+            lora_source_url("civitai:model:2151066"),
+            "https://civitai.com/models/2151066"
+        );
+        assert_eq!(lora_source_url(""), "");
+        assert_eq!(lora_source_url("civitai:model:abc"), "");
+        assert_eq!(lora_source_url("civitai:model:2151066:abc"), "");
     }
 }
 

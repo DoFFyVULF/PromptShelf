@@ -9,13 +9,15 @@ interface DuplicateDialogProps {
   hits: DuplicateHit[];
   /** Label of the "continue anyway" action, depending on the flow. */
   proceedKey?: "dup.anyway" | "dup.proceed";
+  /** Lora shelf: the same dialog with lora wording. */
+  lora?: boolean;
   onProceed: () => void;
   /** Without a handler the "open existing card" button stays hidden. */
   onOpen?: (id: string) => void;
   onClose: () => void;
 }
 
-export function DuplicateDialog({ open, hits, proceedKey = "dup.anyway", onProceed, onOpen, onClose }: DuplicateDialogProps) {
+export function DuplicateDialog({ open, hits, proceedKey = "dup.anyway", lora, onProceed, onOpen, onClose }: DuplicateDialogProps) {
   const { t, formatDate } = useI18n();
 
   return (
@@ -23,7 +25,7 @@ export function DuplicateDialog({ open, hits, proceedKey = "dup.anyway", onProce
       <div className="flex items-center justify-between px-7 pt-6 pb-1">
         <h2 id="dup-title" className="t-display flex items-center gap-2.5 text-[18px] text-ink">
           <FileSearch size={18} strokeWidth={1.8} className="text-faint" />
-          {t("dup.title")}
+          {t(lora ? "dup.lora.title" : "dup.title")}
         </h2>
         <DialogCloseButton onClose={onClose} label={t("action.close")} />
       </div>

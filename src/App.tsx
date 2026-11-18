@@ -54,9 +54,18 @@ import { useUpdateCheck } from "./lib/useUpdateCheck";
 
 // CivitAI links for clipboard auto-import, mirroring the Rust link parsers:
 // image/post links feed the prompt shelf, model links the lora shelf. The
-// lookahead keeps trailing text ("…/123abc") from matching.
-const CIVITAI_ITEM_LINK = /(?:https?:\/\/)?(?:www\.)?civitai\.(?:com|red)\/(?:images|posts)\/\d+(?=[/?#]|$)/i;
-const CIVITAI_MODEL_LINK = /(?:https?:\/\/)?(?:www\.)?civitai\.(?:com|red)\/models\/\d+(?=[/?#]|$)/i;
+// whole URL is kept — slug, `?modelVersionId=…` (the exact version the user is
+// looking at) and post params — while the digit boundary still keeps trailing
+// text ("…/123abc") from matching.
+const CIVITAI_ITEM_LINK =
+  /(?:https?:\/\/)?(?:www\.)?civitai\.(?:com|red)\/(?:images|posts)\/\d+(?![A-Za-z0-9_])[^\s"'<>]*/i;
+const CIVITAI_MODEL_LINK =
+  /(?:https?:\/\/)?(?:www\.)?civitai\.(?:com|red)\/models\/\d+(?![A-Za-z0-9_])[^\s"'<>]*/i;
+
+/** A clipboard link may be glued to prose punctuation: "(https://…/123)." */
+function matchCivitaiLink(text: string, re: RegExp): string | null {
+  return text.match(re)?.[0].replace(/[)\]}>.,;!]+$/, "") ?? null;
+}
 
 function Shell() {
   const { t, lang, setLang } = useI18n();
@@ -1087,13 +1096,13 @@ function Shell() {
     const link = text?.trim() ?? "";
     if (link) {
       if (modeRef.current === "prompt") {
-        const hit = link.match(CIVITAI_ITEM_LINK)?.[0];
+        const hit = matchCivitaiLink(link, CIVITAI_ITEM_LINK);
         if (hit) {
           void startCivitaiImport(hit);
           return;
         }
       } else {
-        const hit = link.match(CIVITAI_MODEL_LINK)?.[0];
+        const hit = matchCivitaiLink(link, CIVITAI_MODEL_LINK);
         if (hit) {
           void startLoraImport(hit);
           return;
@@ -1791,6 +1800,7 @@ function Shell() {
           open={loraDupHits !== null}
           hits={loraDupHits ?? []}
           proceedKey="dup.proceed"
+          lora
           onProceed={() => {
             const p = loraPendingDup.current;
             setLoraDupHits(null);

@@ -99,6 +99,7 @@ export const en = {
   "detail.noPrompt": "No prompt saved — add one whenever you like.",
 
   "dup.title": "Duplicate prompt",
+  "dup.lora.title": "Duplicate LoRA",
   "dup.hint": "Already in your library:",
   "dup.open": "Open existing",
   "dup.anyway": "Add anyway",

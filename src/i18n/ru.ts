@@ -101,6 +101,7 @@ export const ru: Record<DictKey, string> = {
   "detail.noPrompt": "Промпт не сохранён — можно добавить в любой момент.",
 
   "dup.title": "Такой промпт уже есть",
+  "dup.lora.title": "Такая LoRA уже есть",
   "dup.hint": "Совпадения в вашей библиотеке:",
   "dup.open": "Открыть",
   "dup.anyway": "Всё равно добавить",
