@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { AnimatePresence } from "motion/react";
 import { Layers, Star } from "lucide-react";
 import { useI18n } from "../i18n";
@@ -6,6 +6,8 @@ import { assetUrl } from "../lib/api";
 import { attachCardGhost } from "../lib/dragGhost";
 import { ImportJobTile, type ImportJob } from "./ImportJobs";
 import { CARD_DRAG_TYPE } from "./Grid";
+import { LoraFamilyTile } from "./LoraFamilyTile";
+import type { LoraFamily } from "../lib/loraFamilies";
 import type { LoraSummary } from "../lib/types";
 
 interface LoraGridProps {
@@ -17,6 +19,10 @@ interface LoraGridProps {
   selectMode: boolean;
   selection: string[];
   onToggleSelect: (id: string) => void;
+  /** Accepted same-lora variant sets; each one occupies one tile in the grid. */
+  families: LoraFamily[];
+  onOpenFamily: (id: string) => void;
+  onSplitFamily: (id: string) => void;
 }
 
 function LoraTile({
@@ -167,7 +173,18 @@ function LoraTile({
   );
 }
 
-export function LoraGrid({ loras, jobs, onJobRetry, onJobDismiss, onOpen, selectMode, selection, onToggleSelect }: LoraGridProps) {
+export function LoraGrid({ loras, jobs, onJobRetry, onJobDismiss, onOpen, selectMode, selection, onToggleSelect, families, onOpenFamily, onSplitFamily }: LoraGridProps) {
+  // Members disappear from the grid and are represented by one deck tile at
+  // the position of their newest member, so sorting stays intact.
+  const familyByMember = useMemo(() => {
+    const map = new Map<string, LoraFamily>();
+    for (const family of families) {
+      for (const member of family.members) map.set(member.id, family);
+    }
+    return map;
+  }, [families]);
+  const shownFamilies = new Set<string>();
+
   return (
     <div className="grid grid-cols-[repeat(auto-fill,minmax(236px,1fr))] gap-4 px-5 pt-5 pb-10">
       <AnimatePresence mode="popLayout">
@@ -175,17 +192,33 @@ export function LoraGrid({ loras, jobs, onJobRetry, onJobDismiss, onOpen, select
           <ImportJobTile key={job.id} job={job} onRetry={onJobRetry} onDismiss={onJobDismiss} lora />
         ))}
       </AnimatePresence>
-      {loras.map((lora, i) => (
-        <LoraTile
-          key={lora.id}
-          lora={lora}
-          onOpen={onOpen}
-          delay={i * 28}
-          selectMode={selectMode}
-          selected={selection.includes(lora.id)}
-          onToggleSelect={onToggleSelect}
-        />
-      ))}
+      {loras.map((lora, i) => {
+        const family = familyByMember.get(lora.id);
+        if (family) {
+          if (shownFamilies.has(family.id)) return null;
+          shownFamilies.add(family.id);
+          return (
+            <LoraFamilyTile
+              key={`family-${family.id}`}
+              family={family}
+              onOpen={onOpenFamily}
+              onSplit={onSplitFamily}
+              delay={i * 28}
+            />
+          );
+        }
+        return (
+          <LoraTile
+            key={lora.id}
+            lora={lora}
+            onOpen={onOpen}
+            delay={i * 28}
+            selectMode={selectMode}
+            selected={selection.includes(lora.id)}
+            onToggleSelect={onToggleSelect}
+          />
+        );
+      })}
     </div>
   );
 }

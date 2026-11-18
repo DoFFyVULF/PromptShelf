@@ -20,6 +20,7 @@ import {
 import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
 import { useI18n } from "../i18n";
 import { api, assetUrl } from "../lib/api";
+import type { FamilyOffer } from "../lib/loraFamilies";
 import { modKey } from "../lib/platform";
 import type { ImageInfo, LoraDetail as LoraDetailData, TagCount } from "../lib/types";
 import { useImagePaste } from "../lib/useImagePaste";
@@ -41,6 +42,10 @@ interface LoraDetailProps {
   onClose: () => void;
   onChanged: (lora: LoraDetailData) => void;
   onDeleted: () => void;
+  /** A declined family this lora still belongs to — grouping stays reachable
+   *  from the page itself even though the header offer was dismissed. */
+  groupOffer?: FamilyOffer | null;
+  onGroupFamily?: (id: string) => void;
 }
 
 export function LoraDetail({
@@ -52,7 +57,9 @@ export function LoraDetail({
   onNext,
   onClose,
   onChanged,
-  onDeleted
+  onDeleted,
+  groupOffer,
+  onGroupFamily
 }: LoraDetailProps) {
   const { t, formatDate } = useI18n();
   const { toast } = useToast();
@@ -576,6 +583,49 @@ export function LoraDetail({
               </>
             ) : (
               <>
+                {/* A declined header offer is not the end of it: every lora
+                    that still meets the rules carries its own quiet way in. */}
+                {groupOffer && onGroupFamily && (
+                  <section className="flex items-center gap-3 rounded-xl border border-action/20 bg-action/[0.05] px-3.5 py-2.5">
+                    <span aria-hidden className="relative block h-[22px] w-[28px] shrink-0">
+                      {[-20, 0, 20].map((angle, i) => (
+                        <span
+                          key={i}
+                          style={{
+                            zIndex: i + 1,
+                            transform: `translateX(-50%) rotateZ(${angle}deg)`,
+                          }}
+                          className={`absolute top-[2px] left-1/2 h-[18px] w-[12px] rounded-[3px] border ${
+                            i === 1
+                              ? "border-action/40 bg-card"
+                              : "border-action/25 bg-action/10"
+                          }`}
+                        />
+                      ))}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[12.5px] font-medium text-ink">
+                        {t("family.detail.title")}
+                      </p>
+                      <p className="truncate text-[11.5px] text-muted">
+                        {t(
+                          groupOffer.reason === "version"
+                            ? "family.detail.versionHint"
+                            : "family.detail.modelHint",
+                          { n: groupOffer.count },
+                        )}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => onGroupFamily(groupOffer.id)}
+                      className="press-bg flex shrink-0 cursor-pointer items-center rounded-full bg-action px-3 py-1.5 text-[12px] font-medium text-white transition-[filter] hover:brightness-110"
+                    >
+                      {t("family.group")}
+                    </button>
+                  </section>
+                )}
+
                 {/* facts row */}
                 {(lora.published_at || lora.base_model) && (
                   <section className="flex flex-wrap gap-x-5 gap-y-1.5">

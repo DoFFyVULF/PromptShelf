@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ImageDown } from "lucide-react";
 import { I18nProvider, useI18n, type DictKey } from "./i18n";
@@ -26,6 +26,17 @@ import { TopBar } from "./components/TopBar";
 import { FilterBar } from "./components/FilterBar";
 import { CardGrid, CARD_DRAG_TYPE } from "./components/Grid";
 import { LoraGrid } from "./components/LoraGrid";
+import { LoraFamilyDialog } from "./components/LoraFamilyDialog";
+import {
+  detectFamilies,
+  isFamilyDismissed,
+  readDismissedFamilies,
+  readGroupedFamilies,
+  writeDismissedFamilies,
+  writeGroupedFamilies,
+  type FamilyDismiss,
+  type FamilyOffer,
+} from "./lib/loraFamilies";
 import { BootLoader } from "./components/BootLoader";
 import { EmptyState } from "./components/EmptyState";
 import { CardDetail } from "./components/CardDetail";
@@ -197,6 +208,60 @@ function Shell() {
     pre: CivitaiLoraImport | null;
   } | null>(null);
   const [loraReceipts, setLoraReceipts] = useState<ImportReceipt[]>([]);
+
+  // ------------------------------------------------------- lora families
+  // Same lora kept in several versions / for several base models can be
+  // folded into a single deck tile. Both decisions live in localStorage, so a
+  // group survives a restart and a declined offer stays declined until the
+  // set of variants actually changes.
+  const [familyGrouped, setFamilyGrouped] =
+    useState<string[]>(readGroupedFamilies);
+  const [familyDismissed, setFamilyDismissed] =
+    useState<FamilyDismiss[]>(readDismissedFamilies);
+  const [familyOpenId, setFamilyOpenId] = useState<string | null>(null);
+
+  // Family detection runs on the currently visible loras, so a search or tag
+  // filter naturally narrows both the offer and the deck to what's on screen.
+  const detectedFamilies = useMemo(
+    () => (mode === "lora" ? detectFamilies(loras) : []),
+    [loras, mode],
+  );
+  const groupedFamilies = useMemo(
+    () => detectedFamilies.filter((f) => familyGrouped.includes(f.id)),
+    [detectedFamilies, familyGrouped],
+  );
+  const pendingFamilies = useMemo(
+    () =>
+      detectedFamilies.filter(
+        (f) =>
+          !familyGrouped.includes(f.id) && !isFamilyDismissed(f, familyDismissed),
+      ),
+    [detectedFamilies, familyGrouped, familyDismissed],
+  );
+  const openFamily = groupedFamilies.find((f) => f.id === familyOpenId) ?? null;
+
+  // A declined family keeps its offer on the lora page itself — the header
+  // suggestion is gone, but the decision is never buried.
+  const declinedFamilies = useMemo(
+    () =>
+      detectedFamilies.filter(
+        (f) =>
+          !familyGrouped.includes(f.id) && isFamilyDismissed(f, familyDismissed),
+      ),
+    [detectedFamilies, familyGrouped, familyDismissed],
+  );
+  const detailFamilyOffer: FamilyOffer | null = useMemo(() => {
+    if (!loraDetailId) return null;
+    const family = declinedFamilies.find((f) =>
+      f.members.some((m) => m.id === loraDetailId),
+    );
+    if (!family) return null;
+    return {
+      id: family.id,
+      count: family.members.length,
+      reason: family.reason,
+    };
+  }, [declinedFamilies, loraDetailId]);
 
   // refs for stable listeners
   const scrollRef = useRef<HTMLElement | null>(null);
@@ -399,6 +464,7 @@ function Shell() {
     setDetail(null);
     setLoraDetailId(null);
     setLoraDetail(null);
+    setFamilyOpenId(null);
   }, [mode]);
 
   useEffect(() => {
@@ -612,6 +678,61 @@ function Shell() {
       }
     },
     [loadCards, loadGroups, loadLoraGroups, loadLoras, mode, t, toast],
+  );
+
+  // ------------------------------------------------------- lora families
+
+  const groupPendingFamilies = useCallback(() => {
+    if (pendingFamilies.length === 0) return;
+    const next = Array.from(
+      new Set([...familyGrouped, ...pendingFamilies.map((f) => f.id)]),
+    );
+    setFamilyGrouped(next);
+    writeGroupedFamilies(next);
+    toast(t("family.grouped", { n: pendingFamilies.length }));
+  }, [familyGrouped, pendingFamilies, t, toast]);
+
+  const dismissPendingFamilies = useCallback(() => {
+    if (pendingFamilies.length === 0) return;
+    const next = [...familyDismissed];
+    for (const family of pendingFamilies) {
+      const record: FamilyDismiss = {
+        id: family.id,
+        signature: family.signature,
+      };
+      const at = next.findIndex((d) => d.id === family.id);
+      if (at === -1) next.push(record);
+      else next[at] = record;
+    }
+    setFamilyDismissed(next);
+    writeDismissedFamilies(next);
+  }, [familyDismissed, pendingFamilies]);
+
+  const splitFamily = useCallback(
+    (id: string) => {
+      const next = familyGrouped.filter((x) => x !== id);
+      setFamilyGrouped(next);
+      writeGroupedFamilies(next);
+      setFamilyOpenId(null);
+      toast(t("family.splitToast"));
+    },
+    [familyGrouped, t, toast],
+  );
+
+  /** Grouping from a lora page also clears that family's decline, so a later
+   *  split can bring the header offer back for a fresh decision. */
+  const groupFamilyFromDetail = useCallback(
+    (id: string) => {
+      const nextDismissed = familyDismissed.filter((d) => d.id !== id);
+      setFamilyDismissed(nextDismissed);
+      writeDismissedFamilies(nextDismissed);
+      const nextGrouped = Array.from(new Set([...familyGrouped, id]));
+      setFamilyGrouped(nextGrouped);
+      writeGroupedFamilies(nextGrouped);
+      setLoraDetailId(null);
+      toast(t("family.groupedOne"));
+    },
+    [familyDismissed, familyGrouped, t, toast],
   );
 
   // ---------------------------------------------------------------- editor
@@ -1089,7 +1210,8 @@ function Shell() {
       loraDetailOpenRef.current ||
       dupHits !== null ||
       missingPrompt !== null ||
-      loraDupHits !== null;
+      loraDupHits !== null ||
+      familyOpenId !== null;
     const text = modalOpen
       ? null
       : await api.pasteTextFromClipboard().catch(() => null);
@@ -1114,6 +1236,7 @@ function Shell() {
       : pasteLoraGlobally());
   }, [
     dupHits,
+    familyOpenId,
     importOpen,
     loraDupHits,
     missingPrompt,
@@ -1415,7 +1538,8 @@ function Shell() {
     settingsOpen ||
     groupsOpen ||
     tagsOpen ||
-    updateOpen;
+    updateOpen ||
+    familyOpenId !== null;
 
   return (
     <div className="flex h-full flex-col">
@@ -1431,6 +1555,9 @@ function Shell() {
         onSettings={() => setSettingsOpen(true)}
         updateAvailable={update.available !== null}
         onUpdateOpen={() => setUpdateOpen(true)}
+        familyCount={pendingFamilies.length}
+        onGroupFamilies={groupPendingFamilies}
+        onDismissFamilies={dismissPendingFamilies}
       />
 
       <FilterBar
@@ -1529,6 +1656,9 @@ function Shell() {
                   selectMode={selectMode}
                   selection={selection}
                   onToggleSelect={toggleSelect}
+                  families={groupedFamilies}
+                  onOpenFamily={setFamilyOpenId}
+                  onSplitFamily={splitFamily}
                 />
               </motion.div>
             )}
@@ -1566,6 +1696,18 @@ function Shell() {
         }
         onClear={() => setSelectedTags([])}
       />
+
+      {openFamily && (
+        <LoraFamilyDialog
+          family={openFamily}
+          onClose={() => setFamilyOpenId(null)}
+          onSplit={splitFamily}
+          onOpenLora={(id) => {
+            setFamilyOpenId(null);
+            setLoraDetailId(id);
+          }}
+        />
+      )}
 
       {selectMode && (
         <div className="anim-panel fixed bottom-5 left-1/2 z-[80] flex max-w-[calc(100vw-16px)] -translate-x-1/2 items-center gap-1.5 rounded-full bg-ink py-2 pr-2 pl-5 text-on-ink shadow-panel">
@@ -1648,6 +1790,8 @@ function Shell() {
           onClose={() => setLoraDetailId(null)}
           onChanged={onLoraDetailChanged}
           onDeleted={() => void handleDeleteLora()}
+          groupOffer={detailFamilyOffer}
+          onGroupFamily={groupFamilyFromDetail}
         />
       )}
 

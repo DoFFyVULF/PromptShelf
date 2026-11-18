@@ -211,6 +211,28 @@ export const en = {
   "lora.noDetails": "No description, notes or tags yet",
   "lora.detail.noImages": "Lora without images",
 
+  "family.banner": "Same lora in {n} other versions or models — group them?",
+  "family.group": "Group them",
+  "family.dismiss": "Not now",
+  "family.grouped": "Grouped {n} sets",
+  "family.splitToast": "Group split — loras are back on the shelf",
+  "family.groupedOne": "Variants grouped",
+  "family.detail.title": "Other versions of this lora",
+  "family.detail.versionHint": "{n} versions found on your shelf",
+  "family.detail.modelHint": "{n} variants on other base models",
+  "family.badge.version": "Versions",
+  "family.badge.model": "Models",
+  "family.split": "Split group",
+  "family.dialog.versionHint": "One lora, several CivitAI versions.",
+  "family.dialog.modelHint": "One lora, several base models.",
+  "family.dialog.hint": "Open a variant to inspect it, or split the group to put every lora back on the shelf.",
+  "family.variants.one": "{n} version",
+  "family.variants.other": "{n} versions",
+  // Russian-only plural forms live in the dictionary too, so the derived key
+  // stays a valid DictKey in both components.
+  "family.variants.few": "{n} versions",
+  "family.variants.many": "{n} versions",
+
   "loraeditor.new.title": "New lora",
   "loraeditor.name": "Name",
   "loraeditor.name.placeholder": "Lora name, e.g. add_detail_xl",

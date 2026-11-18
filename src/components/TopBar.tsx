@@ -5,6 +5,7 @@ import { Search, Plus, Settings2, ChevronDown, CloudDownload } from "lucide-reac
 import { useI18n } from "../i18n";
 import { modKey } from "../lib/platform";
 import type { Mode, Sort } from "../lib/types";
+import { LoraFamilyBanner } from "./LoraFamilyBanner";
 
 interface TopBarProps {
   mode: Mode;
@@ -18,6 +19,10 @@ interface TopBarProps {
   onSettings: () => void;
   updateAvailable: boolean;
   onUpdateOpen: () => void;
+  /** LoraShelf: unresolved same-lora variant sets waiting for a decision. */
+  familyCount: number;
+  onGroupFamilies: () => void;
+  onDismissFamilies: () => void;
 }
 
 /** Word/label swaps are soft blur-crossfades; size/position changes ride on
@@ -174,7 +179,7 @@ function SwappableLabel({ show, text, reduce, className = "" }: { show: boolean;
   );
 }
 
-export function TopBar({ mode, onToggleMode, query, onQuery, sort, onSort, onNew, onImportCivitai, onSettings, updateAvailable, onUpdateOpen }: TopBarProps) {
+export function TopBar({ mode, onToggleMode, query, onQuery, sort, onSort, onNew, onImportCivitai, onSettings, updateAvailable, onUpdateOpen, familyCount, onGroupFamilies, onDismissFamilies }: TopBarProps) {
   const { t } = useI18n();
   const reduce = useReducedMotion() ?? false;
   const layout = reduce ? false : true;
@@ -310,6 +315,12 @@ export function TopBar({ mode, onToggleMode, query, onQuery, sort, onSort, onNew
       </motion.div>
 
       <div className="flex-1" />
+
+      <LoraFamilyBanner
+        count={familyCount}
+        onGroup={onGroupFamilies}
+        onDismiss={onDismissFamilies}
+      />
 
       <motion.div layout={layout} transition={LAYOUT_SPRING} className="relative">
         <select
