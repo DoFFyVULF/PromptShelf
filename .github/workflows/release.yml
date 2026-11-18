@@ -58,26 +58,27 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: "PromptShelf ${{ github.ref_name }}"
           releaseBody: |
-            **What's new in v0.2.3**
+            **What's new in v0.2.4**
 
-            **Variants you can see**
+            **A place for photos without prompts**
 
-            - Cards holding more than one prompt now wear a subtle stack of text sheets, with an always-visible count under the excerpt — separate from the image counter, so alternates read at a glance. Hover or keyboard-focus a card and the sheets gently spread; opening, selecting and dragging work exactly as before, and reduced motion is respected. List summaries show variant counts too, without extra requests.
+            - CivitAI pages published without generation data no longer end in a generic fetch error. The import parks as a quiet "No prompt" tile with a softened preview of the site photo, then asks one clear question: keep the image or let it go. Nothing is downloaded until you say yes — and the download is restricted to CivitAI HTTPS links.
+            - Kept photos become ordinary cards with an empty prompt and a gentle note in the detail view. Rating, tags, notes and variants stay fully editable, so the prompt can be written whenever you like. The floating import receipt and the card pager both understand these cards now.
 
-            **A calmer tag browser — with a choice of matching**
+            **Every version gets its own shelf slot**
 
-            - The cramped tag grid is now a roomier, theme-aware dialog: search, a dedicated selection area, readable usage counts and helpful empty states, with native focus handling and keyboard shortcuts. Long tag names stay readable.
-            - Matching is now an explicit, animated switch: show cards with *any* selected tag or with *all* of them, on both the prompt and LoRA shelves. The rule survives reopening the dialog and stays independent from the shelf's text search.
-            - The transitions got care as well: chips fade and scale without fighting the reflow, the empty-selection hint crossfades, and the any/all labels roll past each other in a clipped track — rapid toggles reverse the motion instead of overlapping text.
+            - Pinned `?modelVersionId=` links now survive clipboard auto-import, so the exact version you were looking at reaches the library instead of the model's default one.
+            - LoRA origins are version-scoped (`civitai:model:<model>:<version>`), so the same model built for Moss, Krea 2 and friends lives side by side instead of tripping the duplicate warning. Unpinned links are checked after the fetch, once the version is known, and the CivitAI link on the detail page points at that version too. The duplicate dialog now speaks LoRA rather than prompt.
 
-            **Delete the whole selection, still can't miss it**
+            **One tile for the whole family**
 
-            - The floating selection bar now has a trash action for everything you've picked. It springs open into the same red "Are you sure?" pill as the single-item delete, re-skinned for the dark bar. Changing the selection or switching shelves disarms it, so a stale confirm can never fire on a different set.
+            - When the same lora turns up in several versions or for several base models, LoraShelf offers to fold them into a single deck — right between search and sort. Accept or decline; the choice sticks.
+            - A group takes exactly one normal-sized tile: mini covers tilted on the Z axis, fanning out on hover. Open it to see every variant, jump into any one of them, or split the group apart — the offer returns when you want to gather them again.
+            - Declined a group and changed your mind later? Each matching lora page carries its own quiet grouping button, so the decision is never buried.
 
             **Small things**
 
-            - Fixed: copy, paste and the other shortcuts (Cmd/Ctrl+C, V, N, F, ,) never fired on non-Latin keyboard layouts — on Russian, Ctrl+C arrives as the letter "с". Shortcuts now resolve through the physical key when the layout produces non-Latin characters, so they work on any layout while Dvorak-style remaps keep working.
-            - Fixed: a LoRA imported without trigger words showed a prominent copy button that did nothing. It now sits quiet in the row without the ⌘C hint, the trigger-words section shows a dashed note pointing at Edit, and clicking the inert button explains itself instead of failing silently.
+            - Fixed: the sort dropdown drew a hard 2px keyboard outline on click. It now fades into the same active border and soft shadow ring as the search field, with the same easing.
 
             Installers, built from this tag with the updater signing key:
 

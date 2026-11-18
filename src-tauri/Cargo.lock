@@ -3114,7 +3114,7 @@ dependencies = [
 
 [[package]]
 name = "promptshelf"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "ammonia",
  "arboard",
