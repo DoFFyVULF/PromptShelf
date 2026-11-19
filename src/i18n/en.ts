@@ -69,6 +69,7 @@ export const en = {
   "groups.style.searchIcons": "Find an icon…",
   "groups.style.noIcons": "No matching icons",
   "groups.style.done": "Done",
+  "groups.reorder": "Drag to reorder",
 
   "select.select": "Select cards",
   "select.move": "Move to…",

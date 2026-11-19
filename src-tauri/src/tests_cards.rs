@@ -465,6 +465,79 @@ fn test_groups_crud_move_and_default() {
 }
 
 #[test]
+fn test_group_reorder_persists() {
+    use crate::cards::{create_group_inner, list_groups_inner, reorder_groups_inner};
+    use crate::models::{NewGroupInput, ReorderGroupsInput};
+
+    let dir = tmp_dir("group_reorder");
+    let default_id = list_groups_inner(&dir).unwrap()[0].id.clone();
+    let make = |name: &str| {
+        create_group_inner(
+            &dir,
+            NewGroupInput {
+                name: name.to_string(),
+                color: String::new(),
+                icon: String::new(),
+            },
+        )
+        .unwrap()
+    };
+    let a = make("Alpha");
+    let b = make("Beta");
+    let c = make("Gamma");
+
+    let ids = vec![default_id.clone(), c.id.clone(), a.id.clone(), b.id.clone()];
+    reorder_groups_inner(&dir, ReorderGroupsInput { ids: ids.clone() }).unwrap();
+
+    let order: Vec<String> = list_groups_inner(&dir).unwrap().into_iter().map(|g| g.id).collect();
+    assert_eq!(order, ids);
+
+    // a partial/stale list is rejected instead of interleaving old sort values
+    assert!(reorder_groups_inner(
+        &dir,
+        ReorderGroupsInput {
+            ids: vec![default_id, a.id],
+        },
+    )
+    .is_err());
+
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn test_lora_group_reorder_persists() {
+    use crate::loras::{create_lora_group_inner, list_lora_groups_inner, reorder_lora_groups_inner};
+    use crate::models::{NewGroupInput, ReorderGroupsInput};
+
+    let dir = tmp_dir("lora_group_reorder");
+    let default_id = list_lora_groups_inner(&dir).unwrap()[0].id.clone();
+    let make = |name: &str| {
+        create_lora_group_inner(
+            &dir,
+            NewGroupInput {
+                name: name.to_string(),
+                color: String::new(),
+                icon: String::new(),
+            },
+        )
+        .unwrap()
+    };
+    let a = make("Alpha");
+    let b = make("Beta");
+
+    let ids = vec![default_id, b.id.clone(), a.id.clone()];
+    reorder_lora_groups_inner(&dir, ReorderGroupsInput { ids: ids.clone() }).unwrap();
+    let order: Vec<String> = list_lora_groups_inner(&dir)
+        .unwrap()
+        .into_iter()
+        .map(|g| g.id)
+        .collect();
+    assert_eq!(order, ids);
+
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
 fn test_prompt_variants_roundtrip_and_search() {
     let dir = tmp_dir("variants");
     let detail = create_card_inner(

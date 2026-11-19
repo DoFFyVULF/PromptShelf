@@ -313,6 +313,12 @@ pub struct GroupStyleInput {
     pub icon: String,
 }
 
+/// Full ordered list of group ids — index becomes the new `sort` value.
+#[derive(Deserialize)]
+pub struct ReorderGroupsInput {
+    pub ids: Vec<String>,
+}
+
 #[derive(Deserialize)]
 pub struct MoveCardsInput {
     pub ids: Vec<String>,

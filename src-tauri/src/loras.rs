@@ -7,7 +7,8 @@ use crate::dedup;
 use crate::images::{self, ImportSettings};
 use crate::models::{
     es, DuplicateCheckInput, DuplicateHit, GroupInfo, GroupStyleInput, ImageInfo, ListFilter, LoraDetail,
-    LoraSummary, MoveCardsInput, NewGroupInput, NewLoraInput, RenameGroupInput, TagCount, UpdateLoraInput,
+    LoraSummary, MoveCardsInput, NewGroupInput, NewLoraInput, ReorderGroupsInput, RenameGroupInput, TagCount,
+    UpdateLoraInput,
 };
 use crate::store;
 use rusqlite::{params, Connection, OptionalExtension};
@@ -705,6 +706,34 @@ pub fn set_lora_group_style_inner(dir: &Path, input: GroupStyleInput) -> Result<
     Ok(())
 }
 
+pub fn reorder_lora_groups_inner(dir: &Path, input: ReorderGroupsInput) -> Result<(), String> {
+    let mut conn = store::open(dir)?;
+    let tx = conn.transaction().map_err(es)?;
+
+    let total: i64 = tx.query_row("SELECT COUNT(*) FROM lora_groups", [], |r| r.get(0)).map_err(es)?;
+    let unique: HashSet<&str> = input.ids.iter().map(|id| id.as_str()).collect();
+    if input.ids.len() != total as usize || unique.len() != input.ids.len() {
+        return Err("group list out of date".to_string());
+    }
+    let mut stmt = tx.prepare("SELECT 1 FROM lora_groups WHERE id = ?1").map_err(es)?;
+    for id in &input.ids {
+        if stmt.query_row(params![id], |_| Ok(true)).optional().map_err(es)?.is_none() {
+            return Err("group not found".to_string());
+        }
+    }
+    drop(stmt);
+
+    for (sort, id) in input.ids.iter().enumerate() {
+        tx.execute(
+            "UPDATE lora_groups SET sort = ?1 WHERE id = ?2",
+            params![sort as i64, id],
+        )
+        .map_err(es)?;
+    }
+    tx.commit().map_err(es)?;
+    Ok(())
+}
+
 pub fn rename_lora_group_inner(dir: &Path, input: RenameGroupInput) -> Result<(), String> {
     let name = clean_group_name(&input.name)?;
     let conn = store::open(dir)?;
@@ -900,6 +929,11 @@ pub fn create_lora_group(state: tauri::State<'_, crate::AppState>, input: NewGro
 #[tauri::command]
 pub fn set_lora_group_style(state: tauri::State<'_, crate::AppState>, input: GroupStyleInput) -> Result<(), String> {
     set_lora_group_style_inner(&state.dir, input)
+}
+
+#[tauri::command]
+pub fn reorder_lora_groups(state: tauri::State<'_, crate::AppState>, input: ReorderGroupsInput) -> Result<(), String> {
+    reorder_lora_groups_inner(&state.dir, input)
 }
 
 #[tauri::command]

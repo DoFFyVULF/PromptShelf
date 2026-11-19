@@ -2,7 +2,7 @@ use crate::dedup;
 use crate::images::{self, ImportSettings};
 use crate::models::{
     es, CardDetail, CardSummary, GroupInfo, GroupStyleInput, ImageInfo, ListFilter, Lora, MoveCardsInput,
-    NewCardInput, NewGroupInput, RenameGroupInput, TagCount, UpdateCardInput,
+    NewCardInput, NewGroupInput, ReorderGroupsInput, RenameGroupInput, TagCount, UpdateCardInput,
 };
 use crate::store;
 use rusqlite::{params, Connection, OptionalExtension};
@@ -781,6 +781,36 @@ pub fn set_group_style_inner(dir: &Path, input: GroupStyleInput) -> Result<(), S
     Ok(())
 }
 
+/// Persists the full displayed order. The list must contain every group
+/// exactly once — a stale list would silently interleave old `sort` values.
+pub fn reorder_groups_inner(dir: &Path, input: ReorderGroupsInput) -> Result<(), String> {
+    let mut conn = store::open(dir)?;
+    let tx = conn.transaction().map_err(es)?;
+
+    let total: i64 = tx.query_row("SELECT COUNT(*) FROM groups", [], |r| r.get(0)).map_err(es)?;
+    let unique: HashSet<&str> = input.ids.iter().map(|id| id.as_str()).collect();
+    if input.ids.len() != total as usize || unique.len() != input.ids.len() {
+        return Err("group list out of date".to_string());
+    }
+    let mut stmt = tx.prepare("SELECT 1 FROM groups WHERE id = ?1").map_err(es)?;
+    for id in &input.ids {
+        if stmt.query_row(params![id], |_| Ok(true)).optional().map_err(es)?.is_none() {
+            return Err("group not found".to_string());
+        }
+    }
+    drop(stmt);
+
+    for (sort, id) in input.ids.iter().enumerate() {
+        tx.execute(
+            "UPDATE groups SET sort = ?1 WHERE id = ?2",
+            params![sort as i64, id],
+        )
+        .map_err(es)?;
+    }
+    tx.commit().map_err(es)?;
+    Ok(())
+}
+
 pub fn rename_group_inner(dir: &Path, input: RenameGroupInput) -> Result<(), String> {
     let name = clean_group_name(&input.name)?;
     let conn = store::open(dir)?;
@@ -934,6 +964,11 @@ pub fn create_group(state: tauri::State<'_, crate::AppState>, input: NewGroupInp
 #[tauri::command]
 pub fn set_group_style(state: tauri::State<'_, crate::AppState>, input: GroupStyleInput) -> Result<(), String> {
     set_group_style_inner(&state.dir, input)
+}
+
+#[tauri::command]
+pub fn reorder_groups(state: tauri::State<'_, crate::AppState>, input: ReorderGroupsInput) -> Result<(), String> {
+    reorder_groups_inner(&state.dir, input)
 }
 
 #[tauri::command]

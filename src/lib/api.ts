@@ -57,6 +57,7 @@ export const api = {
     invoke<GroupInfo>("create_group", { input: { name, color, icon } }),
   setGroupStyle: (id: string, color: string, icon: string) =>
     invoke<void>("set_group_style", { input: { id, color, icon } }),
+  reorderGroups: (ids: string[]) => invoke<void>("reorder_groups", { input: { ids } }),
   renameGroup: (id: string, name: string) => invoke<void>("rename_group", { input: { id, name } }),
   deleteGroup: (id: string) => invoke<void>("delete_group", { id }),
   moveCards: (ids: string[], group_id: string) => invoke<void>("move_cards", { input: { ids, group_id } }),
@@ -90,6 +91,7 @@ export const api = {
     invoke<GroupInfo>("create_lora_group", { input: { name, color, icon } }),
   setLoraGroupStyle: (id: string, color: string, icon: string) =>
     invoke<void>("set_lora_group_style", { input: { id, color, icon } }),
+  reorderLoraGroups: (ids: string[]) => invoke<void>("reorder_lora_groups", { input: { ids } }),
   renameLoraGroup: (id: string, name: string) => invoke<void>("rename_lora_group", { input: { id, name } }),
   deleteLoraGroup: (id: string) => invoke<void>("delete_lora_group", { id }),
   moveLoras: (ids: string[], group_id: string) => invoke<void>("move_loras", { input: { ids, group_id } }),

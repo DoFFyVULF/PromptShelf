@@ -71,6 +71,7 @@ export const ru: Record<DictKey, string> = {
   "groups.style.searchIcons": "Найти иконку…",
   "groups.style.noIcons": "Иконки не найдены",
   "groups.style.done": "Готово",
+  "groups.reorder": "Перетащите, чтобы изменить порядок",
 
   "select.select": "Выбрать карточки",
   "select.move": "Переместить в…",

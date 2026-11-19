@@ -9,6 +9,8 @@ import type { CardSummary } from "../lib/types";
 
 /** dataTransfer type used when dragging cards onto the groups panel. */
 export const CARD_DRAG_TYPE = "application/x-promptshelf-cards";
+/** Dragging a group row inside the panel to change the display order. */
+export const GROUP_DRAG_TYPE = "application/x-promptshelf-group";
 
 interface GridProps {
   cards: CardSummary[];

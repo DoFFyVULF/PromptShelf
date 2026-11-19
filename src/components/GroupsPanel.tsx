@@ -1,24 +1,26 @@
 import { useEffect, useRef, useState } from "react";
-import { CornerDownRight, Home, Palette, Pencil, Plus, Trash2, X } from "lucide-react";
+import { CornerDownRight, GripVertical, Home, Palette, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useI18n } from "../i18n";
 import { api } from "../lib/api";
 import { groupColorVar } from "../lib/groupStyle";
 import type { GroupInfo } from "../lib/types";
 import { GroupAppearance } from "./GroupAppearance";
 import { GroupGlyph } from "./GroupGlyph";
-import { CARD_DRAG_TYPE } from "./Grid";
+import { CARD_DRAG_TYPE, GROUP_DRAG_TYPE } from "./Grid";
 import { useToast } from "./Toasts";
 
 /** Group management calls, one set per shelf. */
 const cardGroupApi = {
   create: (name: string) => api.createGroup(name),
   style: (id: string, color: string, icon: string) => api.setGroupStyle(id, color, icon),
+  reorder: (ids: string[]) => api.reorderGroups(ids),
   rename: (id: string, name: string) => api.renameGroup(id, name),
   remove: (id: string) => api.deleteGroup(id)
 };
 const loraGroupApi = {
   create: (name: string) => api.createLoraGroup(name),
   style: (id: string, color: string, icon: string) => api.setLoraGroupStyle(id, color, icon),
+  reorder: (ids: string[]) => api.reorderLoraGroups(ids),
   rename: (id: string, name: string) => api.renameLoraGroup(id, name),
   remove: (id: string) => api.deleteLoraGroup(id)
 };
@@ -63,6 +65,10 @@ export function GroupsPanel({
   const [styleId, setStyleId] = useState<string | null>(null);
   const [styleDraft, setStyleDraft] = useState({ color: "", icon: "" });
   const [styleDirty, setStyleDirty] = useState(false);
+  // Local copy so a drop can move the row immediately, before SQLite confirms.
+  const [orderedGroups, setOrderedGroups] = useState<GroupInfo[]>(groups);
+  const [reorderId, setReorderId] = useState<string | null>(null);
+  const [dropIndex, setDropIndex] = useState<number | null>(null);
   const draftRef = useRef<HTMLInputElement>(null);
   const editRef = useRef<HTMLInputElement>(null);
 
@@ -93,8 +99,15 @@ export function GroupsPanel({
       setDragActive(false);
       setStyleId(null);
       setStyleDirty(false);
+      setReorderId(null);
+      setDropIndex(null);
     }
   }, [open]);
+
+  // The shelf reloads the list after every edit; adopt its authoritative order.
+  useEffect(() => {
+    setOrderedGroups(groups);
+  }, [groups]);
 
   // card drags anywhere in the window switch the rows into drop-target mode;
   // not gated on `open` so the very first drag (which auto-opens the panel
@@ -108,6 +121,8 @@ export function GroupsPanel({
     const onEnd = () => {
       setDragActive(false);
       setDragOverId(null);
+      setReorderId(null);
+      setDropIndex(null);
     };
     window.addEventListener("dragstart", onStart);
     window.addEventListener("dragend", onEnd);
@@ -221,6 +236,69 @@ export function GroupsPanel({
     }
   };
 
+  const isReorderDrag = (e: React.DragEvent) =>
+    Array.from(e.dataTransfer.types).includes(GROUP_DRAG_TYPE);
+
+  const startReorder = (id: string, e: React.DragEvent) => {
+    e.dataTransfer.setData(GROUP_DRAG_TYPE, id);
+    // Some WebViews refuse a drag with only a custom MIME type.
+    e.dataTransfer.setData("text/plain", id);
+    e.dataTransfer.effectAllowed = "move";
+    setReorderId(id);
+    setDragOverId(null);
+  };
+
+  const onReorderDragOver = (index: number, e: React.DragEvent) => {
+    if (!isReorderDrag(e)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = "move";
+    const rect = e.currentTarget.getBoundingClientRect();
+    const after = e.clientY > rect.top + rect.height / 2;
+    setDropIndex(index + (after ? 1 : 0));
+  };
+
+  const finishReorder = () => {
+    setReorderId(null);
+    setDropIndex(null);
+  };
+
+  const applyReorder = async (id: string, target: number) => {
+    const current = orderedGroups.map((g) => g.id);
+    const from = current.indexOf(id);
+    const defaultIndex = orderedGroups.findIndex((g) => g.is_default);
+    // The default group is always first; nothing may be dropped above it.
+    const min = defaultIndex >= 0 ? defaultIndex + 1 : 0;
+    finishReorder();
+    if (from < 0) return;
+
+    const without = current.filter((x) => x !== id);
+    let insert = from < target ? target - 1 : target;
+    insert = Math.max(min, Math.min(insert, without.length));
+    const nextIds = [...without.slice(0, insert), id, ...without.slice(insert)];
+    if (nextIds.join("|") === current.join("|")) return;
+
+    const byId = new Map(orderedGroups.map((g) => [g.id, g]));
+    setOrderedGroups(nextIds.map((x) => byId.get(x)!).filter(Boolean));
+    try {
+      await apiGroup.reorder(nextIds);
+      onChanged();
+    } catch {
+      toast(t("toast.error"), "error");
+      setOrderedGroups(groups);
+    }
+  };
+
+  const onReorderDrop = (e: React.DragEvent) => {
+    if (!isReorderDrag(e)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const id = e.dataTransfer.getData(GROUP_DRAG_TYPE);
+    const target = dropIndex;
+    finishReorder();
+    if (id && target !== null) void applyReorder(id, target);
+  };
+
   if (!open) return null;
 
   return (
@@ -251,7 +329,7 @@ export function GroupsPanel({
       )}
 
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
-        {groups.map((g) => {
+        {orderedGroups.map((g, index) => {
           const current = g.id === currentGroupId;
           // with an active selection a row click moves the cards instead of
           // switching the view — switching would silently drop the selection
@@ -261,6 +339,7 @@ export function GroupsPanel({
             <div key={g.id}>
               <div
                 onClick={() => {
+                  if (reorderId) return;
                   if (moveActive) {
                     if (!current) moveHere(g, selection);
                     return;
@@ -268,17 +347,28 @@ export function GroupsPanel({
                   onSwitch(g.id);
                 }}
                 onDragOver={(e) => {
+                  if (isReorderDrag(e)) {
+                    onReorderDragOver(index, e);
+                    return;
+                  }
                   e.preventDefault();
                   e.dataTransfer.dropEffect = "move";
                   setDragOverId(g.id);
                 }}
                 onDragLeave={() => setDragOverId((cur) => (cur === g.id ? null : cur))}
-                onDrop={(e) => onDrop(g, e)}
+                onDrop={(e) => {
+                  if (isReorderDrag(e)) {
+                    onReorderDrop(e);
+                    return;
+                  }
+                  onDrop(g, e);
+                }}
                 role="button"
                 tabIndex={0}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") {
                     e.preventDefault();
+                    if (reorderId) return;
                     if (moveActive) {
                       if (!current) moveHere(g, selection);
                       return;
@@ -305,8 +395,34 @@ export function GroupsPanel({
                       : moveActive
                         ? "border-transparent text-body hover:border-leaf-edge hover:bg-leaf-soft/60"
                         : "border-transparent text-body hover:bg-parchment"
-                }`}
+                } ${reorderId === g.id ? "opacity-40" : ""}`}
               >
+                {reorderId && dropIndex === index && (
+                  <span aria-hidden className="pointer-events-none absolute -top-px right-2 left-2 z-20 h-0.5 rounded-full bg-leaf-icon" />
+                )}
+                {reorderId && dropIndex === index + 1 && (
+                  <span aria-hidden className="pointer-events-none absolute -bottom-px right-2 left-2 z-20 h-0.5 rounded-full bg-leaf-icon" />
+                )}
+
+                {g.is_default ? (
+                  <span aria-hidden className="flex h-6 w-3.5 shrink-0" />
+                ) : (
+                  <span
+                    draggable={!editingId && !dragActive}
+                    onDragStart={(e) => startReorder(g.id, e)}
+                    onDragEnd={finishReorder}
+                    onClick={(e) => e.stopPropagation()}
+                    role="button"
+                    aria-label={t("groups.reorder")}
+                    title={t("groups.reorder")}
+                    className={`relative z-10 flex h-6 w-3.5 shrink-0 cursor-grab items-center justify-center text-faint transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 active:cursor-grabbing ${
+                      reorderId === g.id ? "opacity-100" : "opacity-45"
+                    }`}
+                  >
+                    <GripVertical size={12} />
+                  </span>
+                )}
+
                 <span
                   aria-hidden
                   className={`flex h-6 w-6 shrink-0 items-center justify-center ${
