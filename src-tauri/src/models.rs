@@ -280,17 +280,37 @@ pub struct GroupInfo {
     pub name: String,
     pub is_default: bool,
     pub count: i64,
+    /// Palette key from `group_style::COLORS`, empty until customised.
+    #[serde(default)]
+    pub color: String,
+    /// Lucide icon key from `group_style::ICONS`, empty until customised.
+    #[serde(default)]
+    pub icon: String,
 }
 
 #[derive(Deserialize)]
 pub struct NewGroupInput {
     pub name: String,
+    #[serde(default)]
+    pub color: String,
+    #[serde(default)]
+    pub icon: String,
 }
 
 #[derive(Deserialize)]
 pub struct RenameGroupInput {
     pub id: String,
     pub name: String,
+}
+
+/// Appearance-only edit — keeps rename a rename and makes partial updates safe.
+#[derive(Deserialize)]
+pub struct GroupStyleInput {
+    pub id: String,
+    #[serde(default)]
+    pub color: String,
+    #[serde(default)]
+    pub icon: String,
 }
 
 #[derive(Deserialize)]

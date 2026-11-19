@@ -348,8 +348,9 @@ fn test_add_image_sets_cover_and_sort() {    let dir = tmp_dir("addimg");
 fn test_groups_crud_move_and_default() {
     use crate::cards::{
         create_group_inner, delete_group_inner, list_groups_inner, move_cards_inner, rename_group_inner,
+        set_group_style_inner,
     };
-    use crate::models::{MoveCardsInput, NewGroupInput, RenameGroupInput};
+    use crate::models::{GroupStyleInput, MoveCardsInput, NewGroupInput, RenameGroupInput};
 
     let dir = tmp_dir("groups");
 
@@ -384,8 +385,33 @@ fn test_groups_crud_move_and_default() {
     assert_eq!(detail.group_id, default_id);
 
     // create, rename, move
-    let g = create_group_inner(&dir, NewGroupInput { name: "  Anime  ".to_string() }).unwrap();
+    let g = create_group_inner(
+        &dir,
+        NewGroupInput {
+            name: "  Anime  ".to_string(),
+            color: "violet".to_string(),
+            icon: "sparkles".to_string(),
+        },
+    )
+    .unwrap();
     assert_eq!(g.name, "Anime");
+    assert_eq!(g.color, "violet");
+    assert_eq!(g.icon, "sparkles");
+    assert_eq!(list_groups_inner(&dir).unwrap().iter().find(|x| x.id == g.id).unwrap().icon, "sparkles");
+
+    // appearance is a separate, partial-safe edit
+    set_group_style_inner(
+        &dir,
+        GroupStyleInput {
+            id: g.id.clone(),
+            color: "rose".to_string(),
+            icon: String::new(),
+        },
+    )
+    .unwrap();
+    let styled = list_groups_inner(&dir).unwrap().into_iter().find(|x| x.id == g.id).unwrap();
+    assert_eq!(styled.color, "rose");
+    assert_eq!(styled.icon, "");
 
     move_cards_inner(
         &dir,

@@ -28,7 +28,9 @@ CREATE TABLE IF NOT EXISTS groups (
     name TEXT NOT NULL,
     is_default INTEGER NOT NULL DEFAULT 0,
     sort INTEGER NOT NULL DEFAULT 0,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    color TEXT NOT NULL DEFAULT '',
+    icon TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_groups_sort ON groups(is_default DESC, sort, name);
 CREATE TABLE IF NOT EXISTS card_images (
@@ -97,7 +99,9 @@ CREATE TABLE IF NOT EXISTS lora_groups (
     name TEXT NOT NULL,
     is_default INTEGER NOT NULL DEFAULT 0,
     sort INTEGER NOT NULL DEFAULT 0,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    color TEXT NOT NULL DEFAULT '',
+    icon TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_lora_groups_sort ON lora_groups(is_default DESC, sort, name);
 CREATE TABLE IF NOT EXISTS lora_tags (
@@ -199,6 +203,32 @@ fn ensure_columns(conn: &Connection) -> Result<(), String> {
     if !lora_names.iter().any(|n| n == "pinned") {
         conn.execute("ALTER TABLE loras ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0", [])
             .map_err(es)?;
+    }
+
+    // Group appearance was added after v1 to both shelves. DEFAULT '' keeps
+    // the seeded default group and all existing groups looking unchanged.
+    ensure_group_columns(conn, "groups")?;
+    ensure_group_columns(conn, "lora_groups")?;
+    Ok(())
+}
+
+fn ensure_group_columns(conn: &Connection, table: &str) -> Result<(), String> {
+    let mut stmt = conn.prepare(&format!("PRAGMA table_info({table})")).map_err(es)?;
+    let names = stmt
+        .query_map([], |r| r.get::<_, String>(1))
+        .map_err(es)?
+        .filter_map(|n| n.ok())
+        .collect::<Vec<String>>();
+    drop(stmt);
+
+    for column in ["color", "icon"] {
+        if !names.iter().any(|n| n == column) {
+            conn.execute(
+                &format!("ALTER TABLE {table} ADD COLUMN {column} TEXT NOT NULL DEFAULT ''"),
+                [],
+            )
+            .map_err(es)?;
+        }
     }
     Ok(())
 }

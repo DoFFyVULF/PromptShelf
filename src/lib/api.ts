@@ -53,7 +53,10 @@ export const api = {
   listTags: () => invoke<TagCount[]>("list_tags"),
 
   listGroups: () => invoke<GroupInfo[]>("list_groups"),
-  createGroup: (name: string) => invoke<GroupInfo>("create_group", { input: { name } }),
+  createGroup: (name: string, color = "", icon = "") =>
+    invoke<GroupInfo>("create_group", { input: { name, color, icon } }),
+  setGroupStyle: (id: string, color: string, icon: string) =>
+    invoke<void>("set_group_style", { input: { id, color, icon } }),
   renameGroup: (id: string, name: string) => invoke<void>("rename_group", { input: { id, name } }),
   deleteGroup: (id: string) => invoke<void>("delete_group", { id }),
   moveCards: (ids: string[], group_id: string) => invoke<void>("move_cards", { input: { ids, group_id } }),
@@ -83,7 +86,10 @@ export const api = {
   setLoraPinned: (id: string, pinned: boolean) => invoke<void>("set_lora_pinned", { id, pinned }),
   listLoraTags: () => invoke<TagCount[]>("list_lora_tags"),
   listLoraGroups: () => invoke<GroupInfo[]>("list_lora_groups"),
-  createLoraGroup: (name: string) => invoke<GroupInfo>("create_lora_group", { input: { name } }),
+  createLoraGroup: (name: string, color = "", icon = "") =>
+    invoke<GroupInfo>("create_lora_group", { input: { name, color, icon } }),
+  setLoraGroupStyle: (id: string, color: string, icon: string) =>
+    invoke<void>("set_lora_group_style", { input: { id, color, icon } }),
   renameLoraGroup: (id: string, name: string) => invoke<void>("rename_lora_group", { input: { id, name } }),
   deleteLoraGroup: (id: string) => invoke<void>("delete_lora_group", { id }),
   moveLoras: (ids: string[], group_id: string) => invoke<void>("move_loras", { input: { ids, group_id } }),

@@ -1,6 +1,8 @@
 import { ChevronDown, Folder, ListChecks, Tag, X } from "lucide-react";
 import { useI18n } from "../i18n";
+import { groupColorVar } from "../lib/groupStyle";
 import type { GroupInfo, TagCount } from "../lib/types";
+import { GroupGlyph } from "./GroupGlyph";
 
 interface FilterBarProps {
   tags: TagCount[];
@@ -44,8 +46,15 @@ export function FilterBar({
         title={t("groups.title")}
         className="press flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-hairline bg-card py-0 pr-2.5 pl-3 text-[12.5px] font-medium text-body transition-colors hover:bg-parchment"
       >
-        <Folder size={13} className="text-faint" />
-        <span className="max-w-[160px] truncate">{group?.name ?? t("group.home")}</span>
+        <span className="flex text-faint">
+          <GroupGlyph group={group} size={13} fallback={<Folder size={13} />} />
+        </span>
+        <span
+          className="max-w-[160px] truncate"
+          style={group?.color ? { color: groupColorVar(group.color) } : undefined}
+        >
+          {group?.name ?? t("group.home")}
+        </span>
         <ChevronDown size={12} className="text-faint" />
       </button>
 

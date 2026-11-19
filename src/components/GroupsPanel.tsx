@@ -1,19 +1,24 @@
 import { useEffect, useRef, useState } from "react";
-import { CornerDownRight, Home, Pencil, Plus, Trash2, X } from "lucide-react";
+import { CornerDownRight, Home, Palette, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useI18n } from "../i18n";
 import { api } from "../lib/api";
+import { groupColorVar } from "../lib/groupStyle";
 import type { GroupInfo } from "../lib/types";
+import { GroupAppearance } from "./GroupAppearance";
+import { GroupGlyph } from "./GroupGlyph";
 import { CARD_DRAG_TYPE } from "./Grid";
 import { useToast } from "./Toasts";
 
 /** Group management calls, one set per shelf. */
 const cardGroupApi = {
   create: (name: string) => api.createGroup(name),
+  style: (id: string, color: string, icon: string) => api.setGroupStyle(id, color, icon),
   rename: (id: string, name: string) => api.renameGroup(id, name),
   remove: (id: string) => api.deleteGroup(id)
 };
 const loraGroupApi = {
   create: (name: string) => api.createLoraGroup(name),
+  style: (id: string, color: string, icon: string) => api.setLoraGroupStyle(id, color, icon),
   rename: (id: string, name: string) => api.renameLoraGroup(id, name),
   remove: (id: string) => api.deleteLoraGroup(id)
 };
@@ -55,6 +60,9 @@ export function GroupsPanel({
   // true while a card drag is in flight anywhere in the window — every group
   // row then presents itself as a drop target
   const [dragActive, setDragActive] = useState(false);
+  const [styleId, setStyleId] = useState<string | null>(null);
+  const [styleDraft, setStyleDraft] = useState({ color: "", icon: "" });
+  const [styleDirty, setStyleDirty] = useState(false);
   const draftRef = useRef<HTMLInputElement>(null);
   const editRef = useRef<HTMLInputElement>(null);
 
@@ -83,6 +91,8 @@ export function GroupsPanel({
       setArmDelete(null);
       setDragOverId(null);
       setDragActive(false);
+      setStyleId(null);
+      setStyleDirty(false);
     }
   }, [open]);
 
@@ -124,11 +134,16 @@ export function GroupsPanel({
       return;
     }
     try {
-      await apiGroup.create(name);
+      const created = await apiGroup.create(name);
       toast(t("toast.groupCreated"));
       setDraftName("");
       setCreating(false);
       onChanged();
+      // Reveal the appearance editor right away so the new feature is
+      // discoverable — Done closes it without any extra confirmation.
+      setStyleId(created.id);
+      setStyleDraft({ color: created.color, icon: created.icon });
+      setStyleDirty(false);
     } catch (e) {
       const msg = String(e);
       toast(msg.includes("GROUP_NAME") ? t("editor.error.prompt") : t("toast.error"), "error");
@@ -168,6 +183,29 @@ export function GroupsPanel({
   const moveHere = (group: GroupInfo, ids: string[]) => {
     if (ids.length === 0) return;
     onMoved(group, ids);
+  };
+
+  const openStyle = (group: GroupInfo) => {
+    setStyleId(group.id);
+    setStyleDraft({ color: group.color, icon: group.icon });
+    setStyleDirty(false);
+  };
+
+  const closeStyle = () => {
+    if (styleDirty) toast(t("toast.groupStyled"));
+    setStyleId(null);
+    setStyleDirty(false);
+  };
+
+  const pickStyle = async (id: string, next: { color: string; icon: string }) => {
+    setStyleDraft(next);
+    setStyleDirty(true);
+    try {
+      await apiGroup.style(id, next.color, next.icon);
+      onChanged();
+    } catch {
+      toast(t("toast.error"), "error");
+    }
   };
 
   const onDrop = (group: GroupInfo, e: React.DragEvent) => {
@@ -220,156 +258,185 @@ export function GroupsPanel({
           // and look like "nothing happened"
           const moveActive = selection.length > 0 && !dragActive;
           return (
-            <div
-              key={g.id}
-              onClick={() => {
-                if (moveActive) {
-                  if (!current) moveHere(g, selection);
-                  return;
-                }
-                onSwitch(g.id);
-              }}
-              onDragOver={(e) => {
-                e.preventDefault();
-                e.dataTransfer.dropEffect = "move";
-                setDragOverId(g.id);
-              }}              onDragLeave={() => setDragOverId((cur) => (cur === g.id ? null : cur))}
-              onDrop={(e) => onDrop(g, e)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
+            <div key={g.id}>
+              <div
+                onClick={() => {
                   if (moveActive) {
                     if (!current) moveHere(g, selection);
                     return;
                   }
                   onSwitch(g.id);
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
+                  setDragOverId(g.id);
+                }}
+                onDragLeave={() => setDragOverId((cur) => (cur === g.id ? null : cur))}
+                onDrop={(e) => onDrop(g, e)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    if (moveActive) {
+                      if (!current) moveHere(g, selection);
+                      return;
+                    }
+                    onSwitch(g.id);
+                  }
+                }}
+                title={
+                  moveActive && !current
+                    ? `${t("groups.moveHere")} (${selection.length})`
+                    : undefined
                 }
-              }}
-              title={
-                moveActive && !current
-                  ? `${t("groups.moveHere")} (${selection.length})`
-                  : undefined
-              }
-              className={`group relative flex cursor-pointer items-center gap-2.5 rounded-[10px] border px-2.5 py-2 transition-[background-color,border-color,color] duration-150 ${
-                dragActive
-                  ? current
-                    ? dragOverId === g.id
-                      ? "border-leaf-icon bg-leaf-target text-leaf-strong"
-                      : "border-dashed border-leaf-edge/80 bg-leaf-soft/70 text-leaf"
-                    : dragOverId === g.id
-                      ? "border-leaf-icon bg-leaf-target text-leaf-strong"
-                      : "border-dashed border-leaf-edge/70 bg-leaf-soft/50 text-leaf/80"
-                  : current
-                    ? "border-leaf-edge bg-leaf-soft text-leaf"
-                    : moveActive
-                      ? "border-transparent text-body hover:border-leaf-edge hover:bg-leaf-soft/60"
-                      : "border-transparent text-body hover:bg-parchment"
-              }`}
-            >
-              <span
-                aria-hidden
-                className={`flex h-6 w-6 shrink-0 items-center justify-center ${
-                  current ? "text-leaf-icon" : "text-faint"
+                className={`group relative flex cursor-pointer items-center gap-2.5 rounded-[10px] border px-2.5 py-2 transition-[background-color,border-color,color] duration-150 ${
+                  dragActive
+                    ? current
+                      ? dragOverId === g.id
+                        ? "border-leaf-icon bg-leaf-target text-leaf-strong"
+                        : "border-dashed border-leaf-edge/80 bg-leaf-soft/70 text-leaf"
+                      : dragOverId === g.id
+                        ? "border-leaf-icon bg-leaf-target text-leaf-strong"
+                        : "border-dashed border-leaf-edge/70 bg-leaf-soft/50 text-leaf/80"
+                    : current
+                      ? "border-leaf-edge bg-leaf-soft text-leaf"
+                      : moveActive
+                        ? "border-transparent text-body hover:border-leaf-edge hover:bg-leaf-soft/60"
+                        : "border-transparent text-body hover:bg-parchment"
                 }`}
               >
-                {g.is_default ? <Home size={14.5} /> : <span className="h-2 w-2 rounded-full bg-current" />}
-              </span>
-
-              {editingId === g.id ? (
-                <input
-                  ref={editRef}
-                  type="text"
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  onClick={(e) => e.stopPropagation()}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      void commitRename(g.id);
-                    } else if (e.key === "Escape") {
-                      e.stopPropagation();
-                      setEditingId(null);
-                    }
-                  }}
-                  onBlur={() => void commitRename(g.id)}
-                  maxLength={48}
-                  spellCheck={false}
-                  className="min-w-0 flex-1 rounded-md border border-leaf-edge bg-card px-2 py-1 text-[13px] text-ink outline-none focus:shadow-focus"
-                />
-              ) : (
-                <span className={`min-w-0 flex-1 truncate text-[13.5px] font-medium ${current ? "text-leaf" : ""}`}>
-                  {g.name}
+                <span
+                  aria-hidden
+                  className={`flex h-6 w-6 shrink-0 items-center justify-center ${
+                    current ? "text-leaf-icon" : "text-faint"
+                  }`}
+                >
+                  <GroupGlyph
+                    group={g}
+                    size={14.5}
+                    fallback={g.is_default ? <Home size={14.5} /> : <span className="h-2 w-2 rounded-full bg-current" />}
+                  />
                 </span>
-              )}
 
-              {!editingId && (
-                <>
-                  <span className={`shrink-0 text-[11px] tabular-nums ${current ? "text-leaf-icon/80" : "text-faint"}`}>
-                    {g.count}
-                  </span>
-
-                  {dragActive && (
-                    <CornerDownRight
-                      size={13}
-                      className={`shrink-0 text-leaf-icon transition-transform duration-150 ${
-                        dragOverId === g.id ? "scale-125 opacity-100" : "opacity-55"
-                      }`}
-                    />
-                  )}
-
-                  {selection.length > 0 && !dragActive && (
-                    <button
-                      type="button"
-                      aria-label={t("groups.moveHere")}
-                      title={t("groups.moveHere")}
-                      onClick={(e) => {
+                {editingId === g.id ? (
+                  <input
+                    ref={editRef}
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        void commitRename(g.id);
+                      } else if (e.key === "Escape") {
                         e.stopPropagation();
-                        moveHere(g, selection);
-                      }}
-                      className="press flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-leaf-icon transition-colors hover:bg-parchment"
-                    >
-                      <CornerDownRight size={13} />
-                    </button>
-                  )}
+                        setEditingId(null);
+                      }
+                    }}
+                    onBlur={() => void commitRename(g.id)}
+                    maxLength={48}
+                    spellCheck={false}
+                    className="min-w-0 flex-1 rounded-md border border-leaf-edge bg-card px-2 py-1 text-[13px] text-ink outline-none focus:shadow-focus"
+                  />
+                ) : (
+                  <span
+                    className={`min-w-0 flex-1 truncate text-[13.5px] font-medium ${current ? "text-leaf" : ""}`}
+                    style={!current && g.color ? { color: groupColorVar(g.color) } : undefined}
+                  >
+                    {g.name}
+                  </span>
+                )}
 
-                  {!g.is_default && !dragActive && (
-                    <span
-                      className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100"
-                    >
-                      <button
-                        type="button"
-                        aria-label={t("action.edit")}
-                        title={t("action.edit")}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditName(g.name);
-                          setEditingId(g.id);
-                        }}
-                        className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-md text-muted transition-colors hover:bg-parchment hover:text-ink"
-                      >
-                        <Pencil size={12} />
-                      </button>
-                      <button
-                        type="button"
-                        aria-label={t("action.delete")}
-                        title={armDelete === g.id ? t("groups.deleteHint", { name: groupNameOf(groups) }) : t("action.delete")}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          void removeGroup(g);
-                        }}
-                        className={`flex h-6 w-6 cursor-pointer items-center justify-center rounded-md transition-colors ${
-                          armDelete === g.id
-                            ? "bg-destructive text-on-ink"
-                            : "text-muted hover:bg-parchment hover:text-destructive"
-                        }`}
-                      >
-                        <Trash2 size={12} />
-                      </button>
+                {!editingId && (
+                  <>
+                    <span className={`shrink-0 text-[11px] tabular-nums ${current ? "text-leaf-icon/80" : "text-faint"}`}>
+                      {g.count}
                     </span>
-                  )}
-                </>
+
+                    {dragActive && (
+                      <CornerDownRight
+                        size={13}
+                        className={`shrink-0 text-leaf-icon transition-transform duration-150 ${
+                          dragOverId === g.id ? "scale-125 opacity-100" : "opacity-55"
+                        }`}
+                      />
+                    )}
+
+                    {selection.length > 0 && !dragActive && (
+                      <button
+                        type="button"
+                        aria-label={t("groups.moveHere")}
+                        title={t("groups.moveHere")}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          moveHere(g, selection);
+                        }}
+                        className="press flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-leaf-icon transition-colors hover:bg-parchment"
+                      >
+                        <CornerDownRight size={13} />
+                      </button>
+                    )}
+
+                    {!g.is_default && !dragActive && (
+                      <span
+                        className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100"
+                      >
+                        <button
+                          type="button"
+                          aria-label={t("groups.style")}
+                          title={t("groups.style")}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openStyle(g);
+                          }}
+                          className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-md text-muted transition-colors hover:bg-parchment hover:text-ink"
+                        >
+                          <Palette size={12} />
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={t("action.edit")}
+                          title={t("action.edit")}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditName(g.name);
+                            setEditingId(g.id);
+                          }}
+                          className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-md text-muted transition-colors hover:bg-parchment hover:text-ink"
+                        >
+                          <Pencil size={12} />
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={t("action.delete")}
+                          title={armDelete === g.id ? t("groups.deleteHint", { name: groupNameOf(groups) }) : t("action.delete")}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void removeGroup(g);
+                          }}
+                          className={`flex h-6 w-6 cursor-pointer items-center justify-center rounded-md transition-colors ${
+                            armDelete === g.id
+                              ? "bg-destructive text-on-ink"
+                              : "text-muted hover:bg-parchment hover:text-destructive"
+                          }`}
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </span>
+                    )}
+                  </>
+                )}
+              </div>
+              {styleId === g.id && (
+                <GroupAppearance
+                  color={styleDraft.color}
+                  icon={styleDraft.icon}
+                  onPick={(next) => void pickStyle(g.id, next)}
+                  onClose={closeStyle}
+                />
               )}
             </div>
           );

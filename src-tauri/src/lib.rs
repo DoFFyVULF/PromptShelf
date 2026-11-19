@@ -1,6 +1,7 @@
 mod cards;
 mod civitai;
 mod dedup;
+mod group_style;
 mod images;
 mod loras;
 mod models;
@@ -60,6 +61,7 @@ pub fn run() {
             cards::list_tags,
             cards::list_groups,
             cards::create_group,
+            cards::set_group_style,
             cards::rename_group,
             cards::delete_group,
             cards::move_cards,
@@ -79,6 +81,7 @@ pub fn run() {
             loras::list_lora_tags,
             loras::list_lora_groups,
             loras::create_lora_group,
+            loras::set_lora_group_style,
             loras::rename_lora_group,
             loras::delete_lora_group,
             loras::move_loras,

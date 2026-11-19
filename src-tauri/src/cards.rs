@@ -1,8 +1,8 @@
 use crate::dedup;
 use crate::images::{self, ImportSettings};
 use crate::models::{
-    es, CardDetail, CardSummary, GroupInfo, ImageInfo, ListFilter, Lora, MoveCardsInput, NewCardInput, NewGroupInput,
-    RenameGroupInput, TagCount, UpdateCardInput,
+    es, CardDetail, CardSummary, GroupInfo, GroupStyleInput, ImageInfo, ListFilter, Lora, MoveCardsInput,
+    NewCardInput, NewGroupInput, RenameGroupInput, TagCount, UpdateCardInput,
 };
 use crate::store;
 use rusqlite::{params, Connection, OptionalExtension};
@@ -702,7 +702,7 @@ pub fn list_groups_inner(dir: &Path) -> Result<Vec<GroupInfo>, String> {
 
     let mut stmt = conn
         .prepare(
-            "SELECT g.id, g.name, g.is_default, COUNT(c.id)
+            "SELECT g.id, g.name, g.is_default, COUNT(c.id), g.color, g.icon
              FROM groups g
              LEFT JOIN cards c ON c.group_id = g.id
              GROUP BY g.id
@@ -716,6 +716,8 @@ pub fn list_groups_inner(dir: &Path) -> Result<Vec<GroupInfo>, String> {
                 name: r.get(1)?,
                 is_default: r.get::<_, i64>(2)? != 0,
                 count: r.get(3)?,
+                color: r.get(4)?,
+                icon: r.get(5)?,
             })
         })
         .map_err(es)?;
@@ -740,14 +742,17 @@ fn clean_group_name(name: &str) -> Result<String, String> {
 
 pub fn create_group_inner(dir: &Path, input: NewGroupInput) -> Result<GroupInfo, String> {
     let name = clean_group_name(&input.name)?;
+    let color = crate::group_style::clean_color(&input.color)?;
+    let icon = crate::group_style::clean_icon(&input.icon)?;
     let conn = store::open(dir)?;
     let sort: i64 = conn
         .query_row("SELECT COALESCE(MAX(sort) + 1, 1) FROM groups", [], |r| r.get(0))
         .map_err(es)?;
     let id = uuid::Uuid::new_v4().to_string();
     conn.execute(
-        "INSERT INTO groups(id, name, is_default, sort, created_at) VALUES(?1, ?2, 0, ?3, ?4)",
-        params![id, name, sort, now()],
+        "INSERT INTO groups(id, name, is_default, sort, created_at, color, icon)
+         VALUES(?1, ?2, 0, ?3, ?4, ?5, ?6)",
+        params![id, name, sort, now(), color, icon],
     )
     .map_err(es)?;
     Ok(GroupInfo {
@@ -755,7 +760,25 @@ pub fn create_group_inner(dir: &Path, input: NewGroupInput) -> Result<GroupInfo,
         name,
         is_default: false,
         count: 0,
+        color,
+        icon,
     })
+}
+
+pub fn set_group_style_inner(dir: &Path, input: GroupStyleInput) -> Result<(), String> {
+    let color = crate::group_style::clean_color(&input.color)?;
+    let icon = crate::group_style::clean_icon(&input.icon)?;
+    let conn = store::open(dir)?;
+    let n = conn
+        .execute(
+            "UPDATE groups SET color = ?1, icon = ?2 WHERE id = ?3",
+            params![color, icon, input.id],
+        )
+        .map_err(es)?;
+    if n == 0 {
+        return Err("group not found".to_string());
+    }
+    Ok(())
 }
 
 pub fn rename_group_inner(dir: &Path, input: RenameGroupInput) -> Result<(), String> {
@@ -906,6 +929,11 @@ pub fn list_groups(state: tauri::State<'_, crate::AppState>) -> Result<Vec<Group
 #[tauri::command]
 pub fn create_group(state: tauri::State<'_, crate::AppState>, input: NewGroupInput) -> Result<GroupInfo, String> {
     create_group_inner(&state.dir, input)
+}
+
+#[tauri::command]
+pub fn set_group_style(state: tauri::State<'_, crate::AppState>, input: GroupStyleInput) -> Result<(), String> {
+    set_group_style_inner(&state.dir, input)
 }
 
 #[tauri::command]

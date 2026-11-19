@@ -77,6 +77,10 @@ export interface GroupInfo {
   name: string;
   is_default: boolean;
   count: number;
+  /** Key from `GROUP_COLORS`; empty until the group is customised. */
+  color: string;
+  /** Key from `GROUP_ICONS`; empty until the group is customised. */
+  icon: string;
 }
 
 export interface ListFilter {
