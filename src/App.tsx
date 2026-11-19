@@ -39,6 +39,7 @@ import {
 } from "./lib/loraFamilies";
 import { BootLoader } from "./components/BootLoader";
 import { EmptyState } from "./components/EmptyState";
+import { GroupEmptyState } from "./components/GroupEmptyState";
 import { CardDetail } from "./components/CardDetail";
 import { LoraDetail } from "./components/LoraDetail";
 import { LoraShelfEditor } from "./components/LoraShelfEditor";
@@ -61,6 +62,7 @@ import { MissingPromptDialog } from "./components/MissingPromptDialog";
 import { CornerDownRight, ListChecks, X } from "lucide-react";
 import { applyTheme, onSystemThemeChange, themeFromStorage } from "./lib/theme";
 import { shortcutKey } from "./lib/platform";
+import { ALL_GROUPS, allGroupsCount, groupFilterId, isAllGroups } from "./lib/groups";
 import { useUpdateCheck } from "./lib/useUpdateCheck";
 
 // CivitAI links for clipboard auto-import, mirroring the Rust link parsers:
@@ -361,7 +363,7 @@ function Shell() {
       match_all_tags: matchAllTags,
       min_rating: 0,
       sort,
-      group_id: groupId || null,
+      group_id: groupFilterId(groupId),
     };
     try {
       const [list, tagList] = await Promise.all([
@@ -405,7 +407,7 @@ function Shell() {
       match_all_tags: matchAllTags,
       min_rating: 0,
       sort,
-      group_id: loraGroupId || null,
+      group_id: groupFilterId(loraGroupId),
     };
     try {
       const [list, tagList] = await Promise.all([
@@ -453,8 +455,10 @@ function Shell() {
     [loadLoras],
   );
 
-  // keep groupId valid (e.g. the group was deleted or the library was replaced)
+  // keep groupId valid (e.g. the group was deleted or the library was replaced).
+  // "All groups" is a view, not a stored row, so it is always valid.
   useEffect(() => {
+    if (isAllGroups(groupId)) return;
     if (!groupsReady || groups.length === 0) return;
     if (groups.some((g) => g.id === groupId)) return;
     const def = groups.find((g) => g.is_default) ?? groups[0];
@@ -464,6 +468,7 @@ function Shell() {
 
   // the same, per shelf: lora groups live separately
   useEffect(() => {
+    if (isAllGroups(loraGroupId)) return;
     if (!loraGroupsReady || loraGroups.length === 0) return;
     if (loraGroups.some((g) => g.id === loraGroupId)) return;
     const def = loraGroups.find((g) => g.is_default) ?? loraGroups[0];
@@ -588,6 +593,39 @@ function Shell() {
     [loadLoras, loadLoraGroups],
   );
 
+  // The detail view is the one place a single card can be filed without
+  // entering selection mode. The picker sends a real group, never the
+  // "All groups" view sentinel.
+  const moveCardToGroup = useCallback(
+    async (group: GroupInfo) => {
+      if (!detail) return;
+      try {
+        await api.moveCards([detail.id], group.id);
+        setDetail((cur) => (cur ? { ...cur, group_id: group.id } : cur));
+        toast(t("toast.moved", { name: group.name }));
+        await Promise.all([loadCards(), loadGroups()]);
+      } catch {
+        toast(t("toast.error"), "error");
+      }
+    },
+    [detail, loadCards, loadGroups, t, toast],
+  );
+
+  const moveLoraToGroup = useCallback(
+    async (group: GroupInfo) => {
+      if (!loraDetail) return;
+      try {
+        await api.moveLoras([loraDetail.id], group.id);
+        setLoraDetail((cur) => (cur ? { ...cur, group_id: group.id } : cur));
+        toast(t("toast.moved", { name: group.name }));
+        await Promise.all([loadLoras(), loadLoraGroups()]);
+      } catch {
+        toast(t("toast.error"), "error");
+      }
+    },
+    [loraDetail, loadLoras, loadLoraGroups, t, toast],
+  );
+
   const copyPromptText = useCallback(
     async (text: string, copiedKey: DictKey = "toast.copied") => {
       try {
@@ -604,12 +642,39 @@ function Shell() {
 
   const currentGroup =
     mode === "prompt"
-      ? (groups.find((g) => g.id === groupId) ??
-        groups.find((g) => g.is_default) ??
-        null)
-      : (loraGroups.find((g) => g.id === loraGroupId) ??
-        loraGroups.find((g) => g.is_default) ??
-        null);
+      ? isAllGroups(groupId)
+        ? {
+            id: ALL_GROUPS,
+            name: t("groups.all"),
+            is_default: false,
+            count: allGroupsCount(groups),
+            color: "",
+            icon: "",
+          }
+        : (groups.find((g) => g.id === groupId) ??
+          groups.find((g) => g.is_default) ??
+          null)
+      : isAllGroups(loraGroupId)
+        ? {
+            id: ALL_GROUPS,
+            name: t("groups.all.lora"),
+            is_default: false,
+            count: allGroupsCount(loraGroups),
+            color: "",
+            icon: "",
+          }
+        : (loraGroups.find((g) => g.id === loraGroupId) ??
+          loraGroups.find((g) => g.is_default) ??
+          null);
+
+  // New items always land in a real group: when the shelf is scoped to
+  // "All cards" the default group is the sensible destination.
+  const newCardGroupId = isAllGroups(groupId)
+    ? (groups.find((g) => g.is_default)?.id ?? "")
+    : groupId;
+  const newLoraGroupId = isAllGroups(loraGroupId)
+    ? (loraGroups.find((g) => g.is_default)?.id ?? "")
+    : loraGroupId;
 
   const toggleTags = useCallback(() => {
     setTagsOpen((on) => !on);
@@ -935,7 +1000,7 @@ function Shell() {
           tags: res.tags,
           images: [image.temp_path],
           loras: res.loras,
-          group_id: groupId,
+          group_id: newCardGroupId,
           author: res.author || null,
           checkpoint: res.checkpoint || null,
           meta: res.meta,
@@ -955,7 +1020,7 @@ function Shell() {
         throw e;
       }
     },
-    [groupId, loadCards, pushReceipt],
+    [newCardGroupId, loadCards, pushReceipt],
   );
 
   // --------------------------------------------------------- import jobs
@@ -1108,7 +1173,7 @@ function Shell() {
           primary_tag: res.primary_tag,
           tags: res.tags,
           images: res.images.map((img) => img.temp_path),
-          group_id: loraGroupId,
+          group_id: newLoraGroupId,
           source_key: res.source_key,
         });
         setLoraReceipts((prev) => [
@@ -1128,7 +1193,7 @@ function Shell() {
         throw e;
       }
     },
-    [loraGroupId, loadLoras],
+    [newLoraGroupId, loadLoras],
   );
 
   const updateLoraJob = useCallback((id: string, patch: Partial<ImportJob>) => {
@@ -1428,19 +1493,22 @@ function Shell() {
   // ---------------------------------------------------------------- drag & drop
 
   // grabbing a card slides the groups panel in, so the drop targets are
-  // visible before the drag even starts
+  // visible before the drag even starts. With a single group there is nowhere
+  // to file the card, so the panel stays out of the way.
   useEffect(() => {
     const onDragStart = (e: DragEvent) => {
       if (
-        e.dataTransfer &&
-        Array.from(e.dataTransfer.types).includes(CARD_DRAG_TYPE)
+        !e.dataTransfer ||
+        !Array.from(e.dataTransfer.types).includes(CARD_DRAG_TYPE)
       ) {
-        setGroupsOpen((v) => v || true);
+        return;
       }
+      const groupCount = mode === "prompt" ? groups.length : loraGroups.length;
+      if (groupCount > 1) setGroupsOpen(true);
     };
     window.addEventListener("dragstart", onDragStart);
     return () => window.removeEventListener("dragstart", onDragStart);
-  }, []);
+  }, [mode, groups.length, loraGroups.length]);
 
   // HTML5 dnd only: the native Tauri drag-drop handler is disabled
   // (dragDropEnabled: false) because it hijacks internal card drags on macOS.
@@ -1568,6 +1636,16 @@ function Shell() {
     activeJobs.length === 0 &&
     !loading &&
     !loadError;
+  // A folder that exists but holds nothing is not an empty library: the shelf
+  // itself has cards, so the smaller group state is the honest one.
+  const groupEmpty =
+    !anyFilter &&
+    activeCards.length === 0 &&
+    activeJobs.length === 0 &&
+    !loading &&
+    !loadError &&
+    allGroupsCount(mode === "prompt" ? groups : loraGroups) > 0 &&
+    !isAllGroups(currentGroup?.id ?? "");
   const overlayOpen =
     editorOpen ||
     loraEditorOpen ||
@@ -1614,6 +1692,7 @@ function Shell() {
         filtering={anyFilter}
         group={currentGroup}
         onOpenGroups={() => setGroupsOpen((v) => !v)}
+        groupsOpen={groupsOpen}
         onOpenTags={toggleTags}
         selectMode={selectMode}
         onToggleSelectMode={toggleSelectMode}
@@ -1637,6 +1716,13 @@ function Shell() {
               {t("action.retry")}
             </button>
           </div>
+        ) : groupEmpty ? (
+          <GroupEmptyState
+            groupName={currentGroup?.name}
+            lora={mode === "lora"}
+            onNew={mode === "prompt" ? openEditorNew : openLoraEditorNew}
+            onShowAll={() => switchGroup(ALL_GROUPS)}
+          />
         ) : filterEmpty ? (
           <EmptyState
             hasFilters={false}
@@ -1813,6 +1899,8 @@ function Shell() {
           onClose={() => setDetailId(null)}
           onChanged={onDetailChanged}
           onDeleted={() => void handleDeleteCard()}
+          groups={groups}
+          onMoveToGroup={(group) => void moveCardToGroup(group)}
         />
       )}
 
@@ -1829,6 +1917,8 @@ function Shell() {
           onClose={() => setLoraDetailId(null)}
           onChanged={onLoraDetailChanged}
           onDeleted={() => void handleDeleteLora()}
+          groups={loraGroups}
+          onMoveToGroup={(group) => void moveLoraToGroup(group)}
           groupOffer={detailFamilyOffer}
           onGroupFamily={groupFamilyFromDetail}
         />
@@ -1839,6 +1929,7 @@ function Shell() {
           staged={loraStaged}
           onStaged={setLoraStaged}
           suggestions={loraTags}
+          groupId={newLoraGroupId}
           onClose={closeLoraEditor}
           onSaved={(fresh: LoraDetailData) => {
             closeLoraEditor();
@@ -1853,7 +1944,7 @@ function Shell() {
           staged={staged}
           onStaged={setStaged}
           settings={settings}
-          groupId={groupId}
+          groupId={newCardGroupId}
           suggestions={tags}
           onClose={closeEditor}
           onSaved={(d) => void onEditorSaved(d)}

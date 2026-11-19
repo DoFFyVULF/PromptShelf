@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { CornerDownRight, Home, Palette, Pencil, Plus, Trash2, X } from "lucide-react";
-import { useI18n } from "../i18n";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { Check, CornerDownRight, Home, Layers, Palette, Pencil, Plus, Trash2, X } from "lucide-react";
+import { useI18n, type DictKey } from "../i18n";
 import { api } from "../lib/api";
+import { ALL_GROUPS, allGroupsCount } from "../lib/groups";
 import { groupColorVar } from "../lib/groupStyle";
 import type { GroupInfo } from "../lib/types";
 import { GroupAppearance } from "./GroupAppearance";
@@ -22,6 +24,15 @@ const loraGroupApi = {
   rename: (id: string, name: string) => api.renameLoraGroup(id, name),
   remove: (id: string) => api.deleteLoraGroup(id)
 };
+
+/** Backend errors are stable machine strings; the panel owns their wording. */
+function groupErrorKey(error: unknown): DictKey {
+  const message = String(error);
+  if (message.includes("GROUP_NAME_REQUIRED")) return "groups.nameRequired";
+  if (message.includes("GROUP_NAME_TOO_LONG")) return "groups.nameTooLong";
+  if (message.includes("GROUP_NAME_EXISTS")) return "groups.nameExists";
+  return "toast.error";
+}
 
 interface GroupsPanelProps {
   open: boolean;
@@ -49,6 +60,7 @@ export function GroupsPanel({
 }: GroupsPanelProps) {
   const { t } = useI18n();
   const { toast } = useToast();
+  const reduceMotion = useReducedMotion();
   const apiGroup = lora ? loraGroupApi : cardGroupApi;
 
   const [creating, setCreating] = useState(false);
@@ -65,6 +77,10 @@ export function GroupsPanel({
   const [styleDirty, setStyleDirty] = useState(false);
   const draftRef = useRef<HTMLInputElement>(null);
   const editRef = useRef<HTMLInputElement>(null);
+
+  const allLabel = t(lora ? "groups.all.lora" : "groups.all");
+  const allCount = allGroupsCount(groups);
+  const allCurrent = currentGroupId === ALL_GROUPS;
 
   // close on outside clicks; during an HTML5 drag no click fires, so the
   // panel stays open and cards can be dropped onto group rows
@@ -145,8 +161,7 @@ export function GroupsPanel({
       setStyleDraft({ color: created.color, icon: created.icon });
       setStyleDirty(false);
     } catch (e) {
-      const msg = String(e);
-      toast(msg.includes("GROUP_NAME") ? t("editor.error.prompt") : t("toast.error"), "error");
+      toast(t(groupErrorKey(e)), "error");
     }
   };
 
@@ -158,8 +173,8 @@ export function GroupsPanel({
       await apiGroup.rename(id, name);
       toast(t("toast.groupRenamed"));
       onChanged();
-    } catch {
-      toast(t("toast.error"), "error");
+    } catch (e) {
+      toast(t(groupErrorKey(e)), "error");
     }
   };
 
@@ -224,31 +239,116 @@ export function GroupsPanel({
   if (!open) return null;
 
   return (
-    <div
+    <motion.div
       data-groups-panel
-      className={`anim-panel fixed top-14 right-3 z-[75] flex max-h-[calc(100vh-72px)] w-[320px] flex-col overflow-hidden rounded-panel border border-hairline bg-card shadow-panel transition-shadow duration-200 ${
+      initial={reduceMotion ? false : { opacity: 0, y: -6, scale: 0.985 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -6, scale: 0.985 }}
+      transition={
+        reduceMotion
+          ? { duration: 0 }
+          : { type: "spring", visualDuration: 0.24, bounce: 0.08 }
+      }
+      className={`fixed top-14 right-3 z-[75] flex max-h-[calc(100vh-72px)] w-[320px] flex-col overflow-hidden rounded-panel border border-hairline bg-card shadow-panel transition-shadow duration-200 ${
         dragActive ? "ring-2 ring-leaf-edge/80" : ""
       }`}
     >
       <div className="flex items-center justify-between px-4 pt-3.5 pb-2">
-        {dragActive ? (
-          <span className="anim-fade min-w-0 truncate text-[13px] font-semibold text-leaf">
-            {t("groups.dropHint")}
-          </span>
-        ) : (
-          <h3 className="t-display text-[14.5px] text-ink">{t("groups.title")}</h3>
-        )}
+        <AnimatePresence mode="wait" initial={false}>
+          {dragActive ? (
+            <motion.span
+              key="drag"
+              initial={reduceMotion ? false : { opacity: 0, y: 3 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -3 }}
+              transition={{ duration: reduceMotion ? 0 : 0.14 }}
+              className="min-w-0 truncate text-[13px] font-semibold text-leaf"
+            >
+              {t("groups.dropHint")}
+            </motion.span>
+          ) : (
+            <motion.h3
+              key="title"
+              initial={reduceMotion ? false : { opacity: 0, y: -3 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 3 }}
+              transition={{ duration: reduceMotion ? 0 : 0.14 }}
+              className="t-display text-[14.5px] text-ink"
+            >
+              {t("groups.title")}
+            </motion.h3>
+          )}
+        </AnimatePresence>
         <button type="button" className="btn-icon press -mr-1.5 cursor-pointer" aria-label={t("action.close")} onClick={onClose}>
           <X size={15} />
         </button>
       </div>
 
-      {selection.length > 0 && (
-        <div className="mx-3 mb-2 flex items-center gap-2 rounded-[10px] bg-leaf-soft px-3 py-2 text-[11.5px] leading-snug text-leaf">
-          <span className="font-semibold whitespace-nowrap">{t("groups.selected", { n: selection.length })}</span>
-          <span className="min-w-0 truncate text-leaf/80">{t("groups.moveTip")}</span>
+      <AnimatePresence initial={false}>
+        {selection.length > 0 && !dragActive && (
+          <motion.div
+            initial={reduceMotion ? false : { opacity: 0, height: 0, marginBottom: 0 }}
+            animate={{ opacity: 1, height: "auto", marginBottom: 8 }}
+            exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+            transition={{ duration: reduceMotion ? 0 : 0.18, ease: "easeOut" }}
+            className="mx-3 overflow-hidden"
+          >
+            <div className="flex items-center gap-2 rounded-[10px] bg-leaf-soft px-3 py-2 text-[11.5px] leading-snug text-leaf">
+              <span className="font-semibold whitespace-nowrap">{t("groups.selected", { n: selection.length })}</span>
+              <span className="min-w-0 truncate text-leaf/80">{t("groups.moveTip")}</span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* The shelf-wide scope is pinned above the rolling list so it never
+          scrolls away, and it is deliberately not a drop target — "all
+          groups" is a view, not a destination. */}
+      <div className="px-2">
+        <div
+          className={`group relative flex items-center gap-2.5 rounded-[10px] border px-2.5 py-2.5 transition-[background-color,border-color,color,opacity] duration-150 ${
+            allCurrent
+              ? "border-leaf-edge bg-leaf-soft text-leaf"
+              : "border-transparent text-body hover:bg-parchment"
+          } ${dragActive ? "pointer-events-none opacity-40" : ""}`}
+        >
+          <button
+            type="button"
+            onClick={() => onSwitch(ALL_GROUPS)}
+            aria-current={allCurrent ? "true" : undefined}
+            aria-label={`${allLabel}, ${allCount}`}
+            className="absolute inset-0 z-0 cursor-pointer rounded-[10px] outline-none focus-visible:shadow-focus"
+          />
+          <span
+            aria-hidden
+            className={`pointer-events-none relative z-10 flex h-6 w-6 shrink-0 items-center justify-center ${
+              allCurrent ? "text-leaf-icon" : "text-faint"
+            }`}
+          >
+            <Layers size={14.5} />
+          </span>
+          <span
+            className={`pointer-events-none relative z-10 min-w-0 flex-1 truncate text-[13.5px] font-medium ${
+              allCurrent ? "text-leaf" : ""
+            }`}
+          >
+            {allLabel}
+          </span>
+          <span
+            aria-hidden
+            className={`pointer-events-none relative z-10 shrink-0 text-[11px] tabular-nums ${
+              allCurrent ? "text-leaf-icon/80" : "text-faint"
+            }`}
+          >
+            {allCount}
+          </span>
+          {allCurrent && !dragActive && (
+            <Check size={12.5} className="relative z-10 shrink-0 text-leaf-icon" aria-hidden />
+          )}
         </div>
-      )}
+      </div>
+
+      <div className="mx-4 my-1.5 h-px shrink-0 bg-line-soft" aria-hidden />
 
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
         {groups.map((g) => {
@@ -257,16 +357,12 @@ export function GroupsPanel({
           // switching the view — switching would silently drop the selection
           // and look like "nothing happened"
           const moveActive = selection.length > 0 && !dragActive;
+          const rowLabel = moveActive && !current
+            ? `${t("groups.moveHere")} — ${g.name}`
+            : `${g.name}, ${g.count}`;
           return (
             <div key={g.id}>
               <div
-                onClick={() => {
-                  if (moveActive) {
-                    if (!current) moveHere(g, selection);
-                    return;
-                  }
-                  onSwitch(g.id);
-                }}
                 onDragOver={(e) => {
                   e.preventDefault();
                   e.dataTransfer.dropEffect = "move";
@@ -274,24 +370,7 @@ export function GroupsPanel({
                 }}
                 onDragLeave={() => setDragOverId((cur) => (cur === g.id ? null : cur))}
                 onDrop={(e) => onDrop(g, e)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    if (moveActive) {
-                      if (!current) moveHere(g, selection);
-                      return;
-                    }
-                    onSwitch(g.id);
-                  }
-                }}
-                title={
-                  moveActive && !current
-                    ? `${t("groups.moveHere")} (${selection.length})`
-                    : undefined
-                }
-                className={`group relative flex cursor-pointer items-center gap-2.5 rounded-[10px] border px-2.5 py-2 transition-[background-color,border-color,color] duration-150 ${
+                className={`group relative flex items-center gap-2.5 rounded-[10px] border px-2.5 py-2.5 transition-[background-color,border-color,color] duration-150 ${
                   dragActive
                     ? current
                       ? dragOverId === g.id
@@ -307,9 +386,25 @@ export function GroupsPanel({
                         : "border-transparent text-body hover:bg-parchment"
                 }`}
               >
+                {editingId !== g.id && (
+                  <button
+                    type="button"
+                    aria-current={current ? "true" : undefined}
+                    aria-label={rowLabel}
+                    onClick={() => {
+                      if (moveActive) {
+                        if (!current) moveHere(g, selection);
+                        return;
+                      }
+                      onSwitch(g.id);
+                    }}
+                    className="absolute inset-0 z-0 cursor-pointer rounded-[10px] outline-none focus-visible:shadow-focus"
+                  />
+                )}
+
                 <span
                   aria-hidden
-                  className={`flex h-6 w-6 shrink-0 items-center justify-center ${
+                  className={`pointer-events-none relative z-10 flex h-6 w-6 shrink-0 items-center justify-center ${
                     current ? "text-leaf-icon" : "text-faint"
                   }`}
                 >
@@ -326,7 +421,6 @@ export function GroupsPanel({
                     type="text"
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
-                    onClick={(e) => e.stopPropagation()}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
                         e.preventDefault();
@@ -339,27 +433,36 @@ export function GroupsPanel({
                     onBlur={() => void commitRename(g.id)}
                     maxLength={48}
                     spellCheck={false}
-                    className="min-w-0 flex-1 rounded-md border border-leaf-edge bg-card px-2 py-1 text-[13px] text-ink outline-none focus:shadow-focus"
+                    aria-label={t("groups.rename")}
+                    className="relative z-10 min-w-0 flex-1 rounded-md border border-leaf-edge bg-card px-2 py-1 text-[13px] text-ink outline-none focus:shadow-focus"
                   />
                 ) : (
                   <span
-                    className={`min-w-0 flex-1 truncate text-[13.5px] font-medium ${current ? "text-leaf" : ""}`}
+                    className={`pointer-events-none relative z-10 min-w-0 flex-1 truncate text-[13.5px] font-medium ${
+                      current ? "text-leaf" : ""
+                    }`}
                     style={!current && g.color ? { color: groupColorVar(g.color) } : undefined}
                   >
                     {g.name}
                   </span>
                 )}
 
-                {!editingId && (
+                {editingId !== g.id && (
                   <>
-                    <span className={`shrink-0 text-[11px] tabular-nums ${current ? "text-leaf-icon/80" : "text-faint"}`}>
+                    <span
+                      aria-hidden
+                      className={`pointer-events-none relative z-10 shrink-0 text-[11px] tabular-nums ${
+                        current ? "text-leaf-icon/80" : "text-faint"
+                      }`}
+                    >
                       {g.count}
                     </span>
 
                     {dragActive && (
                       <CornerDownRight
                         size={13}
-                        className={`shrink-0 text-leaf-icon transition-transform duration-150 ${
+                        aria-hidden
+                        className={`pointer-events-none relative z-10 shrink-0 text-leaf-icon transition-transform duration-150 ${
                           dragOverId === g.id ? "scale-125 opacity-100" : "opacity-55"
                         }`}
                       />
@@ -368,22 +471,20 @@ export function GroupsPanel({
                     {selection.length > 0 && !dragActive && (
                       <button
                         type="button"
-                        aria-label={t("groups.moveHere")}
+                        aria-label={`${t("groups.moveHere")} — ${g.name}`}
                         title={t("groups.moveHere")}
                         onClick={(e) => {
                           e.stopPropagation();
                           moveHere(g, selection);
                         }}
-                        className="press flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-leaf-icon transition-colors hover:bg-parchment"
+                        className="press relative z-10 flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-leaf-icon transition-colors hover:bg-parchment"
                       >
                         <CornerDownRight size={13} />
                       </button>
                     )}
 
                     {!g.is_default && !dragActive && (
-                      <span
-                        className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100"
-                      >
+                      <span className="relative z-10 flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
                         <button
                           type="button"
                           aria-label={t("groups.style")}
@@ -464,6 +565,7 @@ export function GroupsPanel({
             placeholder={t("groups.new.placeholder")}
             maxLength={48}
             spellCheck={false}
+            aria-label={t("groups.new")}
             className="w-full rounded-md border border-hairline bg-parchment px-2.5 py-1.5 text-[13px] text-ink outline-none placeholder:text-faint focus:shadow-focus"
           />
         ) : (
@@ -477,7 +579,7 @@ export function GroupsPanel({
           </button>
         )}
       </div>
-    </div>
+    </motion.div>
   );
 }
 

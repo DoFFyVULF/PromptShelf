@@ -734,7 +734,9 @@ fn clean_group_name(name: &str) -> Result<String, String> {
     if name.is_empty() {
         return Err("GROUP_NAME_REQUIRED".to_string());
     }
-    if name.len() > 48 {
+    // characters, not bytes: the UI counts characters too, and a Cyrillic
+    // name must not be rejected at half the visible length
+    if name.chars().count() > 48 {
         return Err("GROUP_NAME_TOO_LONG".to_string());
     }
     Ok(name)
@@ -745,6 +747,20 @@ pub fn create_group_inner(dir: &Path, input: NewGroupInput) -> Result<GroupInfo,
     let color = crate::group_style::clean_color(&input.color)?;
     let icon = crate::group_style::clean_icon(&input.icon)?;
     let conn = store::open(dir)?;
+    // Two identically named folders are impossible to tell apart in the
+    // panel and in the move menu, so refuse a second one.
+    let taken: bool = conn
+        .query_row(
+            "SELECT 1 FROM groups WHERE name COLLATE NOCASE = ?1 LIMIT 1",
+            params![name],
+            |_| Ok(true),
+        )
+        .optional()
+        .map_err(es)?
+        .unwrap_or(false);
+    if taken {
+        return Err("GROUP_NAME_EXISTS".to_string());
+    }
     let sort: i64 = conn
         .query_row("SELECT COALESCE(MAX(sort) + 1, 1) FROM groups", [], |r| r.get(0))
         .map_err(es)?;
@@ -784,6 +800,18 @@ pub fn set_group_style_inner(dir: &Path, input: GroupStyleInput) -> Result<(), S
 pub fn rename_group_inner(dir: &Path, input: RenameGroupInput) -> Result<(), String> {
     let name = clean_group_name(&input.name)?;
     let conn = store::open(dir)?;
+    let taken: bool = conn
+        .query_row(
+            "SELECT 1 FROM groups WHERE name COLLATE NOCASE = ?1 AND id <> ?2 LIMIT 1",
+            params![name, input.id],
+            |_| Ok(true),
+        )
+        .optional()
+        .map_err(es)?
+        .unwrap_or(false);
+    if taken {
+        return Err("GROUP_NAME_EXISTS".to_string());
+    }
     let n = conn
         .execute("UPDATE groups SET name = ?1 WHERE id = ?2", params![name, input.id])
         .map_err(es)?;
@@ -807,9 +835,13 @@ pub fn delete_group_inner(dir: &Path, id: &str) -> Result<(), String> {
     }
 
     let default_id = store::default_group_id(&conn)?;
-    conn.execute("UPDATE cards SET group_id = ?1 WHERE group_id = ?2", params![default_id, id])
+    // one transaction: a failed delete must not strand the cards in a group
+    // that is about to disappear
+    let tx = conn.unchecked_transaction().map_err(es)?;
+    tx.execute("UPDATE cards SET group_id = ?1 WHERE group_id = ?2", params![default_id, id])
         .map_err(es)?;
-    conn.execute("DELETE FROM groups WHERE id = ?1", params![id]).map_err(es)?;
+    tx.execute("DELETE FROM groups WHERE id = ?1", params![id]).map_err(es)?;
+    tx.commit().map_err(es)?;
     Ok(())
 }
 
@@ -828,9 +860,11 @@ pub fn move_cards_inner(dir: &Path, input: MoveCardsInput) -> Result<(), String>
     }
 
     let placeholders = vec!["?"; input.ids.len()].join(",");
-    let sql = format!("UPDATE cards SET group_id = ?1, updated_at = ?2 WHERE id IN ({placeholders})");
+    // Filing a card into a group is organization, not an edit: `updated_at`
+    // stays put so a move never reshuffles the "newest first" shelf.
+    let sql = format!("UPDATE cards SET group_id = ?1 WHERE id IN ({placeholders})");
     let mut vals: Vec<rusqlite::types::Value> =
-        vec![rusqlite::types::Value::Text(input.group_id.clone()), rusqlite::types::Value::Text(now())];
+        vec![rusqlite::types::Value::Text(input.group_id.clone())];
     for id in &input.ids {
         vals.push(rusqlite::types::Value::Text(id.clone()));
     }

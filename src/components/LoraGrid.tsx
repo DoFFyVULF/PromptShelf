@@ -32,6 +32,7 @@ function LoraTile({
   delay,
   selectMode,
   selected,
+  selection,
   onToggleSelect,
   onTogglePin
 }: {
@@ -40,6 +41,7 @@ function LoraTile({
   delay: number;
   selectMode: boolean;
   selected: boolean;
+  selection: string[];
   onToggleSelect: (id: string) => void;
   onTogglePin: (id: string, pinned: boolean) => void;
 }) {
@@ -53,11 +55,13 @@ function LoraTile({
   };
 
   /** Lora drags reuse the card drag channel — only one groups panel exists at
-   * a time (the one for the active shelf), so the payload never crosses over. */
+   * a time (the one for the active shelf), so the payload never crosses over.
+   * A checked tile carries the whole selection, matching the prompt shelf. */
   const onDragStart = (e: React.DragEvent) => {
+    const ids = selected ? selection : [lora.id];
     try {
-      e.dataTransfer.setData(CARD_DRAG_TYPE, JSON.stringify([lora.id]));
-      e.dataTransfer.setData("text/plain", `promptshelf:${lora.name}`);
+      e.dataTransfer.setData(CARD_DRAG_TYPE, JSON.stringify(ids));
+      e.dataTransfer.setData("text/plain", `promptshelf:${ids.length}`);
     } catch {
       /* some engines restrict custom types */
     }
@@ -65,6 +69,7 @@ function LoraTile({
     attachCardGhost(e, {
       title: lora.name,
       strong: true,
+      count: ids.length,
       badge: lora.primary_tag ?? undefined,
       meta: lora.base_model ?? undefined
     });
@@ -262,6 +267,7 @@ export function LoraGrid({ loras, jobs, onJobRetry, onJobDismiss, onOpen, select
             delay={i * 28}
             selectMode={selectMode}
             selected={selection.includes(lora.id)}
+            selection={selection}
             onToggleSelect={onToggleSelect}
             onTogglePin={onTogglePin}
           />

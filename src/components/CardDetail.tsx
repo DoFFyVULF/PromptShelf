@@ -21,7 +21,7 @@ import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
 import { useI18n } from "../i18n";
 import { api, assetUrl } from "../lib/api";
 import { modKey } from "../lib/platform";
-import type { CardDetail as CardDetailType, ImageInfo, LoraItem, TagCount } from "../lib/types";
+import type { CardDetail as CardDetailType, GroupInfo, ImageInfo, LoraItem, TagCount } from "../lib/types";
 import { isLoraKind } from "../lib/types";
 import { useImagePaste } from "../lib/useImagePaste";
 import { Stars } from "./Stars";
@@ -31,6 +31,7 @@ import { LoraMenu, resKindLabel } from "./LoraMenu";
 import { LoraEditor, applyLoraDraft, type LoraDraft } from "./LoraEditor";
 import { PromptPager } from "./PromptPager";
 import { ConfirmDeleteButton } from "./ConfirmDeleteButton";
+import { GroupPicker } from "./GroupPicker";
 import { IMAGE_EXTS } from "./Editor";
 
 interface CardDetailProps {
@@ -46,9 +47,12 @@ interface CardDetailProps {
   onClose: () => void;
   onChanged: (card: CardDetailType) => void;
   onDeleted: () => void;
+  /** Every group on the prompt shelf, for the header's move picker. */
+  groups: GroupInfo[];
+  onMoveToGroup: (group: GroupInfo) => void;
 }
 
-export function CardDetail({ card, suggestions, onImportLora, hasPrev, hasNext, onPrev, onNext, onClose, onChanged, onDeleted }: CardDetailProps) {
+export function CardDetail({ card, suggestions, onImportLora, hasPrev, hasNext, onPrev, onNext, onClose, onChanged, onDeleted, groups, onMoveToGroup }: CardDetailProps) {
   const { t, formatDate } = useI18n();
   const { toast } = useToast();
   const [mainIdx, setMainIdx] = useState(0);
@@ -57,6 +61,7 @@ export function CardDetail({ card, suggestions, onImportLora, hasPrev, hasNext, 
   const reduceMotion = useReducedMotion();
   const [armImage, setArmImage] = useState<string | null>(null);
   const [zoom, setZoom] = useState(false);
+  const [groupMenu, setGroupMenu] = useState(false);
   /** Open lora action bubble: the chip it anchors to. */
   const [loraMenu, setLoraMenu] = useState<{ lora: LoraItem; anchor: HTMLElement } | null>(null);
 
@@ -96,6 +101,7 @@ export function CardDetail({ card, suggestions, onImportLora, hasPrev, hasNext, 
     setLoraMenu(null);
     setEditing(false);
     setSaving(false);
+    setGroupMenu(false);
     setPrompt(card.prompt);
     setNegativePrompt(card.negative_prompt ?? "");
     setCopiedNeg(false);
@@ -116,6 +122,11 @@ export function CardDetail({ card, suggestions, onImportLora, hasPrev, hasNext, 
         e.preventDefault();
         e.stopPropagation();
         setLoraMenu(null);
+        return;
+      }
+      if (groupMenu) {
+        // the picker's own menu handles Esc (and returns focus to its pill);
+        // this branch only keeps the state in sync when focus has left it
         return;
       }
       if (zoom) {
@@ -142,9 +153,10 @@ export function CardDetail({ card, suggestions, onImportLora, hasPrev, hasNext, 
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [zoom, editing, loraMenu]);
+  }, [zoom, editing, loraMenu, groupMenu]);
 
   const startEdit = useCallback(() => {
+    setGroupMenu(false);
     setPrompt(card.prompt);
     setNegativePrompt(card.negative_prompt ?? "");
     setNote(card.note ?? "");
@@ -476,8 +488,19 @@ export function CardDetail({ card, suggestions, onImportLora, hasPrev, hasNext, 
         <div className="flex min-h-0 min-w-0 flex-col border-l border-hairline">
           <div className="flex items-start justify-between gap-3 px-7 pt-6 pb-4">
             <div className="min-w-0">
-              <div className="text-[11.5px] text-faint">
-                {t("detail.added")} · {formatDate(card.created_at)}
+              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
+                <span className="text-[11.5px] text-faint">
+                  {t("detail.added")} · {formatDate(card.created_at)}
+                </span>
+                {!editing && groups.length > 1 && (
+                  <GroupPicker
+                    groups={groups}
+                    currentGroupId={card.group_id}
+                    onPick={onMoveToGroup}
+                    open={groupMenu}
+                    onOpenChange={setGroupMenu}
+                  />
+                )}
               </div>
               <div className="mt-2">
                 <Stars value={editing ? rating : card.rating} size={17} onChange={rate} />

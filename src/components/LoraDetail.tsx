@@ -22,13 +22,14 @@ import { useI18n } from "../i18n";
 import { api, assetUrl } from "../lib/api";
 import type { FamilyOffer } from "../lib/loraFamilies";
 import { modKey } from "../lib/platform";
-import type { ImageInfo, LoraDetail as LoraDetailData, TagCount } from "../lib/types";
+import type { GroupInfo, ImageInfo, LoraDetail as LoraDetailData, TagCount } from "../lib/types";
 import { useImagePaste } from "../lib/useImagePaste";
 import { RichText } from "./RichText";
 import { Stars } from "./Stars";
 import { TagInput } from "./TagInput";
 import { useToast } from "./Toasts";
 import { ConfirmDeleteButton } from "./ConfirmDeleteButton";
+import { GroupPicker } from "./GroupPicker";
 import { IMAGE_EXTS } from "./Editor";
 
 interface LoraDetailProps {
@@ -46,6 +47,9 @@ interface LoraDetailProps {
    *  from the page itself even though the header offer was dismissed. */
   groupOffer?: FamilyOffer | null;
   onGroupFamily?: (id: string) => void;
+  /** Every group on the lora shelf, for the header's move picker. */
+  groups: GroupInfo[];
+  onMoveToGroup: (group: GroupInfo) => void;
 }
 
 export function LoraDetail({
@@ -59,7 +63,9 @@ export function LoraDetail({
   onChanged,
   onDeleted,
   groupOffer,
-  onGroupFamily
+  onGroupFamily,
+  groups,
+  onMoveToGroup
 }: LoraDetailProps) {
   const { t, formatDate } = useI18n();
   const { toast } = useToast();
@@ -69,6 +75,7 @@ export function LoraDetail({
   const reduceMotion = useReducedMotion();
   const [armImage, setArmImage] = useState<string | null>(null);
   const [zoom, setZoom] = useState(false);
+  const [groupMenu, setGroupMenu] = useState(false);
   const [adding, setAdding] = useState(0);
 
   // ---------------------------------------------------------------- edit mode
@@ -101,6 +108,7 @@ export function LoraDetail({
     setZoom(false);
     setEditing(false);
     setSaving(false);
+    setGroupMenu(false);
     setName(lora.name);
     setBaseModel(lora.base_model);
     setTriggerDraft(lora.trigger_words.join(", "));
@@ -114,6 +122,10 @@ export function LoraDetail({
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
+      if (groupMenu) {
+        // the picker's menu owns Esc and restores focus to its pill
+        return;
+      }
       if (zoom) {
         e.preventDefault();
         e.stopPropagation();
@@ -133,9 +145,10 @@ export function LoraDetail({
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [zoom, editing]);
+  }, [zoom, editing, groupMenu]);
 
   const startEdit = useCallback(() => {
+    setGroupMenu(false);
     setName(lora.name);
     setBaseModel(lora.base_model);
     setTriggerDraft(lora.trigger_words.join(", "));
@@ -463,9 +476,18 @@ export function LoraDetail({
                   </span>
                 )}
               </div>
-              <div className="mt-2 flex items-center gap-3">
+              <div className="mt-2 flex flex-wrap items-center gap-3">
                 <Stars value={editing ? rating : lora.rating} size={16} onChange={rate} />
                 <span className="text-[11.5px] text-faint">{formatDate(lora.created_at)}</span>
+                {!editing && groups.length > 1 && (
+                  <GroupPicker
+                    groups={groups}
+                    currentGroupId={lora.group_id}
+                    onPick={onMoveToGroup}
+                    open={groupMenu}
+                    onOpenChange={setGroupMenu}
+                  />
+                )}
               </div>
             </div>
             <button type="button" className="btn-icon press -mr-2 shrink-0 cursor-pointer" aria-label={t("action.close")} onClick={onClose}>

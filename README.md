@@ -79,8 +79,11 @@ nothing deletes it.
 - **Groups** — every card lives in exactly one group (each shelf has its own groups). The
   default group ("Home"/"Домашняя") cannot be deleted. The groups panel opens from a chip in
   the filter bar: create, rename, delete (cards of a deleted group return to the default one),
-  switch by clicking, per-group card counters. The current group is highlighted in emerald —
-  the only color accent in the UI (on the LoRA shelf the violet trigger-word chips echo it).
+  switch by clicking, per-group card counters. An **"All cards"** scope at the top of the panel
+  shows every group at once, so search and filters are not limited to one folder, and the group
+  pill in the detail header files a single card into another group. The current group is
+  highlighted in emerald — the only color accent in the UI (on the LoRA shelf the violet
+  trigger-word chips echo it).
 - **Multi-select** — a "select" toggle in the filter bar; clicking tiles adds or removes cards.
   A selection bar appears at the bottom: count, "Move to…", "Clear", "Done".
 - **Drag & drop cards into groups** — pick up a card and the groups panel slides out

@@ -1,5 +1,7 @@
-import { ChevronDown, Folder, ListChecks, Tag, X } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { ChevronDown, Folder, Layers, ListChecks, Tag, X } from "lucide-react";
 import { useI18n } from "../i18n";
+import { isAllGroups } from "../lib/groups";
 import { groupColorVar } from "../lib/groupStyle";
 import type { GroupInfo, TagCount } from "../lib/types";
 import { GroupGlyph } from "./GroupGlyph";
@@ -13,6 +15,8 @@ interface FilterBarProps {
   filtering: boolean;
   group: GroupInfo | null;
   onOpenGroups: () => void;
+  /** Whether the groups panel is currently open (for the chip's ARIA state). */
+  groupsOpen?: boolean;
   onOpenTags: () => void;
   selectMode: boolean;
   onToggleSelectMode: () => void;
@@ -29,13 +33,16 @@ export function FilterBar({
   filtering,
   group,
   onOpenGroups,
+  groupsOpen,
   onOpenTags,
   selectMode,
   onToggleSelectMode,
   lora
 }: FilterBarProps) {
   const { t, count } = useI18n();
+  const reduceMotion = useReducedMotion();
   const hasTagsFilter = selected.length > 0;
+  const allScope = group ? isAllGroups(group.id) : false;
 
   return (
     <div className="flex h-11 shrink-0 items-center gap-2 overflow-x-auto border-b border-line-soft px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -43,19 +50,38 @@ export function FilterBar({
         type="button"
         data-groups-trigger
         onClick={onOpenGroups}
-        title={t("groups.title")}
-        className="press flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-hairline bg-card py-0 pr-2.5 pl-3 text-[12.5px] font-medium text-body transition-colors hover:bg-parchment"
+        title={allScope ? t("groups.allHint") : t("groups.title")}
+        aria-haspopup="dialog"
+        aria-expanded={groupsOpen}
+        className="press flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-hairline bg-card py-0 pr-2.5 pl-3 text-[12.5px] font-medium text-body outline-none transition-colors hover:bg-parchment focus-visible:shadow-focus"
       >
-        <span className="flex text-faint">
-          <GroupGlyph group={group} size={13} fallback={<Folder size={13} />} />
-        </span>
-        <span
-          className="max-w-[160px] truncate"
-          style={group?.color ? { color: groupColorVar(group.color) } : undefined}
-        >
-          {group?.name ?? t("group.home")}
-        </span>
-        <ChevronDown size={12} className="text-faint" />
+        {/* The scope swap is a tiny crossfade — enough to register the change
+            from a folder to the whole shelf without drawing attention. */}
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.span
+            key={allScope ? "all" : "group"}
+            initial={reduceMotion ? false : { opacity: 0, y: 2 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -2 }}
+            transition={{ duration: reduceMotion ? 0 : 0.14, ease: "easeOut" }}
+            className="flex min-w-0 items-center gap-1.5"
+          >
+            {allScope ? (
+              <Layers size={13} className="shrink-0 text-faint" />
+            ) : (
+              <span className="flex shrink-0 text-faint">
+                <GroupGlyph group={group} size={13} fallback={<Folder size={13} />} />
+              </span>
+            )}
+            <span
+              className="max-w-[160px] truncate"
+              style={!allScope && group?.color ? { color: groupColorVar(group.color) } : undefined}
+            >
+              {group?.name ?? t("group.home")}
+            </span>
+          </motion.span>
+        </AnimatePresence>
+        <ChevronDown size={12} className="shrink-0 text-faint" />
       </button>
 
       <button
