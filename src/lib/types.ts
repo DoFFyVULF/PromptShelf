@@ -26,6 +26,8 @@ export interface CardSummary {
   variant_count: number;
   cover: ImageInfo | null;
   group_id: string;
+  /** Pinned cards always sort first, whatever the shelf order is. */
+  pinned: boolean;
 }
 
 export interface CardDetail {
@@ -212,6 +214,8 @@ export interface LoraSummary {
   cover: ImageInfo | null;
   group_id: string;
   tags: string[];
+  /** Pinned loras always sort first, whatever the shelf order is. */
+  pinned: boolean;
 }
 
 export interface LoraDetail {

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { ImageOff, Images, Star } from "lucide-react";
+import { ImageOff, Images, Pin, Star } from "lucide-react";
 import { useI18n } from "../i18n";
 import { assetUrl } from "../lib/api";
 import { attachCardGhost } from "../lib/dragGhost";
@@ -20,6 +20,7 @@ interface GridProps {
   selectMode: boolean;
   selection: string[];
   onToggleSelect: (id: string) => void;
+  onTogglePin: (id: string, pinned: boolean) => void;
 }
 
 function CardTile({
@@ -29,7 +30,8 @@ function CardTile({
   selectMode,
   selected,
   onToggleSelect,
-  selection
+  selection,
+  onTogglePin
 }: {
   card: CardSummary;
   onOpen: (id: string) => void;
@@ -38,6 +40,7 @@ function CardTile({
   selected: boolean;
   onToggleSelect: (id: string) => void;
   selection: string[];
+  onTogglePin: (id: string, pinned: boolean) => void;
 }) {
   const { formatDate, t, lang } = useI18n();
   const reduced = useReducedMotion();
@@ -80,7 +83,7 @@ function CardTile({
         dragging
           ? "scale-[0.9] border-leaf-edge/80 shadow-none"
           : "border-hairline"
-      }`}
+      } ${card.pinned ? "tile-pinned" : ""}`}
       style={{ animationDelay: `${Math.min(delay, 320)}ms` }}
       onClick={activate}
       role="button"
@@ -129,6 +132,49 @@ function CardTile({
               <Images size={10.5} />
               {card.image_count}
             </span>
+          )}
+          {!selectMode && !dragging && (
+            <div
+              className={`absolute top-2 right-2 z-10 transition-[opacity,translate] duration-200 ease-[cubic-bezier(0.32,0.72,0,1)] ${
+                card.pinned
+                  ? "opacity-100"
+                  : "pointer-events-none -translate-y-1 opacity-0 group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:translate-y-0 group-focus-within:opacity-100"
+              }`}
+            >
+              <motion.button
+                type="button"
+                draggable={false}
+                className={`pin-chip ${card.pinned ? "is-on" : ""}`}
+                aria-label={card.pinned ? t("card.unpin") : t("card.pin")}
+                aria-pressed={card.pinned}
+                title={card.pinned ? t("card.unpin") : t("card.pin")}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onTogglePin(card.id, !card.pinned);
+                }}
+                onKeyDown={(e) => e.stopPropagation()}
+                whileHover={reduced ? undefined : { scale: 1.08 }}
+                whileTap={reduced ? undefined : { scale: 0.88 }}
+                transition={{ type: "spring", stiffness: 520, damping: 26 }}
+              >
+                <motion.span
+                  key={card.pinned ? "on" : "off"}
+                  initial={{ scale: 0.55, rotate: -35, opacity: 0 }}
+                  animate={{ scale: 1, rotate: 0, opacity: 1 }}
+                  transition={
+                    reduced
+                      ? { duration: 0 }
+                      : { type: "spring", stiffness: 560, damping: 20 }
+                  }
+                >
+                  <Pin
+                    size={14}
+                    strokeWidth={2.2}
+                    className={card.pinned ? "fill-current" : undefined}
+                  />
+                </motion.span>
+              </motion.button>
+            </div>
           )}
         </div>
       </div>
@@ -195,7 +241,7 @@ function CardTile({
   );
 }
 
-export function CardGrid({ cards, jobs, onJobRetry, onJobDismiss, onOpen, selectMode, selection, onToggleSelect }: GridProps) {
+export function CardGrid({ cards, jobs, onJobRetry, onJobDismiss, onOpen, selectMode, selection, onToggleSelect, onTogglePin }: GridProps) {
   return (
     <div className="grid grid-cols-[repeat(auto-fill,minmax(236px,1fr))] gap-4 px-5 pt-5 pb-10">
       <AnimatePresence mode="popLayout">
@@ -212,6 +258,7 @@ export function CardGrid({ cards, jobs, onJobRetry, onJobDismiss, onOpen, select
           selectMode={selectMode}
           selected={selection.includes(card.id)}
           onToggleSelect={onToggleSelect}
+          onTogglePin={onTogglePin}
           selection={selection}
         />
       ))}

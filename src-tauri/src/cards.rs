@@ -277,7 +277,8 @@ fn build_filter_sql(filter: &ListFilter) -> (String, Vec<rusqlite::types::Value>
         _ => "c.created_at DESC".to_string(),
     };
 
-    (format!("{where_sql} ORDER BY {order_sql}"), vals)
+    // Pinned cards are always first, whatever the chosen order is.
+    (format!("{where_sql} ORDER BY c.pinned DESC, {order_sql}"), vals)
 }
 
 pub fn list_cards_inner(dir: &Path, filter: &ListFilter) -> Result<Vec<CardSummary>, String> {
@@ -285,12 +286,12 @@ pub fn list_cards_inner(dir: &Path, filter: &ListFilter) -> Result<Vec<CardSumma
     store::init_schema(&conn)?;
 
     let (tail, vals) = build_filter_sql(filter);
-    // Columns: 0..=6 card, 7 image_count, 8..=14 cover image, 15 loras, 16 group, 17 variants.
+    // Columns: 0..=6 card, 7 image_count, 8..=14 cover image, 15 loras, 16 group, 17 variants, 18 pinned.
     let sql = format!(
         "SELECT c.id, c.prompt, c.note, c.rating, c.created_at, c.updated_at, c.cover_image_id,
                 (SELECT COUNT(*) FROM card_images ci WHERE ci.card_id = c.id) AS image_count,
                 cv.id, cv.file, cv.thumb, cv.original, cv.width, cv.height, cv.bytes,
-                c.loras, c.group_id, c.variants_json
+                c.loras, c.group_id, c.variants_json, c.pinned
          FROM cards c
          LEFT JOIN card_images cv ON cv.card_id = c.id
            AND cv.id = COALESCE(c.cover_image_id,
@@ -330,6 +331,7 @@ pub fn list_cards_inner(dir: &Path, filter: &ListFilter) -> Result<Vec<CardSumma
                     variant_count: parse_variants(&r.get::<_, String>(17)?).len(),
                     cover,
                     group_id: r.get::<_, Option<String>>(16)?.unwrap_or_default(),
+                    pinned: r.get::<_, i64>(18)? != 0,
                 },
                 r.get::<_, String>(0)?,
                 parse_loras(&loras_raw),
@@ -676,6 +678,22 @@ pub fn set_cover_inner(dir: &Path, id: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Pins/unpins a card. Pinning is a shelf position, not an edit: `updated_at`
+/// stays untouched so the "newest first" order of the card itself is stable.
+pub fn set_card_pinned_inner(dir: &Path, id: &str, pinned: bool) -> Result<(), String> {
+    let conn = store::open(dir)?;
+    let n = conn
+        .execute(
+            "UPDATE cards SET pinned = ?1 WHERE id = ?2",
+            params![if pinned { 1 } else { 0 }, id],
+        )
+        .map_err(es)?;
+    if n == 0 {
+        return Err("card not found".to_string());
+    }
+    Ok(())
+}
+
 // ---------------------------------------------------------------- groups
 
 pub fn list_groups_inner(dir: &Path) -> Result<Vec<GroupInfo>, String> {
@@ -864,6 +882,15 @@ pub fn delete_card_image(state: tauri::State<'_, crate::AppState>, id: String) -
 #[tauri::command]
 pub fn set_cover(state: tauri::State<'_, crate::AppState>, id: String) -> Result<(), String> {
     set_cover_inner(&state.dir, &id)
+}
+
+#[tauri::command]
+pub fn set_card_pinned(
+    state: tauri::State<'_, crate::AppState>,
+    id: String,
+    pinned: bool,
+) -> Result<(), String> {
+    set_card_pinned_inner(&state.dir, &id, pinned)
 }
 
 #[tauri::command]

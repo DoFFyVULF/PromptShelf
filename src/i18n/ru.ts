@@ -98,6 +98,8 @@ export const ru: Record<DictKey, string> = {
   "import.noPrompt.saving": "Сохраняем…",
   "import.noPrompt.badge": "Без промпта",
   "card.noPrompt": "Без промпта",
+  "card.pin": "Закрепить наверху",
+  "card.unpin": "Открепить",
   "detail.noPrompt": "Промпт не сохранён — можно добавить в любой момент.",
 
   "dup.title": "Такой промпт уже есть",

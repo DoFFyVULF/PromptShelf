@@ -48,6 +48,7 @@ export const api = {
   addCardImage: (card: string, path: string) => invoke<void>("add_card_image", { card, path }),
   deleteCardImage: (id: string) => invoke<void>("delete_card_image", { id }),
   setCover: (id: string) => invoke<void>("set_cover", { id }),
+  setCardPinned: (id: string, pinned: boolean) => invoke<void>("set_card_pinned", { id, pinned }),
 
   listTags: () => invoke<TagCount[]>("list_tags"),
 
@@ -79,6 +80,7 @@ export const api = {
   addLoraImage: (lora: string, path: string) => invoke<ImageInfo>("add_lora_image", { lora, path }),
   deleteLoraImage: (id: string) => invoke<void>("delete_lora_image", { id }),
   setLoraCover: (id: string) => invoke<void>("set_lora_cover", { id }),
+  setLoraPinned: (id: string, pinned: boolean) => invoke<void>("set_lora_pinned", { id, pinned }),
   listLoraTags: () => invoke<TagCount[]>("list_lora_tags"),
   listLoraGroups: () => invoke<GroupInfo[]>("list_lora_groups"),
   createLoraGroup: (name: string) => invoke<GroupInfo>("create_lora_group", { input: { name } }),

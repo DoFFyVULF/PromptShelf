@@ -96,6 +96,8 @@ export const en = {
   "import.noPrompt.saving": "Saving…",
   "import.noPrompt.badge": "No prompt",
   "card.noPrompt": "No prompt",
+  "card.pin": "Pin to top",
+  "card.unpin": "Unpin",
   "detail.noPrompt": "No prompt saved — add one whenever you like.",
 
   "dup.title": "Duplicate prompt",

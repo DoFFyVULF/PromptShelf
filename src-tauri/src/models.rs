@@ -24,6 +24,8 @@ pub struct CardSummary {
     pub variant_count: usize,
     pub cover: Option<ImageInfo>,
     pub group_id: String,
+    /// Pinned cards sort before everything else on every sort order.
+    pub pinned: bool,
 }
 
 #[derive(Serialize)]
@@ -171,6 +173,8 @@ pub struct LoraSummary {
     pub cover: Option<ImageInfo>,
     pub group_id: String,
     pub tags: Vec<String>,
+    /// Pinned loras sort before everything else on every sort order.
+    pub pinned: bool,
 }
 
 #[derive(Serialize)]

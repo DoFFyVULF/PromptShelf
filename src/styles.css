@@ -82,6 +82,13 @@
   --color-violet-hover: #6d28d9;
   --color-violet-soft: #f5f3ff;
   --color-violet-edge: #ddd6fe;
+  /* gold: the pinned-card state — a gilded tint, never an action colour.
+     `gold` is the ink (borders, focus, glow); `gold-bright` is the metal
+     highlight that makes the seal read as gold rather than dull yellow. */
+  --color-gold: #a97a12;
+  --color-gold-bright: #e8c05a;
+  --color-gold-soft: #fdf6e3;
+  --color-gold-edge: #e9cf8f;
   --color-scroll: #d4d4d8;
   --color-scroll-hover: #a1a1aa;
 
@@ -183,6 +190,10 @@ body {
   --color-violet-hover: #7c3aed;
   --color-violet-soft: #2b2440;
   --color-violet-edge: #3f3358;
+  --color-gold: #e3c477;
+  --color-gold-bright: #f6e2a0;
+  --color-gold-soft: #2c2513;
+  --color-gold-edge: #574724;
   --color-scroll: #46464b;
   --color-scroll-hover: #5d5d63;
 
@@ -736,6 +747,94 @@ body {
   outline: 2px solid var(--color-canvas);
   outline-offset: 3px;
   border-radius: 9999px;
+}
+
+/* ------------------------------------------------------------- pinned tiles */
+
+/* A pinned card is the shelf's "always first" item: warm paper tint, a
+   gilded hairline and a gold chip. Gold is a state colour, never an action
+   colour — every button keeps its ink/action grammar. */
+.tile-pinned {
+  background: color-mix(in oklab, var(--color-gold-soft) 60%, var(--color-card));
+  border-color: color-mix(in oklab, var(--color-gold-edge) 80%, var(--color-hairline));
+}
+.tile-pinned:hover {
+  border-color: color-mix(in oklab, var(--color-gold) 46%, var(--color-gold-edge));
+  box-shadow: 0 12px 30px -16px color-mix(in oklab, var(--color-gold) 34%, rgb(0 0 0 / 0.16));
+}
+/* a hairline of gilding along the top edge, clipped by the card radius */
+.tile-pinned::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 6;
+  height: 1.5px;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklab, var(--color-gold-bright) 85%, transparent) 50%,
+    transparent
+  );
+}
+
+/* The pin control floats over the cover: a quiet glass chip until the card is
+   pinned, then a small gilded seal that stays visible. */
+.pin-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9999px;
+  border: 1px solid rgb(255 255 255 / 0.16);
+  background: rgb(24 24 27 / 0.58);
+  color: #fff;
+  cursor: pointer;
+  -webkit-backdrop-filter: blur(10px) saturate(160%);
+  backdrop-filter: blur(10px) saturate(160%);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.25);
+  transition:
+    background-color 0.18s var(--ease-apple),
+    border-color 0.18s var(--ease-apple),
+    color 0.18s var(--ease-apple),
+    box-shadow 0.18s var(--ease-apple);
+}
+/* 44px hit target without a 44px visual chip */
+.pin-chip::after {
+  content: "";
+  position: absolute;
+  inset: -7px;
+  border-radius: inherit;
+}
+.pin-chip:hover {
+  background: rgb(24 24 27 / 0.76);
+}
+.pin-chip:focus-visible {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgb(0 0 0 / 0.35);
+}
+/* Pinned: the chip becomes a struck gold seal — bright metal gradient with
+   dark ink and an inner highlight. This is what separates gold from mustard:
+   the colour is carried by a gradient, not a single flat fill. */
+.pin-chip.is-on {
+  border-color: color-mix(in oklab, #8a6410 55%, transparent);
+  background: linear-gradient(140deg, #f9e59a 0%, #e8c05a 35%, #d0a232 68%, #a97a12 100%);
+  color: #3f2c06;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.72),
+    0 2px 10px color-mix(in oklab, #d4af37 38%, transparent),
+    0 1px 2px rgb(0 0 0 / 0.22);
+}
+.pin-chip.is-on:hover {
+  background: linear-gradient(140deg, #ffeaa8 0%, #f0ca64 35%, #d9ab39 68%, #b3831a 100%);
+}
+@media (prefers-reduced-motion: reduce) {
+  .pin-chip {
+    transition: none;
+  }
 }
 
 /* Keyboard focus ring for buttons, links and selects. Lives in the base

@@ -78,6 +78,12 @@ function matchCivitaiLink(text: string, re: RegExp): string | null {
   return text.match(re)?.[0].replace(/[)\]}>.,;!]+$/, "") ?? null;
 }
 
+/** Optimistic shelf order: pinned items float to the top while everything
+ * else keeps the order the backend returned for the active sort. */
+function pinnedFirst<T extends { pinned: boolean }>(items: T[]): T[] {
+  return [...items].sort((a, b) => Number(b.pinned) - Number(a.pinned));
+}
+
 function Shell() {
   const { t, lang, setLang } = useI18n();
   const { toast } = useToast();
@@ -415,6 +421,37 @@ function Shell() {
       setLoading(false);
     }
   }, [debouncedQ, loraGroupId, selectedTags, matchAllTags, sort]);
+
+  const toggleCardPin = useCallback(
+    async (id: string, pinned: boolean) => {
+      // move it immediately — the card jumps to its new place without a reload
+      setCards((prev) =>
+        pinnedFirst(prev.map((c) => (c.id === id ? { ...c, pinned } : c))),
+      );
+      try {
+        await api.setCardPinned(id, pinned);
+      } catch {
+        /* the reload below restores the stored state */
+      }
+      void loadCards();
+    },
+    [loadCards],
+  );
+
+  const toggleLoraPin = useCallback(
+    async (id: string, pinned: boolean) => {
+      setLoras((prev) =>
+        pinnedFirst(prev.map((l) => (l.id === id ? { ...l, pinned } : l))),
+      );
+      try {
+        await api.setLoraPinned(id, pinned);
+      } catch {
+        /* the reload below restores the stored state */
+      }
+      void loadLoras();
+    },
+    [loadLoras],
+  );
 
   // keep groupId valid (e.g. the group was deleted or the library was replaced)
   useEffect(() => {
@@ -1639,6 +1676,7 @@ function Shell() {
                   selectMode={selectMode}
                   selection={selection}
                   onToggleSelect={toggleSelect}
+                  onTogglePin={toggleCardPin}
                 />
               </motion.div>
             ) : (
@@ -1656,6 +1694,7 @@ function Shell() {
                   selectMode={selectMode}
                   selection={selection}
                   onToggleSelect={toggleSelect}
+                  onTogglePin={toggleLoraPin}
                   families={groupedFamilies}
                   onOpenFamily={setFamilyOpenId}
                   onSplitFamily={splitFamily}

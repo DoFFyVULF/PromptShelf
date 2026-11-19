@@ -1,6 +1,6 @@
 use crate::cards::{
     create_card_inner, delete_card_image_inner, delete_card_inner, get_card_inner, list_cards_inner,
-    list_tags_inner, update_card_inner
+    list_tags_inner, set_card_pinned_inner, update_card_inner
 };
 use crate::images::process_into;
 use crate::images::ImportSettings;
@@ -637,5 +637,119 @@ fn promptless_imports_are_real_cards_and_stay_editable() {
         ),
         Err(e) if e == "PROMPT_REQUIRED"
     ));
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn test_pinned_rows_sort_first_on_both_shelves() {
+    let dir = tmp_dir("pinned-sort");
+    let conn = crate::store::open(&dir).unwrap();
+    crate::store::init_schema(&conn).unwrap();
+    conn.execute_batch(
+        "INSERT INTO cards (id, prompt, created_at, updated_at, group_id) VALUES
+            ('c-old', 'old', '2026-01-01', '2026-01-01', 'g'),
+            ('c-new', 'new', '2026-02-01', '2026-02-01', 'g'),
+            ('c-mid', 'mid', '2026-01-15', '2026-01-15', 'g');
+         INSERT INTO loras (id, name, created_at, updated_at, group_id) VALUES
+            ('l-old', 'old', '2026-01-01', '2026-01-01', 'g'),
+            ('l-new', 'new', '2026-02-01', '2026-02-01', 'g'),
+            ('l-mid', 'mid', '2026-01-15', '2026-01-15', 'g');",
+    )
+    .unwrap();
+    drop(conn);
+
+    let ids = |sort: &str| -> (Vec<String>, Vec<String>) {
+        let mut filter = no_filter();
+        filter.sort = Some(sort.to_string());
+        let cards = list_cards_inner(&dir, &filter)
+            .unwrap()
+            .into_iter()
+            .map(|c| c.id)
+            .collect();
+        let loras = crate::loras::list_loras_inner(&dir, &filter)
+            .unwrap()
+            .into_iter()
+            .map(|l| l.id)
+            .collect();
+        (cards, loras)
+    };
+
+    // unpinned rows follow the shelf order
+    assert_eq!(ids("newest").0, vec!["c-new", "c-mid", "c-old"]);
+    assert_eq!(ids("oldest").0, vec!["c-old", "c-mid", "c-new"]);
+
+    set_card_pinned_inner(&dir, "c-old", true).unwrap();
+    crate::loras::set_lora_pinned_inner(&dir, "l-old", true).unwrap();
+
+    // pinned wins over every sort order, on both shelves
+    for sort in ["newest", "oldest", "rating"] {
+        let (cards, loras) = ids(sort);
+        assert_eq!(cards.first().map(String::as_str), Some("c-old"), "cards/{sort}");
+        assert_eq!(loras.first().map(String::as_str), Some("l-old"), "loras/{sort}");
+    }
+
+    let mut filter = no_filter();
+    filter.sort = None;
+    assert!(list_cards_inner(&dir, &filter).unwrap()[0].pinned);
+    assert!(crate::loras::list_loras_inner(&dir, &filter).unwrap()[0].pinned);
+
+    // unpinning restores the natural order
+    set_card_pinned_inner(&dir, "c-old", false).unwrap();
+    crate::loras::set_lora_pinned_inner(&dir, "l-old", false).unwrap();
+    assert_eq!(ids("newest").0, vec!["c-new", "c-mid", "c-old"]);
+    assert_eq!(ids("newest").1, vec!["l-new", "l-mid", "l-old"]);
+
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn test_pinned_column_migrates_old_libraries() {
+    let dir = tmp_dir("pinned-migrate");
+    {
+        // a pre-pin library: both tables exist, neither knows the column
+        let conn = rusqlite::Connection::open(dir.join("library.db")).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE cards (
+                id TEXT PRIMARY KEY, prompt TEXT NOT NULL DEFAULT '',
+                negative_prompt TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '',
+                rating INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL, cover_image_id TEXT,
+                loras TEXT NOT NULL DEFAULT '[]', variants_json TEXT NOT NULL DEFAULT '[]',
+                group_id TEXT, author TEXT, checkpoint TEXT,
+                meta_json TEXT NOT NULL DEFAULT '[]', source_key TEXT, text_hash TEXT
+             );
+             CREATE TABLE loras (
+                id TEXT PRIMARY KEY, name TEXT NOT NULL DEFAULT '',
+                base_model TEXT NOT NULL DEFAULT '', published_at TEXT NOT NULL DEFAULT '',
+                usage_tips TEXT NOT NULL DEFAULT '[]',
+                trigger_words TEXT NOT NULL DEFAULT '[]',
+                description TEXT NOT NULL DEFAULT '', primary_tag TEXT,
+                note TEXT NOT NULL DEFAULT '', rating INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL, updated_at TEXT NOT NULL, group_id TEXT,
+                cover_image_id TEXT, source_key TEXT, text_hash TEXT
+             );",
+        )
+        .unwrap();
+    }
+
+    // open() runs the migration
+    let conn = crate::store::open(&dir).unwrap();
+    conn.execute(
+        "INSERT INTO cards (id, created_at, updated_at) VALUES ('c', 't', 't')",
+        [],
+    )
+    .unwrap();
+    conn.execute(
+        "INSERT INTO loras (id, created_at, updated_at) VALUES ('l', 't', 't')",
+        [],
+    )
+    .unwrap();
+    let card_pinned: i64 = conn
+        .query_row("SELECT pinned FROM cards WHERE id = 'c'", [], |r| r.get(0))
+        .unwrap();
+    let lora_pinned: i64 = conn
+        .query_row("SELECT pinned FROM loras WHERE id = 'l'", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!((card_pinned, lora_pinned), (0, 0));
     std::fs::remove_dir_all(&dir).ok();
 }

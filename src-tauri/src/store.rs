@@ -20,7 +20,8 @@ CREATE TABLE IF NOT EXISTS cards (
     checkpoint TEXT,
     meta_json TEXT NOT NULL DEFAULT '[]',
     source_key TEXT,
-    text_hash TEXT
+    text_hash TEXT,
+    pinned INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS groups (
     id TEXT PRIMARY KEY,
@@ -73,7 +74,8 @@ CREATE TABLE IF NOT EXISTS loras (
     group_id TEXT,
     cover_image_id TEXT,
     source_key TEXT,
-    text_hash TEXT
+    text_hash TEXT,
+    pinned INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_loras_group ON loras(group_id);
 CREATE INDEX IF NOT EXISTS idx_loras_source_key ON loras(source_key) WHERE source_key IS NOT NULL;
@@ -180,6 +182,23 @@ fn ensure_columns(conn: &Connection) -> Result<(), String> {
     }
     if !names.iter().any(|n| n == "text_hash") {
         conn.execute("ALTER TABLE cards ADD COLUMN text_hash TEXT", []).map_err(es)?;
+    }
+    if !names.iter().any(|n| n == "pinned") {
+        conn.execute("ALTER TABLE cards ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0", [])
+            .map_err(es)?;
+    }
+
+    // The lora shelf mirrors the card schema; only `pinned` was added after v1.
+    let mut stmt = conn.prepare("PRAGMA table_info(loras)").map_err(es)?;
+    let lora_names = stmt
+        .query_map([], |r| r.get::<_, String>(1))
+        .map_err(es)?
+        .filter_map(|n| n.ok())
+        .collect::<Vec<String>>();
+    drop(stmt);
+    if !lora_names.iter().any(|n| n == "pinned") {
+        conn.execute("ALTER TABLE loras ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0", [])
+            .map_err(es)?;
     }
     Ok(())
 }

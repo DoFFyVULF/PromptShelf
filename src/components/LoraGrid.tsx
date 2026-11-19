@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
-import { AnimatePresence } from "motion/react";
-import { Layers, Star } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { Layers, Pin, Star } from "lucide-react";
 import { useI18n } from "../i18n";
 import { assetUrl } from "../lib/api";
 import { attachCardGhost } from "../lib/dragGhost";
@@ -19,6 +19,7 @@ interface LoraGridProps {
   selectMode: boolean;
   selection: string[];
   onToggleSelect: (id: string) => void;
+  onTogglePin: (id: string, pinned: boolean) => void;
   /** Accepted same-lora variant sets; each one occupies one tile in the grid. */
   families: LoraFamily[];
   onOpenFamily: (id: string) => void;
@@ -31,7 +32,8 @@ function LoraTile({
   delay,
   selectMode,
   selected,
-  onToggleSelect
+  onToggleSelect,
+  onTogglePin
 }: {
   lora: LoraSummary;
   onOpen: (id: string) => void;
@@ -39,8 +41,10 @@ function LoraTile({
   selectMode: boolean;
   selected: boolean;
   onToggleSelect: (id: string) => void;
+  onTogglePin: (id: string, pinned: boolean) => void;
 }) {
   const { formatDate, t } = useI18n();
+  const reduced = useReducedMotion();
   const [dragging, setDragging] = useState(false);
 
   const activate = () => {
@@ -71,7 +75,7 @@ function LoraTile({
     <article
       className={`anim-tile group relative flex cursor-pointer flex-col overflow-hidden rounded-card border bg-card transition-[border-color,transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-line-hover hover:shadow-tile-hover ${
         dragging ? "scale-[0.9] border-leaf-edge/80 shadow-none" : "border-hairline"
-      }`}
+      } ${lora.pinned ? "tile-pinned" : ""}`}
       style={{ animationDelay: `${Math.min(delay, 320)}ms` }}
       onClick={activate}
       role="button"
@@ -117,7 +121,7 @@ function LoraTile({
           )}
           {/* blue primary badge, like CivitAI's model-page label */}
           {lora.primary_tag && (
-            <span className="absolute top-1.5 left-1.5 rounded-md bg-action px-1.5 py-[2px] text-[9.5px] font-bold tracking-wide text-white uppercase shadow-chip">
+            <span className="absolute top-1.5 left-1.5 max-w-[calc(100%-3rem)] truncate rounded-md bg-action px-1.5 py-[2px] text-[9.5px] font-bold tracking-wide text-white uppercase shadow-chip">
               {lora.primary_tag}
             </span>
           )}
@@ -125,6 +129,49 @@ function LoraTile({
             <span className="absolute right-1.5 bottom-1.5 flex items-center gap-1 rounded-full bg-black/55 px-2 py-0.5 text-[10.5px] font-medium text-white backdrop-blur-sm">
               {lora.base_model}
             </span>
+          )}
+          {!selectMode && !dragging && (
+            <div
+              className={`absolute top-2 right-2 z-10 transition-[opacity,translate] duration-200 ease-[cubic-bezier(0.32,0.72,0,1)] ${
+                lora.pinned
+                  ? "opacity-100"
+                  : "pointer-events-none -translate-y-1 opacity-0 group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:translate-y-0 group-focus-within:opacity-100"
+              }`}
+            >
+              <motion.button
+                type="button"
+                draggable={false}
+                className={`pin-chip ${lora.pinned ? "is-on" : ""}`}
+                aria-label={lora.pinned ? t("card.unpin") : t("card.pin")}
+                aria-pressed={lora.pinned}
+                title={lora.pinned ? t("card.unpin") : t("card.pin")}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onTogglePin(lora.id, !lora.pinned);
+                }}
+                onKeyDown={(e) => e.stopPropagation()}
+                whileHover={reduced ? undefined : { scale: 1.08 }}
+                whileTap={reduced ? undefined : { scale: 0.88 }}
+                transition={{ type: "spring", stiffness: 520, damping: 26 }}
+              >
+                <motion.span
+                  key={lora.pinned ? "on" : "off"}
+                  initial={{ scale: 0.55, rotate: -35, opacity: 0 }}
+                  animate={{ scale: 1, rotate: 0, opacity: 1 }}
+                  transition={
+                    reduced
+                      ? { duration: 0 }
+                      : { type: "spring", stiffness: 560, damping: 20 }
+                  }
+                >
+                  <Pin
+                    size={14}
+                    strokeWidth={2.2}
+                    className={lora.pinned ? "fill-current" : undefined}
+                  />
+                </motion.span>
+              </motion.button>
+            </div>
           )}
         </div>
       </div>
@@ -173,7 +220,7 @@ function LoraTile({
   );
 }
 
-export function LoraGrid({ loras, jobs, onJobRetry, onJobDismiss, onOpen, selectMode, selection, onToggleSelect, families, onOpenFamily, onSplitFamily }: LoraGridProps) {
+export function LoraGrid({ loras, jobs, onJobRetry, onJobDismiss, onOpen, selectMode, selection, onToggleSelect, onTogglePin, families, onOpenFamily, onSplitFamily }: LoraGridProps) {
   // Members disappear from the grid and are represented by one deck tile at
   // the position of their newest member, so sorting stays intact.
   const familyByMember = useMemo(() => {
@@ -216,6 +263,7 @@ export function LoraGrid({ loras, jobs, onJobRetry, onJobDismiss, onOpen, select
             selectMode={selectMode}
             selected={selection.includes(lora.id)}
             onToggleSelect={onToggleSelect}
+            onTogglePin={onTogglePin}
           />
         );
       })}
