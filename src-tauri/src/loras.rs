@@ -665,8 +665,7 @@ fn clean_group_name(name: &str) -> Result<String, String> {
     if name.is_empty() {
         return Err("GROUP_NAME_REQUIRED".to_string());
     }
-    // characters, not bytes: mirrors the UI's maxLength for Cyrillic names
-    if name.chars().count() > 48 {
+    if name.len() > 48 {
         return Err("GROUP_NAME_TOO_LONG".to_string());
     }
     Ok(name)
@@ -677,18 +676,6 @@ pub fn create_lora_group_inner(dir: &Path, input: NewGroupInput) -> Result<Group
     let color = crate::group_style::clean_color(&input.color)?;
     let icon = crate::group_style::clean_icon(&input.icon)?;
     let conn = store::open(dir)?;
-    let taken: bool = conn
-        .query_row(
-            "SELECT 1 FROM lora_groups WHERE name COLLATE NOCASE = ?1 LIMIT 1",
-            params![name],
-            |_| Ok(true),
-        )
-        .optional()
-        .map_err(es)?
-        .unwrap_or(false);
-    if taken {
-        return Err("GROUP_NAME_EXISTS".to_string());
-    }
     let sort: i64 = conn
         .query_row("SELECT COALESCE(MAX(sort) + 1, 1) FROM lora_groups", [], |r| r.get(0))
         .map_err(es)?;
@@ -721,18 +708,6 @@ pub fn set_lora_group_style_inner(dir: &Path, input: GroupStyleInput) -> Result<
 pub fn rename_lora_group_inner(dir: &Path, input: RenameGroupInput) -> Result<(), String> {
     let name = clean_group_name(&input.name)?;
     let conn = store::open(dir)?;
-    let taken: bool = conn
-        .query_row(
-            "SELECT 1 FROM lora_groups WHERE name COLLATE NOCASE = ?1 AND id <> ?2 LIMIT 1",
-            params![name, input.id],
-            |_| Ok(true),
-        )
-        .optional()
-        .map_err(es)?
-        .unwrap_or(false);
-    if taken {
-        return Err("GROUP_NAME_EXISTS".to_string());
-    }
     let n = conn
         .execute("UPDATE lora_groups SET name = ?1 WHERE id = ?2", params![name, input.id])
         .map_err(es)?;
@@ -756,14 +731,12 @@ pub fn delete_lora_group_inner(dir: &Path, id: &str) -> Result<(), String> {
     }
 
     let default_id = store::default_lora_group_id(&conn)?;
-    let tx = conn.unchecked_transaction().map_err(es)?;
-    tx.execute(
+    conn.execute(
         "UPDATE loras SET group_id = ?1 WHERE group_id = ?2",
         params![default_id, id],
     )
     .map_err(es)?;
-    tx.execute("DELETE FROM lora_groups WHERE id = ?1", params![id]).map_err(es)?;
-    tx.commit().map_err(es)?;
+    conn.execute("DELETE FROM lora_groups WHERE id = ?1", params![id]).map_err(es)?;
     Ok(())
 }
 
@@ -782,11 +755,9 @@ pub fn move_loras_inner(dir: &Path, input: MoveCardsInput) -> Result<(), String>
     }
 
     let placeholders = vec!["?"; input.ids.len()].join(",");
-    // A move is organization, not an edit — keep `updated_at` so the shelf
-    // order does not jump after filing a lora into another group.
-    let sql = format!("UPDATE loras SET group_id = ?1 WHERE id IN ({placeholders})");
+    let sql = format!("UPDATE loras SET group_id = ?1, updated_at = ?2 WHERE id IN ({placeholders})");
     let mut vals: Vec<rusqlite::types::Value> =
-        vec![rusqlite::types::Value::Text(input.group_id.clone())];
+        vec![rusqlite::types::Value::Text(input.group_id.clone()), rusqlite::types::Value::Text(now())];
     for id in &input.ids {
         vals.push(rusqlite::types::Value::Text(id.clone()));
     }
