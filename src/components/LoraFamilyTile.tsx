@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { Layers2, Pin } from "lucide-react";
 import { useI18n, type DictKey } from "../i18n";
@@ -26,6 +27,8 @@ export function LoraFamilyTile({
 }: LoraFamilyTileProps) {
   const { t, lang, formatDate } = useI18n();
   const reduce = useReducedMotion() ?? false;
+  // seeded once: a reorder must not replay the entrance animation
+  const [stagger] = useState(() => Math.min(delay, 320));
 
   // The deck is one shelf entry: it only reads as pinned when every variant
   // is, and toggling it pins the whole group at once.
@@ -52,10 +55,10 @@ export function LoraFamilyTile({
 
   return (
     <article
-      className={`anim-tile group relative flex cursor-pointer flex-col overflow-hidden rounded-card border bg-card transition-[border-color,transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-line-hover hover:shadow-tile-hover ${
+      className={`anim-tile group relative flex h-full cursor-pointer flex-col overflow-hidden rounded-card border bg-card transition-[border-color,transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-line-hover hover:shadow-tile-hover ${
         pinned ? "tile-pinned" : "border-hairline"
       }`}
-      style={{ animationDelay: `${Math.min(delay, 320)}ms` }}
+      style={{ animationDelay: `${stagger}ms` }}
       onClick={activate}
       role="button"
       tabIndex={0}
@@ -132,6 +135,9 @@ export function LoraFamilyTile({
               title={pinned ? t("family.unpin") : t("family.pin")}
               onClick={(e) => {
                 e.stopPropagation();
+                // drop the focus before the deck moves, or WebKit scrolls the
+                // button back into view
+                if (e.detail > 0) e.currentTarget.blur();
                 onTogglePin(memberIds, !pinned);
               }}
               onKeyDown={(e) => e.stopPropagation()}

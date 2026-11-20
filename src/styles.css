@@ -883,6 +883,59 @@ body {
 .pin-chip.is-on:hover {
   background: linear-gradient(140deg, #ffeaa8 0%, #f0ca64 35%, #d9ab39 68%, #b3831a 100%);
 }
+
+/* The gilded beat a tile plays when it is pinned: the rim lights up, a warm
+   halo leaves the card and a ring widens and fades. The bloom sits outside the
+   tile's `overflow: hidden` (on the tile shell), so the light can spill onto
+   its neighbours. Its paint is static — only opacity and scale are animated,
+   which keeps the blur on the compositor instead of repainting every frame. */
+.pin-bloom {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  border-radius: var(--radius-card);
+  pointer-events: none;
+  background: radial-gradient(
+    120% 95% at 50% 0%,
+    color-mix(in oklab, var(--color-gold-bright) 30%, transparent),
+    color-mix(in oklab, var(--color-gold-bright) 7%, transparent) 58%,
+    transparent 80%
+  );
+  box-shadow:
+    0 0 0 1.5px color-mix(in oklab, var(--color-gold-bright) 90%, transparent),
+    0 0 24px 2px color-mix(in oklab, var(--color-gold-bright) 40%, transparent),
+    0 16px 44px -10px color-mix(in oklab, var(--color-gold) 55%, transparent),
+    inset 0 0 36px color-mix(in oklab, var(--color-gold-bright) 24%, transparent);
+  will-change: opacity, transform;
+}
+.pin-ripple {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  border-radius: var(--radius-card);
+  pointer-events: none;
+  border: 1.5px solid color-mix(in oklab, var(--color-gold-bright) 75%, transparent);
+  will-change: opacity, transform;
+}
+
+/* The tile rises off the shelf while the layout spring carries it to the top.
+   Individual transform properties (`translate`/`scale`) compose with the
+   shell's layout animation instead of fighting it, and they cost a composited
+   layer rather than a reflow. */
+.pin-lift {
+  translate: 0 -9px;
+  scale: 1.012;
+  transition:
+    translate 0.42s var(--ease-spring),
+    scale 0.42s var(--ease-spring);
+}
+@media (prefers-reduced-motion: reduce) {
+  .pin-lift {
+    translate: none;
+    scale: none;
+    transition: none;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .pin-chip {
     transition: none;

@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { ImageOff, Images, Pin, Star } from "lucide-react";
 import { useI18n } from "../i18n";
 import { assetUrl } from "../lib/api";
 import { attachCardGhost } from "../lib/dragGhost";
 import { ImportJobTile, type ImportJob } from "./ImportJobs";
+import { TileShell } from "./PinShell";
 import type { CardSummary } from "../lib/types";
 
 /** dataTransfer type used when dragging cards onto the groups panel. */
@@ -25,16 +26,7 @@ interface GridProps {
   onTogglePin: (id: string, pinned: boolean) => void;
 }
 
-function CardTile({
-  card,
-  onOpen,
-  delay,
-  selectMode,
-  selected,
-  onToggleSelect,
-  selection,
-  onTogglePin
-}: {
+interface CardTileProps {
   card: CardSummary;
   onOpen: (id: string) => void;
   delay: number;
@@ -43,7 +35,18 @@ function CardTile({
   onToggleSelect: (id: string) => void;
   selection: string[];
   onTogglePin: (id: string, pinned: boolean) => void;
-}) {
+}
+
+function CardTileBase({
+  card,
+  onOpen,
+  delay,
+  selectMode,
+  selected,
+  onToggleSelect,
+  selection,
+  onTogglePin
+}: CardTileProps) {
   const { formatDate, t, lang } = useI18n();
   const reduced = useReducedMotion();
   const plural = new Intl.PluralRules(lang).select(card.variant_count);
@@ -53,6 +56,10 @@ function CardTile({
   // The state is set on a timeout so React doesn't re-render during the
   // dragstart dispatch; the ghost is already captured from the canvas.
   const [dragging, setDragging] = useState(false);
+  // The entrance stagger is a mount-time affair. Reading it from the prop after
+  // a reorder would rewrite `animation-delay` on every tile, which restarts
+  // `tile-in` and makes the whole shelf flash.
+  const [stagger] = useState(() => Math.min(delay, 320));
 
   const activate = () => {
     if (selectMode) onToggleSelect(card.id);
@@ -81,12 +88,12 @@ function CardTile({
       animate="rest"
       whileHover={reduced || selectMode || dragging ? "rest" : "spread"}
       whileFocus={reduced || selectMode ? "rest" : "spread"}
-      className={`anim-tile group relative flex cursor-pointer flex-col overflow-hidden rounded-card border bg-card transition-[border-color,transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-line-hover hover:shadow-tile-hover ${
+      className={`anim-tile group relative flex h-full cursor-pointer flex-col overflow-hidden rounded-card border bg-card transition-[border-color,transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-line-hover hover:shadow-tile-hover ${
         dragging
           ? "scale-[0.9] border-leaf-edge/80 shadow-none"
           : "border-hairline"
       } ${card.pinned ? "tile-pinned" : ""}`}
-      style={{ animationDelay: `${Math.min(delay, 320)}ms` }}
+      style={{ animationDelay: `${stagger}ms` }}
       onClick={activate}
       role="button"
       tabIndex={0}
@@ -152,6 +159,10 @@ function CardTile({
                 title={card.pinned ? t("card.unpin") : t("card.pin")}
                 onClick={(e) => {
                   e.stopPropagation();
+                  // A pointer click leaves the chip focused; when the card is
+                  // moved to the top, WebKit scrolls the focused button into
+                  // view and yanks the shelf with it.
+                  if (e.detail > 0) e.currentTarget.blur();
                   onTogglePin(card.id, !card.pinned);
                 }}
                 onKeyDown={(e) => e.stopPropagation()}
@@ -243,6 +254,21 @@ function CardTile({
   );
 }
 
+/**
+ * A pin re-sorts the shelf, which re-indexes every tile. `delay` only seeds the
+ * mount stagger, so it is deliberately left out of the comparison: the tile the
+ * user touched (and nothing else) re-renders.
+ */
+const CardTile = memo(CardTileBase, (a: CardTileProps, b: CardTileProps) => (
+  a.card === b.card &&
+  a.selected === b.selected &&
+  a.selectMode === b.selectMode &&
+  a.selection === b.selection &&
+  a.onOpen === b.onOpen &&
+  a.onToggleSelect === b.onToggleSelect &&
+  a.onTogglePin === b.onTogglePin
+));
+
 export function CardGrid({ cards, jobs, onJobRetry, onJobDismiss, onOpen, selectMode, selection, onToggleSelect, onTogglePin }: GridProps) {
   return (
     <div className="grid grid-cols-[repeat(auto-fill,minmax(236px,1fr))] gap-4 px-5 pt-5 pb-10">
@@ -252,17 +278,18 @@ export function CardGrid({ cards, jobs, onJobRetry, onJobDismiss, onOpen, select
         ))}
       </AnimatePresence>
       {cards.map((card, i) => (
-        <CardTile
-          key={card.id}
-          card={card}
-          onOpen={onOpen}
-          delay={i * 28}
-          selectMode={selectMode}
-          selected={selection.includes(card.id)}
-          onToggleSelect={onToggleSelect}
-          onTogglePin={onTogglePin}
-          selection={selection}
-        />
+        <TileShell key={card.id} pinned={card.pinned}>
+          <CardTile
+            card={card}
+            onOpen={onOpen}
+            delay={i * 28}
+            selectMode={selectMode}
+            selected={selection.includes(card.id)}
+            onToggleSelect={onToggleSelect}
+            onTogglePin={onTogglePin}
+            selection={selection}
+          />
+        </TileShell>
       ))}
     </div>
   );

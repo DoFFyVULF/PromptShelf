@@ -78,11 +78,53 @@ function matchCivitaiLink(text: string, re: RegExp): string | null {
   return text.match(re)?.[0].replace(/[)\]}>.,;!]+$/, "") ?? null;
 }
 
-/** Optimistic shelf order: pinned items float to the top while everything
- * else keeps the order the backend returned for the active sort. */
-function pinnedFirst<T extends { pinned: boolean }>(items: T[]): T[] {
-  return [...items].sort((a, b) => Number(b.pinned) - Number(a.pinned));
+/** The slot every item arrived in, so an unpinned item can find its way home
+ * instead of keeping the row it was floated to. */
+type ShelfOrder = Map<string, number>;
+
+function orderOf<T extends { id: string }>(items: T[]): ShelfOrder {
+  const order: ShelfOrder = new Map();
+  items.forEach((item, i) => order.set(item.id, i));
+  return order;
 }
+
+/** Optimistic shelf order: pinned items float to the top while everything else
+ * returns to the slot the backend gave it for the active sort. Sorting by the
+ * remembered slot (and not by the current array) is what lets an unpinned item
+ * travel back down to its own place. */
+function pinnedFirst<T extends { id: string; pinned: boolean }>(
+  items: T[],
+  order: ShelfOrder,
+): T[] {
+  const slot = (item: T) => order.get(item.id) ?? Number.MAX_SAFE_INTEGER;
+  return [...items].sort(
+    (a, b) => Number(b.pinned) - Number(a.pinned) || slot(a) - slot(b),
+  );
+}
+
+/** A pin reorders the grid right under the cursor, and two things then pull the
+ * shelf up with it: the focused tile (WebKit scrolls a focused node back into
+ * view) and Chromium anchoring the scroll to the tile that just left the
+ * viewport. Hold the view still across the commit, put keyboard focus back
+ * without scrolling, and undo any scroll the engine performed anyway. */
+function holdView(container: HTMLElement | null, fn: () => void) {
+  const active = document.activeElement;
+  const keep =
+    active instanceof HTMLElement && active !== document.body ? active : null;
+  const top = container?.scrollTop ?? 0;
+  keep?.blur();
+  fn();
+  requestAnimationFrame(() => {
+    if (keep?.isConnected) keep.focus({ preventScroll: true });
+    if (container && Math.abs(container.scrollTop - top) > 1) {
+      container.scrollTop = top;
+    }
+  });
+}
+
+/** A pin is two beats: the tile gilds and lifts where it stands, then it flies
+ * to the top. The gap between them is one timeout — never a refetch. */
+const PIN_BLOOM_MS = 240;
 
 function Shell() {
   const { t, lang, setLang } = useI18n();
@@ -274,6 +316,9 @@ function Shell() {
 
   // refs for stable listeners
   const scrollRef = useRef<HTMLElement | null>(null);
+  // the backend's ordering, kept as the home slot of every card and lora
+  const cardOrderRef = useRef<ShelfOrder>(new Map());
+  const loraOrderRef = useRef<ShelfOrder>(new Map());
   const editorOpenRef = useRef(false);
   const stagedRef = useRef<StagedImage[]>([]);
   const detailOpenRef = useRef(false);
@@ -372,6 +417,7 @@ function Shell() {
         api.listTags(),
       ]);
       setCards(list);
+      cardOrderRef.current = orderOf(list);
       setTags(tagList);
       setLoadError(false);
     } catch {
@@ -416,6 +462,7 @@ function Shell() {
         api.listLoraTags(),
       ]);
       setLoras(list);
+      loraOrderRef.current = orderOf(list);
       setLoraTags(tagList);
       setLoadError(false);
     } catch {
@@ -425,55 +472,78 @@ function Shell() {
     }
   }, [debouncedQ, loraGroupId, selectedTags, matchAllTags, sort]);
 
-  const toggleCardPin = useCallback(
-    async (id: string, pinned: boolean) => {
-      // move it immediately — the card jumps to its new place without a reload
-      setCards((prev) =>
-        pinnedFirst(prev.map((c) => (c.id === id ? { ...c, pinned } : c))),
+  /** Pinning never touches the shelf data: the tile flips its gild state, the
+   * grid slides it into the new slot with a layout spring, and the write goes
+   * out in the background. No refetch means no re-mount, no lost images and no
+   * scroll jump; a failed write simply puts the tile back. */
+  const toggleCardPin = useCallback((id: string, pinned: boolean) => {
+    setCards((prev) => prev.map((c) => (c.id === id ? { ...c, pinned } : c)));
+    // unpinning needs no bloom — the card can slide back right away
+    const settle = () =>
+      holdView(scrollRef.current, () =>
+        setCards((prev) => pinnedFirst(prev, cardOrderRef.current)),
       );
-      try {
-        await api.setCardPinned(id, pinned);
-      } catch {
-        /* the reload below restores the stored state */
-      }
-      void loadCards();
-    },
-    [loadCards],
-  );
+    if (pinned) window.setTimeout(settle, PIN_BLOOM_MS);
+    else settle();
+    void api.setCardPinned(id, pinned).catch(() => {
+      holdView(scrollRef.current, () =>
+        setCards((prev) =>
+          pinnedFirst(
+            prev.map((c) => (c.id === id ? { ...c, pinned: !pinned } : c)),
+            cardOrderRef.current,
+          ),
+        ),
+      );
+    });
+  }, []);
 
-  const toggleLoraPin = useCallback(
-    async (id: string, pinned: boolean) => {
-      setLoras((prev) =>
-        pinnedFirst(prev.map((l) => (l.id === id ? { ...l, pinned } : l))),
+  const toggleLoraPin = useCallback((id: string, pinned: boolean) => {
+    setLoras((prev) => prev.map((l) => (l.id === id ? { ...l, pinned } : l)));
+    const settle = () =>
+      holdView(scrollRef.current, () =>
+        setLoras((prev) => pinnedFirst(prev, loraOrderRef.current)),
       );
-      try {
-        await api.setLoraPinned(id, pinned);
-      } catch {
-        /* the reload below restores the stored state */
-      }
-      void loadLoras();
-    },
-    [loadLoras],
-  );
+    if (pinned) window.setTimeout(settle, PIN_BLOOM_MS);
+    else settle();
+    void api.setLoraPinned(id, pinned).catch(() => {
+      holdView(scrollRef.current, () =>
+        setLoras((prev) =>
+          pinnedFirst(
+            prev.map((l) => (l.id === id ? { ...l, pinned: !pinned } : l)),
+            loraOrderRef.current,
+          ),
+        ),
+      );
+    });
+  }, []);
 
   /** A family is one shelf entry, so pinning it pins every variant: the deck
    * tile then floats to the top exactly like a single pinned lora. */
   const toggleFamilyPin = useCallback(
-    async (memberIds: string[], pinned: boolean) => {
+    (memberIds: string[], pinned: boolean) => {
       const ids = new Set(memberIds);
-      setLoras((prev) =>
-        pinnedFirst(
-          prev.map((l) => (ids.has(l.id) ? { ...l, pinned } : l)),
-        ),
-      );
-      try {
-        await Promise.all(memberIds.map((id) => api.setLoraPinned(id, pinned)));
-      } catch {
-        /* the reload below restores the stored state */
-      }
-      void loadLoras();
+      holdView(scrollRef.current, () => {
+        setLoras((prev) =>
+          pinnedFirst(
+            prev.map((l) => (ids.has(l.id) ? { ...l, pinned } : l)),
+            loraOrderRef.current,
+          ),
+        );
+      });
+      void Promise.all(
+        memberIds.map((id) => api.setLoraPinned(id, pinned)),
+      ).catch(() => {
+        holdView(scrollRef.current, () => {
+          setLoras((prev) =>
+            pinnedFirst(
+              prev.map((l) => (ids.has(l.id) ? { ...l, pinned: !pinned } : l)),
+              loraOrderRef.current,
+            ),
+          );
+        });
+      });
     },
-    [loadLoras],
+    [],
   );
 
   // keep groupId valid (e.g. the group was deleted or the library was replaced)
@@ -1652,7 +1722,11 @@ function Shell() {
         lora={mode === "lora"}
       />
 
-      <main ref={scrollRef} className="relative min-h-0 flex-1 overflow-y-auto">
+      <main
+        ref={scrollRef}
+        style={{ overflowAnchor: "none" }}
+        className="relative min-h-0 flex-1 overflow-y-auto"
+      >
         {loading && activeCards.length === 0 ? (
           <BootLoader />
         ) : loadError && activeCards.length === 0 ? (

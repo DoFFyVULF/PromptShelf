@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Layers, Pin, Star } from "lucide-react";
 import { useI18n } from "../i18n";
@@ -7,6 +7,7 @@ import { attachCardGhost } from "../lib/dragGhost";
 import { ImportJobTile, type ImportJob } from "./ImportJobs";
 import { CARD_DRAG_TYPE } from "./Grid";
 import { LoraFamilyTile } from "./LoraFamilyTile";
+import { TileShell } from "./PinShell";
 import type { LoraFamily } from "../lib/loraFamilies";
 import type { LoraSummary } from "../lib/types";
 
@@ -27,15 +28,7 @@ interface LoraGridProps {
   onToggleFamilyPin: (memberIds: string[], pinned: boolean) => void;
 }
 
-function LoraTile({
-  lora,
-  onOpen,
-  delay,
-  selectMode,
-  selected,
-  onToggleSelect,
-  onTogglePin
-}: {
+interface LoraTileProps {
   lora: LoraSummary;
   onOpen: (id: string) => void;
   delay: number;
@@ -43,10 +36,22 @@ function LoraTile({
   selected: boolean;
   onToggleSelect: (id: string) => void;
   onTogglePin: (id: string, pinned: boolean) => void;
-}) {
+}
+
+function LoraTileBase({
+  lora,
+  onOpen,
+  delay,
+  selectMode,
+  selected,
+  onToggleSelect,
+  onTogglePin
+}: LoraTileProps) {
   const { formatDate, t } = useI18n();
   const reduced = useReducedMotion();
   const [dragging, setDragging] = useState(false);
+  // seeded once: a reorder must not replay the entrance animation
+  const [stagger] = useState(() => Math.min(delay, 320));
 
   const activate = () => {
     if (selectMode) onToggleSelect(lora.id);
@@ -74,10 +79,10 @@ function LoraTile({
 
   return (
     <article
-      className={`anim-tile group relative flex cursor-pointer flex-col overflow-hidden rounded-card border bg-card transition-[border-color,transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-line-hover hover:shadow-tile-hover ${
+      className={`anim-tile group relative flex h-full cursor-pointer flex-col overflow-hidden rounded-card border bg-card transition-[border-color,transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-line-hover hover:shadow-tile-hover ${
         dragging ? "scale-[0.9] border-leaf-edge/80 shadow-none" : "border-hairline"
       } ${lora.pinned ? "tile-pinned" : ""}`}
-      style={{ animationDelay: `${Math.min(delay, 320)}ms` }}
+      style={{ animationDelay: `${stagger}ms` }}
       onClick={activate}
       role="button"
       tabIndex={0}
@@ -148,6 +153,9 @@ function LoraTile({
                 title={lora.pinned ? t("card.unpin") : t("card.pin")}
                 onClick={(e) => {
                   e.stopPropagation();
+                  // drop the focus before the tile moves, or WebKit scrolls
+                  // the button back into view
+                  if (e.detail > 0) e.currentTarget.blur();
                   onTogglePin(lora.id, !lora.pinned);
                 }}
                 onKeyDown={(e) => e.stopPropagation()}
@@ -221,6 +229,17 @@ function LoraTile({
   );
 }
 
+/** See CardTile: `delay` only seeds the mount stagger, so it stays out of the
+ * comparison and a pin re-renders the tile the user touched, not the shelf. */
+const LoraTile = memo(LoraTileBase, (a: LoraTileProps, b: LoraTileProps) => (
+  a.lora === b.lora &&
+  a.selected === b.selected &&
+  a.selectMode === b.selectMode &&
+  a.onOpen === b.onOpen &&
+  a.onToggleSelect === b.onToggleSelect &&
+  a.onTogglePin === b.onTogglePin
+));
+
 export function LoraGrid({ loras, jobs, onJobRetry, onJobDismiss, onOpen, selectMode, selection, onToggleSelect, onTogglePin, families, onOpenFamily, onToggleFamilyPin }: LoraGridProps) {
   // Members disappear from the grid and are represented by one deck tile at
   // the position of their newest member, so sorting stays intact.
@@ -245,27 +264,31 @@ export function LoraGrid({ loras, jobs, onJobRetry, onJobDismiss, onOpen, select
         if (family) {
           if (shownFamilies.has(family.id)) return null;
           shownFamilies.add(family.id);
+          // the deck reads as pinned only when every variant is
+          const pinned = family.members.every((m) => m.pinned);
           return (
-            <LoraFamilyTile
-              key={`family-${family.id}`}
-              family={family}
-              onOpen={onOpenFamily}
-              onTogglePin={onToggleFamilyPin}
-              delay={i * 28}
-            />
+            <TileShell key={`family-${family.id}`} pinned={pinned}>
+              <LoraFamilyTile
+                family={family}
+                onOpen={onOpenFamily}
+                onTogglePin={onToggleFamilyPin}
+                delay={i * 28}
+              />
+            </TileShell>
           );
         }
         return (
-          <LoraTile
-            key={lora.id}
-            lora={lora}
-            onOpen={onOpen}
-            delay={i * 28}
-            selectMode={selectMode}
-            selected={selection.includes(lora.id)}
-            onToggleSelect={onToggleSelect}
-            onTogglePin={onTogglePin}
-          />
+          <TileShell key={lora.id} pinned={lora.pinned}>
+            <LoraTile
+              lora={lora}
+              onOpen={onOpen}
+              delay={i * 28}
+              selectMode={selectMode}
+              selected={selection.includes(lora.id)}
+              onToggleSelect={onToggleSelect}
+              onTogglePin={onTogglePin}
+            />
+          </TileShell>
         );
       })}
     </div>
