@@ -453,6 +453,26 @@ function Shell() {
     [loadLoras],
   );
 
+  /** A family is one shelf entry, so pinning it pins every variant: the deck
+   * tile then floats to the top exactly like a single pinned lora. */
+  const toggleFamilyPin = useCallback(
+    async (memberIds: string[], pinned: boolean) => {
+      const ids = new Set(memberIds);
+      setLoras((prev) =>
+        pinnedFirst(
+          prev.map((l) => (ids.has(l.id) ? { ...l, pinned } : l)),
+        ),
+      );
+      try {
+        await Promise.all(memberIds.map((id) => api.setLoraPinned(id, pinned)));
+      } catch {
+        /* the reload below restores the stored state */
+      }
+      void loadLoras();
+    },
+    [loadLoras],
+  );
+
   // keep groupId valid (e.g. the group was deleted or the library was replaced)
   useEffect(() => {
     if (!groupsReady || groups.length === 0) return;
@@ -1697,7 +1717,7 @@ function Shell() {
                   onTogglePin={toggleLoraPin}
                   families={groupedFamilies}
                   onOpenFamily={setFamilyOpenId}
-                  onSplitFamily={splitFamily}
+                  onToggleFamilyPin={toggleFamilyPin}
                 />
               </motion.div>
             )}

@@ -236,6 +236,8 @@ export const ru: Record<DictKey, string> = {
   "family.badge.version": "Версии",
   "family.badge.model": "Модели",
   "family.split": "Разделить группу",
+  "family.pin": "Закрепить группу наверху",
+  "family.unpin": "Открепить группу",
   "family.dialog.versionHint": "Одна лора, несколько версий с CivitAI.",
   "family.dialog.modelHint": "Одна лора, несколько базовых моделей.",
   "family.dialog.hint": "Откройте вариант, чтобы посмотреть его, или разделите группу — лоры вернутся на полку.",

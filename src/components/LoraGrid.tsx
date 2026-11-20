@@ -23,7 +23,8 @@ interface LoraGridProps {
   /** Accepted same-lora variant sets; each one occupies one tile in the grid. */
   families: LoraFamily[];
   onOpenFamily: (id: string) => void;
-  onSplitFamily: (id: string) => void;
+  /** Pins every variant in the group, so the deck floats to the top. */
+  onToggleFamilyPin: (memberIds: string[], pinned: boolean) => void;
 }
 
 function LoraTile({
@@ -220,7 +221,7 @@ function LoraTile({
   );
 }
 
-export function LoraGrid({ loras, jobs, onJobRetry, onJobDismiss, onOpen, selectMode, selection, onToggleSelect, onTogglePin, families, onOpenFamily, onSplitFamily }: LoraGridProps) {
+export function LoraGrid({ loras, jobs, onJobRetry, onJobDismiss, onOpen, selectMode, selection, onToggleSelect, onTogglePin, families, onOpenFamily, onToggleFamilyPin }: LoraGridProps) {
   // Members disappear from the grid and are represented by one deck tile at
   // the position of their newest member, so sorting stays intact.
   const familyByMember = useMemo(() => {
@@ -249,7 +250,7 @@ export function LoraGrid({ loras, jobs, onJobRetry, onJobDismiss, onOpen, select
               key={`family-${family.id}`}
               family={family}
               onOpen={onOpenFamily}
-              onSplit={onSplitFamily}
+              onTogglePin={onToggleFamilyPin}
               delay={i * 28}
             />
           );

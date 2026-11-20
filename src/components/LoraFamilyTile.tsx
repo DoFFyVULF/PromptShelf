@@ -1,5 +1,5 @@
 import { motion, useReducedMotion } from "motion/react";
-import { Layers2, Ungroup } from "lucide-react";
+import { Layers2, Pin } from "lucide-react";
 import { useI18n, type DictKey } from "../i18n";
 import { assetUrl } from "../lib/api";
 import type { LoraFamily } from "../lib/loraFamilies";
@@ -7,7 +7,8 @@ import type { LoraFamily } from "../lib/loraFamilies";
 interface LoraFamilyTileProps {
   family: LoraFamily;
   onOpen: (id: string) => void;
-  onSplit: (id: string) => void;
+  /** Pins or unpins every variant the group is made of. */
+  onTogglePin: (memberIds: string[], pinned: boolean) => void;
   delay: number;
 }
 
@@ -20,11 +21,16 @@ interface LoraFamilyTileProps {
 export function LoraFamilyTile({
   family,
   onOpen,
-  onSplit,
+  onTogglePin,
   delay,
 }: LoraFamilyTileProps) {
   const { t, lang, formatDate } = useI18n();
   const reduce = useReducedMotion() ?? false;
+
+  // The deck is one shelf entry: it only reads as pinned when every variant
+  // is, and toggling it pins the whole group at once.
+  const pinned = family.members.every((lora) => lora.pinned);
+  const memberIds = family.members.map((lora) => lora.id);
 
   const shown = family.members.slice(0, 3);
   const angles = shown.length === 2 ? [-8, 8] : [-13, 0, 13];
@@ -46,7 +52,9 @@ export function LoraFamilyTile({
 
   return (
     <article
-      className={`anim-tile group relative flex cursor-pointer flex-col overflow-hidden rounded-card border border-hairline bg-card transition-[border-color,transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-line-hover hover:shadow-tile-hover`}
+      className={`anim-tile group relative flex cursor-pointer flex-col overflow-hidden rounded-card border bg-card transition-[border-color,transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-line-hover hover:shadow-tile-hover ${
+        pinned ? "tile-pinned" : "border-hairline"
+      }`}
       style={{ animationDelay: `${Math.min(delay, 320)}ms` }}
       onClick={activate}
       role="button"
@@ -108,18 +116,41 @@ export function LoraFamilyTile({
             {t(family.reason === "version" ? "family.badge.version" : "family.badge.model")}
           </span>
 
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onSplit(family.id);
-            }}
-            aria-label={t("family.split")}
-            title={t("family.split")}
-            className="press absolute top-1.5 right-1.5 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-black/50 text-white opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
-          >
-            <Ungroup size={14} />
-          </button>
+          <div className="absolute top-1.5 right-1.5 flex items-center gap-1.5">
+            {/* Pin control mirrors a single lora tile: a quiet glass chip on
+                hover, a struck gold seal once the whole group is pinned. */}
+            <motion.button
+              type="button"
+              draggable={false}
+              className={`pin-chip ${pinned ? "is-on" : ""} ${
+                pinned
+                  ? ""
+                  : "pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100"
+              }`}
+              aria-label={pinned ? t("family.unpin") : t("family.pin")}
+              aria-pressed={pinned}
+              title={pinned ? t("family.unpin") : t("family.pin")}
+              onClick={(e) => {
+                e.stopPropagation();
+                onTogglePin(memberIds, !pinned);
+              }}
+              onKeyDown={(e) => e.stopPropagation()}
+              whileHover={reduce ? undefined : { scale: 1.08 }}
+              whileTap={reduce ? undefined : { scale: 0.88 }}
+              transition={{ type: "spring", stiffness: 520, damping: 26 }}
+            >
+              <motion.span
+                key={pinned ? "on" : "off"}
+                initial={{ scale: 0.55, rotate: -35, opacity: 0 }}
+                animate={{ scale: 1, rotate: 0, opacity: 1 }}
+                transition={
+                  reduce ? { duration: 0 } : { type: "spring", stiffness: 560, damping: 20 }
+                }
+              >
+                <Pin size={14} strokeWidth={2.2} className={pinned ? "fill-current" : undefined} />
+              </motion.span>
+            </motion.button>
+          </div>
 
           {n > 3 && (
             <span className="absolute right-1.5 bottom-1.5 rounded-full bg-black/55 px-2 py-0.5 text-[10.5px] font-medium text-white backdrop-blur-sm">

@@ -234,6 +234,8 @@ export const en = {
   "family.badge.version": "Versions",
   "family.badge.model": "Models",
   "family.split": "Split group",
+  "family.pin": "Pin group to top",
+  "family.unpin": "Unpin group",
   "family.dialog.versionHint": "One lora, several CivitAI versions.",
   "family.dialog.modelHint": "One lora, several base models.",
   "family.dialog.hint": "Open a variant to inspect it, or split the group to put every lora back on the shelf.",
