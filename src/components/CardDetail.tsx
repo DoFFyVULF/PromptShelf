@@ -35,6 +35,9 @@ import { IMAGE_EXTS } from "./Editor";
 
 interface CardDetailProps {
   card: CardDetailType;
+  /** Active prompt page shared with App: 0 is the main prompt, n is variant n-1. */
+  promptIdx: number;
+  onPromptIdxChange: (idx: number) => void;
   /** Tags already used across the prompt shelf, for the edit mode's tag hints. */
   suggestions: TagCount[];
   /** Starts a background CivitAI lora import from a model page link. */
@@ -48,7 +51,7 @@ interface CardDetailProps {
   onDeleted: () => void;
 }
 
-export function CardDetail({ card, suggestions, onImportLora, hasPrev, hasNext, onPrev, onNext, onClose, onChanged, onDeleted }: CardDetailProps) {
+export function CardDetail({ card, promptIdx, onPromptIdxChange, suggestions, onImportLora, hasPrev, hasNext, onPrev, onNext, onClose, onChanged, onDeleted }: CardDetailProps) {
   const { t, formatDate } = useI18n();
   const { toast } = useToast();
   const [mainIdx, setMainIdx] = useState(0);
@@ -59,6 +62,9 @@ export function CardDetail({ card, suggestions, onImportLora, hasPrev, hasNext, 
   const [zoom, setZoom] = useState(false);
   /** Open lora action bubble: the chip it anchors to. */
   const [loraMenu, setLoraMenu] = useState<{ lora: LoraItem; anchor: HTMLElement } | null>(null);
+
+  const promptPages = [card.prompt, ...card.variants];
+  const activePrompt = promptPages[Math.min(promptIdx, promptPages.length - 1)] ?? "";
 
   // The import's loras list also carries other CivitAI resources (upscalers,
   // embeddings, workflows) tagged with their kind; they render as plain links
@@ -207,12 +213,12 @@ export function CardDetail({ card, suggestions, onImportLora, hasPrev, hasNext, 
   );
 
   const copyPrompt = useCallback(async () => {
-    if (await copyText(card.prompt)) {
+    if (await copyText(activePrompt)) {
       setCopied(true);
       toast(t("toast.copied"));
       window.setTimeout(() => setCopied(false), 1600);
     }
-  }, [card.prompt, copyText, t, toast]);
+  }, [activePrompt, copyText, t, toast]);
 
   const copyNegative = useCallback(async () => {
     if (await copyText(card.negative_prompt ?? "")) {
@@ -585,7 +591,13 @@ export function CardDetail({ card, suggestions, onImportLora, hasPrev, hasNext, 
               </>
             ) : (
               <>
-                <PromptPager card={card} onChanged={onChanged} copyText={copyText} />
+                <PromptPager
+                  card={card}
+                  idx={promptIdx}
+                  onIdxChange={onPromptIdxChange}
+                  onChanged={onChanged}
+                  copyText={copyText}
+                />
 
                 {card.negative_prompt && (
                   <section className="group/negative relative">
@@ -756,7 +768,7 @@ export function CardDetail({ card, suggestions, onImportLora, hasPrev, hasNext, 
                   type="button"
                   className="btn-primary press min-w-0 cursor-pointer flex-1 disabled:cursor-default disabled:opacity-40"
                   onClick={copyPrompt}
-                  disabled={!card.prompt.trim()}
+                  disabled={!activePrompt.trim()}
                 >
                   {copied ? <Check size={15} /> : <Copy size={14.5} />}
                   <span className="truncate">{copied ? t("toast.copied") : t("action.copy")}</span>

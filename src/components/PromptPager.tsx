@@ -46,13 +46,16 @@ const RAIL_PAD = 8;
 
 interface PromptPagerProps {
   card: CardDetailType;
+  /** Active page: 0 is the card's main prompt, n is variant n-1. */
+  idx: number;
+  onIdxChange: (idx: number) => void;
   /** Replaces the card in App state after every persisted mutation. */
   onChanged: (card: CardDetailType) => void;
   /** Clipboard helper with the Tauri fallback (shared with the detail view). */
   copyText: (text: string) => Promise<boolean>;
 }
 
-export function PromptPager({ card, onChanged, copyText }: PromptPagerProps) {
+export function PromptPager({ card, idx, onIdxChange, onChanged, copyText }: PromptPagerProps) {
   const { t } = useI18n();
   const { toast } = useToast();
   const reduced = useReducedMotion();
@@ -60,7 +63,6 @@ export function PromptPager({ card, onChanged, copyText }: PromptPagerProps) {
   const pages = [card.prompt, ...card.variants];
   const multi = pages.length > 1; // declared early: the rail effects read it in deps
 
-  const [idx, setIdx] = useState(0);
   const [dir, setDir] = useState(1); // 1 → forward, -1 → back
   const [mode, setMode] = useState<"view" | "edit" | "add">("view");
   const [draft, setDraft] = useState("");
@@ -85,13 +87,13 @@ export function PromptPager({ card, onChanged, copyText }: PromptPagerProps) {
   // (the block's bottom edge) was already on screen
   const pin = useRef<{ el: HTMLElement; top: number; h: number | null; railVisible: boolean } | null>(null);
 
-  // keep the current page valid when variants shrink (delete) or the card swaps
+  // keep the controlled page valid when variants shrink after a delete;
+  // switching cards is handled by App's detailPromptIdx reset
   useEffect(() => {
-    setIdx((i) => Math.min(i, pages.length - 1));
-  }, [pages.length]);
+    if (idx > pages.length - 1) onIdxChange(pages.length - 1);
+  }, [idx, pages.length, onIdxChange]);
 
   useEffect(() => {
-    setIdx(0);
     setDir(1);
     setMode("view");
     setArmed(false);
@@ -279,9 +281,9 @@ export function PromptPager({ card, onChanged, copyText }: PromptPagerProps) {
       setDir(clamped > idx ? 1 : -1);
       setMode("view");
       disarm();
-      setIdx(clamped);
+      onIdxChange(clamped);
     },
-    [capturePin, disarm, idx, pages.length]
+    [capturePin, disarm, idx, onIdxChange, pages.length]
   );
 
   const copy = useCallback(async () => {
@@ -305,10 +307,10 @@ export function PromptPager({ card, onChanged, copyText }: PromptPagerProps) {
     capturePin();
     setDraft("");
     setDir(1);
-    setIdx(0);
+    onIdxChange(0);
     setMode("add");
     disarm();
-  }, [capturePin, disarm]);
+  }, [capturePin, disarm, onIdxChange]);
 
   const cancel = useCallback(() => {
     capturePin();
@@ -336,14 +338,14 @@ export function PromptPager({ card, onChanged, copyText }: PromptPagerProps) {
         });
         const fresh = await api.getCard(card.id);
         // capture in the same continuation as the commit: onChanged + setMode
-        // + setIdx land in one batch, so the pin survives to the right frame
+        // + onIdxChange land in one batch, so the pin survives to the right frame
         capturePin();
         onChanged(fresh);
         setMode("view");
         toast(idx === 0 && landing === undefined ? t("toast.updated") : t("variant.saved"));
         if (landing !== undefined) {
           setDir(landing >= idx ? 1 : -1);
-          setIdx(Math.max(0, landing));
+          onIdxChange(Math.max(0, landing));
         }
       } catch {
         // the draft stays open on failure so nothing is lost
@@ -351,7 +353,7 @@ export function PromptPager({ card, onChanged, copyText }: PromptPagerProps) {
         setSaving(false);
       }
     },
-    [card, idx, capturePin, onChanged]
+    [card, idx, capturePin, onChanged, onIdxChange]
   );
 
   const saveDraft = useCallback(() => {

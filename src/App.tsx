@@ -131,6 +131,9 @@ function Shell() {
 
   const [detailId, setDetailId] = useState<string | null>(null);
   const [detail, setDetail] = useState<CardDetailData | null>(null);
+  // active prompt page in the detail view: 0 = main prompt, n = variant n-1.
+  // Shared with CardDetail so both the footer button and ⌘C copy the open page.
+  const [detailPromptIdx, setDetailPromptIdx] = useState(0);
 
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorCard, setEditorCard] = useState<CardDetailData | null>(null);
@@ -528,6 +531,11 @@ function Shell() {
     const id = window.setTimeout(() => setDebouncedQ(query), 220);
     return () => window.clearTimeout(id);
   }, [query]);
+
+  // a different card always opens on its main prompt
+  useEffect(() => {
+    setDetailPromptIdx(0);
+  }, [detailId]);
 
   // ---------------------------------------------------------------- detail
 
@@ -1367,8 +1375,11 @@ function Shell() {
           ) {
             const d = detail;
             if (d) {
-              e.preventDefault();
-              void copyPromptText(d.prompt);
+              const prompt = [d.prompt, ...d.variants][detailPromptIdx];
+              if (prompt?.trim()) {
+                e.preventDefault();
+                void copyPromptText(prompt);
+              }
             }
           }
         } else if (
@@ -1436,6 +1447,7 @@ function Shell() {
   }, [
     copyPromptText,
     detail,
+    detailPromptIdx,
     loraDetail,
     navDetail,
     navLoraDetail,
@@ -1819,6 +1831,8 @@ function Shell() {
       {detail && detailId && mode === "prompt" && (
         <CardDetail
           card={detail}
+          promptIdx={detailPromptIdx}
+          onPromptIdxChange={setDetailPromptIdx}
           suggestions={tags}
           onImportLora={(url) => {
             // jump to the lora shelf so the background job tile is in view
