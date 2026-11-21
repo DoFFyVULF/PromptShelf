@@ -6,6 +6,7 @@ import { assetUrl } from "../lib/api";
 import { attachCardGhost } from "../lib/dragGhost";
 import { ImportJobTile, type ImportJob } from "./ImportJobs";
 import { TileShell } from "./PinShell";
+import { WorkflowBadge } from "./WorkflowBadge";
 import type { CardSummary } from "../lib/types";
 
 /** dataTransfer type used when dragging cards onto the groups panel. */
@@ -219,8 +220,16 @@ function CardTileBase({
           </div>
         )}
 
-        {/* tags row: show up to 10 tags, collapse the rest */}
+        {/* meta row: the workflow seal leads the tags — it is a state, not a
+            tag, and it is the one chip that can be filled or outlined */}
         <div className="mt-2.5 flex min-h-[22px] flex-wrap items-center gap-1">
+          {card.workflow && (
+            <WorkflowBadge
+              saved={card.workflow.saved}
+              nodes={card.workflow.node_count}
+              delay={stagger}
+            />
+          )}
           {card.tags.slice(0, 10).map((tag) => (
             <span key={tag} className="max-w-[96px] truncate rounded-full bg-parchment px-2 py-0.5 text-[11px] text-muted">
               {tag}

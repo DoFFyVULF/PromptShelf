@@ -942,6 +942,140 @@ body {
   }
 }
 
+/* ----------------------------------------------------------- workflow seal */
+
+/* The seal lives in the card's meta row, not on the photo: a compact pill that
+   states the card carries a ComfyUI graph and whether its JSON is on disk.
+   The state is the *material*, so no second accent colour is introduced:
+     pending  → a dashed slot: outline only, muted ink, hollow constellation;
+     archived → the ink fill of the primary control, filled constellation, check.
+   The constellation densifies with the node count, so the pill is a tiny
+   portrait of the graph itself, not just a label. */
+.wf-seal-wrap {
+  display: inline-flex;
+  min-width: 0;
+  flex-shrink: 0;
+}
+.wf-seal {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 7px 0 5px;
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.004em;
+  line-height: 1;
+  white-space: nowrap;
+  transition:
+    background-color 0.22s var(--ease-apple),
+    border-color 0.22s var(--ease-apple),
+    color 0.22s var(--ease-apple);
+}
+.wf-seal--pending {
+  border-style: dashed;
+  border-color: color-mix(in oklab, var(--color-line-active) 78%, transparent);
+  background: transparent;
+  color: var(--color-muted);
+}
+.wf-seal--saved {
+  background: var(--color-ink);
+  color: var(--color-on-ink);
+}
+
+/* the constellation: edges first, then nodes */
+.wf-seal__graph {
+  display: block;
+  width: 12.5px;
+  height: 12.5px;
+  flex-shrink: 0;
+  overflow: visible;
+}
+.wf-seal__edge {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1;
+  stroke-linecap: round;
+}
+.wf-seal--pending .wf-seal__edge {
+  stroke-dasharray: 1.5 1.7;
+  opacity: 0.58;
+}
+.wf-seal--saved .wf-seal__edge {
+  opacity: 0.66;
+}
+.wf-seal__node {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.15;
+}
+.wf-seal--saved .wf-seal__node {
+  fill: currentColor;
+  stroke: none;
+}
+/* the unfinished graph keeps one node breathing — the JSON is still out there */
+.wf-seal__node--live {
+  animation: wf-node-pulse 2.6s var(--ease-apple) infinite;
+}
+@keyframes wf-node-pulse {
+  0%,
+  58%,
+  100% {
+    opacity: 1;
+  }
+  74% {
+    opacity: 0.3;
+  }
+}
+
+.wf-seal__label {
+  display: block;
+}
+/* the node count rides as a quiet spec, tabular so cards align */
+.wf-seal__count {
+  margin-left: -1px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  opacity: 0.6;
+}
+.wf-seal__bead {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 11px;
+  height: 11px;
+  flex-shrink: 0;
+}
+.wf-seal--pending .wf-seal__bead::before {
+  content: "";
+  width: 6.5px;
+  height: 6.5px;
+  border-radius: 9999px;
+  border: 1.25px solid currentColor;
+  opacity: 0.42;
+}
+.wf-seal__check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.wf-seal__stamp {
+  position: absolute;
+  inset: -1px;
+  border-radius: 9999px;
+  border: 1.5px solid var(--color-ink);
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .wf-seal__node--live {
+    animation: none;
+  }
+}
+
 /* Keyboard focus ring for buttons, links and selects. Lives in the base
    layer: utilities (focus:outline-none + a soft ring) must be able to
    override it. Text-entry fields are exempt — the caret, border-color and

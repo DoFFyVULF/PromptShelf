@@ -28,6 +28,16 @@ export interface CardSummary {
   group_id: string;
   /** Pinned cards always sort first, whatever the shelf order is. */
   pinned: boolean;
+  /** Compact workflow presence behind the cover seal; absent for manual cards. */
+  workflow?: CardWorkflow | null;
+}
+
+/** What the shelf needs to know about a card's ComfyUI graph — the full
+ * summary stays in the detail panel. */
+export interface CardWorkflow {
+  node_count: number;
+  /** The JSON is archived on disk (the stored path is re-checked). */
+  saved: boolean;
 }
 
 export interface CardDetail {

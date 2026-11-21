@@ -26,6 +26,19 @@ pub struct CardSummary {
     pub group_id: String,
     /// Pinned cards sort before everything else on every sort order.
     pub pinned: bool,
+    /// Workflow presence for the cover seal; absent for manual cards.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workflow: Option<CardWorkflow>,
+}
+
+/// The little the shelf needs to know about a card's ComfyUI graph: the
+/// constitution of the seal. The full summary stays in the detail panel.
+#[derive(Serialize)]
+pub struct CardWorkflow {
+    pub node_count: usize,
+    /// The JSON is archived on disk — the stored path is re-checked per list,
+    /// so a deleted file reads as "not saved" and can be downloaded again.
+    pub saved: bool,
 }
 
 #[derive(Serialize)]
