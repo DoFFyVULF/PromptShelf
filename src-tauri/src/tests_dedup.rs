@@ -25,6 +25,7 @@ fn card_prompt(dir: &Path, prompt: &str, source_key: Option<String>) -> String {
             author: None,
             checkpoint: None,
             meta: vec![],
+            workflow: None,
             source_key,
             variants: vec![],
             allow_empty_prompt: false,

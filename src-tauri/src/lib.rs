@@ -70,6 +70,7 @@ pub fn run() {
             civitai::civitai_import,
             civitai::civitai_source_key,
             civitai::civitai_download,
+            civitai::civitai_workflow_save,
             loras::list_loras,
             loras::get_lora,
             loras::create_lora,

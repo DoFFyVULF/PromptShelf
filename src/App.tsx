@@ -1037,6 +1037,7 @@ function Shell() {
           author: res.author || null,
           checkpoint: res.checkpoint || null,
           meta: res.meta,
+          workflow: res.workflow ?? null,
           source_key: res.source_key,
           allow_empty_prompt: allowEmptyPrompt,
         });

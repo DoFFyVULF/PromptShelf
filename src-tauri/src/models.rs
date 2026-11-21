@@ -51,6 +51,10 @@ pub struct CardDetail {
     /// "civitai:posts:<id>" → the page); "" for manual cards — the detail
     /// panel then hides the link.
     pub source_url: String,
+    /// Compact ComfyUI graph summary from the import; the full graph is not
+    /// stored and is fetched only when the user downloads the JSON.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workflow: Option<WorkflowInfo>,
 }
 
 #[derive(Deserialize)]
@@ -91,6 +95,40 @@ pub struct MetaItem {
     pub v: String,
 }
 
+/// Compact ComfyUI graph summary kept with an imported card. The full graph
+/// (often >100 KB) stays on CivitAI and is fetched only when the user asks for
+/// the JSON file — the DB never carries the whole workflow.
+#[derive(Serialize, Deserialize, Clone)]
+pub struct WorkflowInfo {
+    /// Engine label, currently always "ComfyUI".
+    pub engine: String,
+    pub node_count: usize,
+    #[serde(default)]
+    pub link_count: usize,
+    #[serde(default)]
+    pub group_count: usize,
+    /// Node class → occurrences, biggest first (notes/reroutes filtered out).
+    #[serde(default)]
+    pub node_types: Vec<WorkflowNode>,
+    /// Source image id on CivitAI, used by the on-demand download.
+    #[serde(default)]
+    pub image_id: String,
+    /// File-name base for the downloaded JSON.
+    #[serde(default)]
+    pub title: String,
+    /// Absolute path of the last saved JSON, once the user downloaded it.
+    /// `None` while nothing was saved (or the file was deleted).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub saved_file: Option<String>,
+}
+
+/// One node class in the workflow summary.
+#[derive(Serialize, Deserialize, Clone)]
+pub struct WorkflowNode {
+    pub name: String,
+    pub count: usize,
+}
+
 #[derive(Deserialize)]
 pub struct NewCardInput {
     pub prompt: String,
@@ -117,6 +155,9 @@ pub struct NewCardInput {
     pub checkpoint: Option<String>,
     #[serde(default)]
     pub meta: Vec<MetaItem>,
+    /// Compact ComfyUI graph summary from a CivitAI import.
+    #[serde(default)]
+    pub workflow: Option<WorkflowInfo>,
     /// Origin fingerprint from an import (e.g. `civitai:images:12`); used to
     /// detect a duplicate link on the next import. Set on create only.
     #[serde(default)]
@@ -423,6 +464,10 @@ pub struct CivitaiImport {
     pub loras: Vec<Lora>,
     pub tags: Vec<String>,
     pub meta: Vec<MetaItem>,
+    /// Compact ComfyUI graph summary (node count/classes) when the page
+    /// embeds a workflow; the graph itself stays on CivitAI.
+    #[serde(default)]
+    pub workflow: Option<WorkflowInfo>,
     /// Origin fingerprint derived from the pasted link (civitai source id),
     /// travels to the editor and is stored with the card on save.
     #[serde(default)]

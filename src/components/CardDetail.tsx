@@ -15,7 +15,9 @@ import {
   Loader2,
   User,
   Cpu,
-  ExternalLink
+  ExternalLink,
+  Download,
+  Workflow
 } from "lucide-react";
 import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
 import { useI18n } from "../i18n";
@@ -62,6 +64,7 @@ export function CardDetail({ card, promptIdx, onPromptIdxChange, suggestions, on
   const [zoom, setZoom] = useState(false);
   /** Open lora action bubble: the chip it anchors to. */
   const [loraMenu, setLoraMenu] = useState<{ lora: LoraItem; anchor: HTMLElement } | null>(null);
+  const [workflowSaving, setWorkflowSaving] = useState(false);
 
   const promptPages = [card.prompt, ...card.variants];
   const activePrompt = promptPages[Math.min(promptIdx, promptPages.length - 1)] ?? "";
@@ -100,6 +103,7 @@ export function CardDetail({ card, promptIdx, onPromptIdxChange, suggestions, on
     setArmImage(null);
     setZoom(false);
     setLoraMenu(null);
+    setWorkflowSaving(false);
     setEditing(false);
     setSaving(false);
     setPrompt(card.prompt);
@@ -270,6 +274,30 @@ export function CardDetail({ card, promptIdx, onPromptIdxChange, suggestions, on
     onChanged(fresh);
     return fresh;
   }, [card.id, onChanged]);
+
+  const savedFile = card.workflow?.saved_file ?? null;
+
+  /** "Открыть папку" — the platform reveals the file in the file manager,
+   *  highlighting it (Finder on macOS). */
+  const openSavedFolder = useCallback(() => {
+    const p = card.workflow?.saved_file;
+    if (!p) return;
+    api.revealFile(p).catch(() => toast(t("toast.error"), "error"));
+  }, [card.workflow?.saved_file, t, toast]);
+
+  const saveWorkflow = useCallback(async () => {
+    if (!card.workflow) return;
+    setWorkflowSaving(true);
+    try {
+      await api.saveWorkflow(card.id);
+      toast(t("detail.workflow.saved"));
+      await refresh();
+    } catch {
+      toast(t("toast.error"), "error");
+    } finally {
+      setWorkflowSaving(false);
+    }
+  }, [card.id, card.workflow, refresh, t, toast]);
 
   const deleteImage = useCallback(
     async (img: ImageInfo) => {
@@ -684,6 +712,71 @@ export function CardDetail({ card, promptIdx, onPromptIdxChange, suggestions, on
                           </span>
                         );
                       })}
+                    </div>
+                  </section>
+                )}
+
+                {card.workflow && (
+                  <section>
+                    <p className="text-[10.5px] font-semibold tracking-[0.07em] text-faint uppercase select-none">{t("detail.workflow")}</p>
+                    <div className="mt-2 overflow-hidden rounded-xl border border-hairline bg-parchment">
+                      <div className="flex items-center gap-3 px-3.5 pt-3.5">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] border border-hairline bg-card text-action shadow-[0_1px_2px_rgb(0_0_0/0.04)]">
+                          <Workflow size={16} strokeWidth={1.7} />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-baseline gap-1.5 text-[12.5px]">
+                            <span className="font-medium text-ink">{card.workflow.engine}</span>
+                            <span className="text-faint">·</span>
+                            <span className="text-muted">{t("detail.workflow.nodes", { n: card.workflow.node_count })}</span>
+                            {card.workflow.group_count > 0 && (
+                              <>
+                                <span className="text-faint">·</span>
+                                <span className="text-muted">{t("detail.workflow.groups", { n: card.workflow.group_count })}</span>
+                              </>
+                            )}
+                          </div>
+                          <div className="mt-0.5 text-[11px] text-faint">
+                            {savedFile ? t("detail.workflow.already") : t("detail.workflow.hint")}
+                          </div>
+                        </div>
+                        <motion.button
+                          type="button"
+                          onClick={savedFile ? openSavedFolder : saveWorkflow}
+                          disabled={workflowSaving}
+                          title={savedFile ?? t("detail.workflow.download")}
+                          aria-label={savedFile ?? t("detail.workflow.download")}
+                          initial={false}
+                          whileTap={reduceMotion ? undefined : { scale: 0.95 }}
+                          transition={{ type: "spring", visualDuration: 0.2, bounce: 0 }}
+                          className="press flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-hairline bg-card pr-2.5 pl-2 text-[11.5px] font-medium text-ink transition-colors hover:border-line-hover disabled:cursor-default disabled:opacity-60"
+                        >
+                          {workflowSaving ? (
+                            <Loader2 size={12.5} className="spin" />
+                          ) : savedFile ? (
+                            <Check size={12.5} className="text-leaf-icon" />
+                          ) : (
+                            <Download size={12.5} className="text-muted" />
+                          )}
+                          <span>{savedFile ? t("detail.workflow.openFolder") : t("detail.workflow.downloadShort")}</span>
+                        </motion.button>
+                      </div>
+                      {card.workflow.node_types.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 px-3.5 pt-3 pb-3.5">
+                          {card.workflow.node_types.map((node) => (
+                            <span
+                              key={node.name}
+                              title={`${node.name}: ${node.count}`}
+                              className="flex items-center gap-1.5 rounded-full border border-hairline bg-card py-0.5 pr-1 pl-2 text-[11px] text-body"
+                            >
+                              <span className="max-w-[160px] truncate">{node.name}</span>
+                              <span className="rounded-full bg-parchment px-1.5 text-[10px] leading-[15px] text-faint tabular-nums">
+                                {node.count}
+                              </span>
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </section>
                 )}

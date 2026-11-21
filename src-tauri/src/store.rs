@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS cards (
     author TEXT,
     checkpoint TEXT,
     meta_json TEXT NOT NULL DEFAULT '[]',
+    workflow_summary TEXT NOT NULL DEFAULT '',
     source_key TEXT,
     text_hash TEXT,
     pinned INTEGER NOT NULL DEFAULT 0
@@ -180,6 +181,13 @@ fn ensure_columns(conn: &Connection) -> Result<(), String> {
     if !names.iter().any(|n| n == "meta_json") {
         conn.execute("ALTER TABLE cards ADD COLUMN meta_json TEXT NOT NULL DEFAULT '[]'", [])
             .map_err(es)?;
+    }
+    if !names.iter().any(|n| n == "workflow_summary") {
+        conn.execute(
+            "ALTER TABLE cards ADD COLUMN workflow_summary TEXT NOT NULL DEFAULT ''",
+            [],
+        )
+        .map_err(es)?;
     }
     if !names.iter().any(|n| n == "source_key") {
         conn.execute("ALTER TABLE cards ADD COLUMN source_key TEXT", []).map_err(es)?;

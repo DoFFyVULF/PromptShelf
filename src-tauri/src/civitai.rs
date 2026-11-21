@@ -6,10 +6,15 @@
 //! responsive.
 
 use crate::images;
-use crate::models::{es, CivitaiImport, CivitaiLoraImport, Lora, MetaItem, PasteImageResult};
+use crate::models::{
+    es, CivitaiImport, CivitaiLoraImport, Lora, MetaItem, PasteImageResult, WorkflowInfo,
+    WorkflowNode,
+};
+use rusqlite::OptionalExtension;
 use serde_json::Value;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::io::Read;
+use std::path::Path;
 use std::time::Duration;
 
 const MAX_LORAS: usize = 24; // mirrors cards::clean_loras / LoraEditor
@@ -446,6 +451,124 @@ fn other_meta(meta: &Value, item: &Value) -> Vec<MetaItem> {
     rows
 }
 
+// ---------------------------------------------------------------- workflow
+
+/// CivitAI embeds the ComfyUI graph as a JSON **string** under `meta.comfy`
+/// (newer payloads may hand the object over directly). Returns the parsed
+/// `{ prompt, workflow }` envelope.
+fn comfy_graph(meta: &Value) -> Option<Value> {
+    match meta.get("comfy")? {
+        Value::String(s) => serde_json::from_str(s).ok(),
+        v @ Value::Object(_) => Some(v.clone()),
+        _ => None,
+    }
+}
+
+/// Utility/annotation nodes that would drown out the real graph in the
+/// summary — they still count towards the total node count.
+fn is_note_node(kind: &str) -> bool {
+    matches!(kind, "MarkdownNote" | "Note" | "Reroute")
+}
+
+/// Node class → occurrences, biggest first, notes/reroutes filtered out.
+fn node_type_counts(graph: &Value) -> Vec<WorkflowNode> {
+    let mut counts: HashMap<String, usize> = HashMap::new();
+    if let Some(nodes) = graph.get("nodes").and_then(|n| n.as_array()) {
+        for node in nodes {
+            if let Some(kind) = node.get("type").and_then(|t| t.as_str()) {
+                if !kind.is_empty() {
+                    *counts.entry(kind.to_string()).or_default() += 1;
+                }
+            }
+        }
+    } else if let Some(prompt) = graph.as_object() {
+        // API-format graph: `{ "3": { class_type, inputs } }`
+        for node in prompt.values() {
+            if let Some(kind) = node.get("class_type").and_then(|t| t.as_str()) {
+                if !kind.is_empty() {
+                    *counts.entry(kind.to_string()).or_default() += 1;
+                }
+            }
+        }
+    }
+
+    let mut out: Vec<WorkflowNode> = counts
+        .into_iter()
+        .filter(|(name, _)| !is_note_node(name))
+        .map(|(name, count)| WorkflowNode { name, count })
+        .collect();
+    out.sort_by(|a, b| b.count.cmp(&a.count).then_with(|| a.name.cmp(&b.name)));
+    out.truncate(8);
+    out
+}
+
+/// Readable file-name base: the prompt's first words in kebab-case, or the
+/// image id when the prompt has no ASCII text (Cyrillic, emoji…).
+fn workflow_title(prompt: &str, image_id: &str) -> String {
+    let mut out = String::new();
+    let mut dash = false;
+    for ch in prompt.chars().take(160) {
+        if ch.is_ascii_alphanumeric() {
+            out.push(ch.to_ascii_lowercase());
+            dash = false;
+        } else if !dash && !out.is_empty() {
+            out.push('-');
+            dash = true;
+        }
+        if out.len() >= 48 {
+            break;
+        }
+    }
+    let trimmed = out.trim_matches('-');
+    if trimmed.is_empty() {
+        format!("workflow-{image_id}")
+    } else {
+        trimmed.to_string()
+    }
+}
+
+/// Compact summary of the embedded ComfyUI graph: node/link/group counts and
+/// the node-class breakdown. Only this lands in the DB — the graph itself is
+/// fetched again on demand by `civitai_workflow_save`.
+fn workflow_summary_of(meta: &Value, image_id: &str, prompt: &str) -> Option<WorkflowInfo> {
+    let comfy = comfy_graph(meta)?;
+    let graph = comfy
+        .get("workflow")
+        .filter(|w| w.is_object())
+        .or_else(|| comfy.get("prompt").filter(|p| p.is_object()))?;
+
+    let node_count = graph
+        .get("nodes")
+        .and_then(|n| n.as_array())
+        .map(|n| n.len())
+        .or_else(|| graph.as_object().map(|o| o.len()))
+        .unwrap_or(0);
+    if node_count == 0 {
+        return None;
+    }
+    let link_count = graph
+        .get("links")
+        .and_then(|l| l.as_array())
+        .map(|l| l.len())
+        .unwrap_or(0);
+    let group_count = graph
+        .get("groups")
+        .and_then(|g| g.as_array())
+        .map(|g| g.len())
+        .unwrap_or(0);
+
+    Some(WorkflowInfo {
+        engine: "ComfyUI".to_string(),
+        node_count,
+        link_count,
+        group_count,
+        node_types: node_type_counts(graph),
+        image_id: image_id.to_string(),
+        title: workflow_title(prompt, image_id),
+        saved_file: None,
+    })
+}
+
 // ---------------------------------------------------------------- flow
 
 /// The image page's resource panel is served by tRPC `image.getGenerationData`:
@@ -741,6 +864,7 @@ fn run(data_dir: &std::path::Path, url: &str) -> Result<CivitaiImport, String> {
         .unwrap_or_default();
 
     let meta_rows = other_meta(meta, &item);
+    let workflow = workflow_summary_of(meta, &image_id, &prompt);
 
     let url_img = item
         .get("url")
@@ -772,6 +896,7 @@ fn run(data_dir: &std::path::Path, url: &str) -> Result<CivitaiImport, String> {
         loras,
         tags,
         meta: meta_rows,
+        workflow,
         source_key: Some(source_key),
     })
 }
@@ -1115,6 +1240,115 @@ pub async fn civitai_download(url: String) -> Result<PasteImageResult, String> {
     }
 }
 
+/// Where the graph lives for a card: the stored image id is authoritative;
+/// legacy rows fall back to the origin key (posts resolve to their first image).
+fn workflow_image_id(
+    info: &WorkflowInfo,
+    source_key: Option<&str>,
+    agent: &ureq::Agent,
+    api_key: Option<&str>,
+) -> Option<String> {
+    if !info.image_id.is_empty() {
+        return Some(info.image_id.clone());
+    }
+    let sk = source_key?;
+    if let Some(id) = sk.strip_prefix("civitai:images:") {
+        return (!id.is_empty()).then(|| id.to_string());
+    }
+    let post_id = sk.strip_prefix("civitai:posts:")?;
+    let post = get_json(agent, &format!("/api/v1/posts/{post_id}"), api_key).ok()??;
+    post.get("images")
+        .and_then(|i| i.as_array())
+        .and_then(|a| a.first())
+        .and_then(|i| i.get("id").and_then(|v| v.as_i64()))
+        .map(|id| id.to_string())
+}
+
+/// Re-fetches the full ComfyUI graph from CivitAI and writes it into the
+/// library's `Workflows` folder. The DB only ever holds the compact summary.
+fn save_workflow(dir: &Path, card_id: &str) -> Result<String, String> {
+    let conn = crate::store::open(dir)?;
+    let row: Option<(String, Option<String>)> = conn
+        .query_row(
+            "SELECT workflow_summary, source_key FROM cards WHERE id = ?1",
+            rusqlite::params![card_id],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .optional()
+        .map_err(es)?;
+    let api_key: String = crate::store::read_settings(&conn)
+        .map(|s| s.civitai_api_key)
+        .unwrap_or_default();
+    let (summary, source_key) = row.ok_or_else(|| "CARD_NOT_FOUND".to_string())?;
+    let mut info: WorkflowInfo =
+        serde_json::from_str(&summary).map_err(|_| "CIVITAI_NO_WORKFLOW".to_string())?;
+    drop(conn);
+
+    let agent = agent();
+    let image_id = workflow_image_id(&info, source_key.as_deref(), &agent, option_key(&api_key))
+        .ok_or_else(|| "CIVITAI_NO_WORKFLOW".to_string())?;
+    let item = fetch_image_item(&agent, &image_id, &api_key)?;
+    let meta = meta_view(&item).ok_or_else(|| "CIVITAI_NO_WORKFLOW".to_string())?;
+    let comfy = comfy_graph(meta).ok_or_else(|| "CIVITAI_NO_WORKFLOW".to_string())?;
+    let graph = comfy
+        .get("workflow")
+        .filter(|w| w.is_object())
+        .or_else(|| comfy.get("prompt").filter(|p| p.is_object()))
+        .cloned()
+        .ok_or_else(|| "CIVITAI_NO_WORKFLOW".to_string())?;
+    let json = serde_json::to_string_pretty(&graph).map_err(es)?;
+
+    let out_dir = dir.join("Workflows");
+    std::fs::create_dir_all(&out_dir).map_err(es)?;
+    let base = if info.title.trim().is_empty() {
+        format!("workflow-{image_id}")
+    } else {
+        info.title.trim().to_string()
+    };
+    // Same card + same graph → the file is already there, hand the path back
+    // instead of stacking " (2)" copies on every click.
+    let mut path = out_dir.join(format!("{base}.json"));
+    let mut n = 2u32;
+    while path.exists() {
+        if std::fs::read_to_string(&path).map(|s| s == json).unwrap_or(false) {
+            record_saved_file(dir, card_id, &mut info, &path);
+            return Ok(path.to_string_lossy().into_owned());
+        }
+        path = out_dir.join(format!("{base} ({n}).json"));
+        n += 1;
+    }
+    std::fs::write(&path, json).map_err(es)?;
+    record_saved_file(dir, card_id, &mut info, &path);
+    Ok(path.to_string_lossy().into_owned())
+}
+
+/// Remember the saved JSON path on the card so the detail panel can offer
+/// "open the Workflows folder" instead of downloading again.
+fn record_saved_file(dir: &Path, card_id: &str, info: &mut WorkflowInfo, path: &Path) {
+    info.saved_file = Some(path.to_string_lossy().into_owned());
+    let Ok(conn) = crate::store::open(dir) else { return };
+    if let Ok(summary) = serde_json::to_string(&info) {
+        let _ = conn.execute(
+            "UPDATE cards SET workflow_summary = ?1 WHERE id = ?2",
+            rusqlite::params![summary, card_id],
+        );
+    }
+}
+
+/// On-demand "Download workflow (JSON)" action for a card's detail panel.
+#[tauri::command]
+pub async fn civitai_workflow_save(
+    state: tauri::State<'_, crate::AppState>,
+    id: String,
+) -> Result<String, String> {
+    let dir = state.dir.clone();
+    let handle = tauri::async_runtime::spawn_blocking(move || save_workflow(&dir, &id));
+    match handle.await {
+        Ok(res) => res,
+        Err(e) => Err(format!("CIVITAI_NETWORK: {}", es(e))),
+    }
+}
+
 /// CivitAI **model page** import for the LoraShelf. Same background-thread
 /// pipeline as the image import.
 #[tauri::command]
@@ -1288,6 +1522,53 @@ mod tests {
         let more = vec![rv(6, "upscaler", "SOMELORA", false), rv(7, "upscaler", "Remacri", false)];
         push_other_resources(&mut loras, &more);
         assert_eq!(loras.len(), 4);
+    }
+
+    #[test]
+    fn builds_workflow_summary() {
+        let comfy = serde_json::json!({
+            "workflow": {
+                "nodes": [
+                    { "type": "KSamplerAdvanced" },
+                    { "type": "VAEDecode" },
+                    { "type": "VAEDecode" },
+                    { "type": "MarkdownNote" },
+                    { "type": "Note" }
+                ],
+                "links": [[1, 2, 3, 4, 5]],
+                "groups": [{ "title": "a" }, { "title": "b" }]
+            },
+            "prompt": { "1": { "class_type": "KSamplerAdvanced" } }
+        });
+        let meta = serde_json::json!({ "comfy": comfy.to_string() });
+        let wf = workflow_summary_of(&meta, "42", "A neon alley at night").expect("summary");
+        assert_eq!(wf.engine, "ComfyUI");
+        assert_eq!(wf.node_count, 5);
+        assert_eq!(wf.link_count, 1);
+        assert_eq!(wf.group_count, 2);
+        assert_eq!(wf.node_types[0].name, "VAEDecode");
+        assert_eq!(wf.node_types[0].count, 2);
+        assert!(wf.node_types.iter().all(|n| !is_note_node(&n.name)));
+        assert_eq!(wf.image_id, "42");
+        assert_eq!(wf.title, "a-neon-alley-at-night");
+    }
+
+    #[test]
+    fn summarizes_api_format_workflow() {
+        let comfy = serde_json::json!({
+            "prompt": {
+                "1": { "class_type": "KSampler" },
+                "2": { "class_type": "VAEDecode" }
+            }
+        });
+        let meta = serde_json::json!({ "comfy": comfy.to_string() });
+        let wf = workflow_summary_of(&meta, "7", "Кириллица").expect("summary");
+        assert_eq!(wf.node_count, 2);
+        assert_eq!(wf.node_types.len(), 2);
+        // no ASCII prompt words → the id keeps the file name safe
+        assert_eq!(wf.title, "workflow-7");
+        // a page without comfy data has no summary at all
+        assert!(workflow_summary_of(&serde_json::json!({}), "7", "x").is_none());
     }
 
     #[test]

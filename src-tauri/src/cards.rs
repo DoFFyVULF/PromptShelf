@@ -3,6 +3,7 @@ use crate::images::{self, ImportSettings};
 use crate::models::{
     es, CardDetail, CardSummary, GroupInfo, GroupStyleInput, ImageInfo, ListFilter, Lora, MoveCardsInput,
     NewCardInput, NewGroupInput, ReorderGroupsInput, RenameGroupInput, TagCount, UpdateCardInput,
+    WorkflowInfo,
 };
 use crate::store;
 use rusqlite::{params, Connection, OptionalExtension};
@@ -121,6 +122,22 @@ fn meta_json(meta: &[crate::models::MetaItem]) -> String {
 
 fn parse_meta(s: &str) -> Vec<crate::models::MetaItem> {
     serde_json::from_str(s).unwrap_or_default()
+}
+
+/// The workflow column carries only the compact summary; an empty string
+/// means the card has none (manual cards, older imports).
+fn workflow_json(workflow: &Option<WorkflowInfo>) -> String {
+    match workflow {
+        Some(w) => serde_json::to_string(w).unwrap_or_default(),
+        None => String::new(),
+    }
+}
+
+fn parse_workflow(s: &str) -> Option<WorkflowInfo> {
+    if s.trim().is_empty() {
+        return None;
+    }
+    serde_json::from_str(s).ok()
 }
 
 /// `civitai:images:<id>` / `civitai:posts:<id>` → the CivitAI page link behind
@@ -372,13 +389,14 @@ pub fn get_card_inner(dir: &Path, id: &str) -> Result<CardDetail, String> {
 
     let mut card = conn
         .query_row(
-            "SELECT id, prompt, negative_prompt, note, rating, created_at, updated_at, loras, group_id, author, checkpoint, meta_json, variants_json, source_key FROM cards WHERE id = ?1",
+            "SELECT id, prompt, negative_prompt, note, rating, created_at, updated_at, loras, group_id, author, checkpoint, meta_json, variants_json, source_key, workflow_summary FROM cards WHERE id = ?1",
             params![id],
             |r| {
                 let loras_raw: String = r.get(7)?;
                 let meta_raw: String = r.get(11)?;
                 let variants_raw: String = r.get(12)?;
                 let source_key: Option<String> = r.get(13)?;
+                let workflow_raw: String = r.get(14)?;
                 Ok(CardDetail {
                     id: r.get(0)?,
                     prompt: r.get(1)?,
@@ -399,6 +417,17 @@ pub fn get_card_inner(dir: &Path, id: &str) -> Result<CardDetail, String> {
                         .as_deref()
                         .map(card_source_url)
                         .unwrap_or_default(),
+                    workflow: parse_workflow(&workflow_raw).map(|mut w| {
+                        // a deleted file is not a saved one — re-download
+                        if w
+                            .saved_file
+                            .as_deref()
+                            .is_some_and(|p| !Path::new(p).exists())
+                        {
+                            w.saved_file = None;
+                        }
+                        w
+                    }),
                 })
             },
         )
@@ -477,6 +506,7 @@ pub fn create_card_inner(dir: &Path, input: NewCardInput) -> Result<CardDetail, 
     let checkpoint = input.checkpoint.as_deref().map(str::trim).filter(|s| !s.is_empty()).map(|s| s.to_string());
     let meta = meta_json(&input.meta);
     let variants = variants_json(&input.variants);
+    let workflow = workflow_json(&input.workflow);
     let source_key = input.source_key.as_deref().map(str::trim).filter(|s| !s.is_empty()).map(|s| s.to_string());
     let text_hash = dedup::text_fingerprint(&prompt);
 
@@ -493,9 +523,9 @@ pub fn create_card_inner(dir: &Path, input: NewCardInput) -> Result<CardDetail, 
     };
 
     conn.execute(
-        "INSERT INTO cards(id, prompt, negative_prompt, note, rating, created_at, updated_at, loras, group_id, author, checkpoint, meta_json, source_key, text_hash, variants_json)
-         VALUES(?1,?2,?3,?4,?5,?6,?6,?7,?8,?9,?10,?11,?12,?13,?14)",
-        params![id, prompt, negative_prompt, note, rating, ts, loras, group_id, author, checkpoint, meta, source_key, text_hash, variants],
+        "INSERT INTO cards(id, prompt, negative_prompt, note, rating, created_at, updated_at, loras, group_id, author, checkpoint, meta_json, source_key, text_hash, variants_json, workflow_summary)
+         VALUES(?1,?2,?3,?4,?5,?6,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15)",
+        params![id, prompt, negative_prompt, note, rating, ts, loras, group_id, author, checkpoint, meta, source_key, text_hash, variants, workflow],
     )
     .map_err(es)?;
 

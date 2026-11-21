@@ -72,6 +72,8 @@ export const api = {
   civitaiSourceKey: (url: string) => invoke<string | null>("civitai_source_key", { url }),
   /** Fetches the photo of a promptless import after the user confirms the save. */
   civitaiDownload: (url: string) => invoke<PasteImageResult>("civitai_download", { url }),
+  /** Re-fetches the full ComfyUI graph and saves it into `<library>/Workflows`. */
+  saveWorkflow: (id: string) => invoke<string>("civitai_workflow_save", { id }),
   checkDuplicates: (input: { prompt?: string | null; source_key?: string | null }) =>
     invoke<DuplicateHit[]>("check_duplicates", { input }),
 

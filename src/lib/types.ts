@@ -49,11 +49,35 @@ export interface CardDetail {
   meta: MetaItem[];
   /** CivitAI page link behind the import origin ("" → manual card). */
   source_url: string;
+  /** Compact ComfyUI graph summary from the import; the full graph stays on
+   * CivitAI and is fetched only by the download action. */
+  workflow: WorkflowInfo | null;
 }
 
 export interface MetaItem {
   k: string;
   v: string;
+}
+
+export interface WorkflowInfo {
+  /** Engine label, currently always "ComfyUI". */
+  engine: string;
+  node_count: number;
+  link_count: number;
+  group_count: number;
+  /** Node class → occurrences, biggest first (notes/reroutes filtered out). */
+  node_types: WorkflowNode[];
+  /** CivitAI image id behind the graph (download source). */
+  image_id: string;
+  /** File-name base for the downloaded JSON. */
+  title: string;
+  /** Absolute path of the last saved JSON, once downloaded. */
+  saved_file: string | null;
+}
+
+export interface WorkflowNode {
+  name: string;
+  count: number;
 }
 
 export interface LoraItem {
@@ -105,6 +129,8 @@ export interface NewCardInput {
   author: string | null;
   checkpoint: string | null;
   meta: MetaItem[];
+  /** Compact ComfyUI graph summary from the import (optional). */
+  workflow?: WorkflowInfo | null;
   /** Origin fingerprint for an imported card (dup detection). */
   source_key?: string | null;
   /** Import flow: the user explicitly kept an image whose page had no prompt. */
@@ -193,6 +219,8 @@ export interface CivitaiImport {
   loras: LoraItem[];
   tags: string[];
   meta: MetaItem[];
+  /** Compact ComfyUI graph summary when the page embeds a workflow. */
+  workflow?: WorkflowInfo | null;
   /** Origin fingerprint from the pasted CivitAI link (dup detection). */
   source_key?: string | null;
 }
