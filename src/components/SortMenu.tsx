@@ -15,7 +15,9 @@ import { useI18n, type DictKey } from "../i18n";
 import type { Mode, Sort } from "../lib/types";
 
 const EASE = [0.32, 0.72, 0, 1] as const;
-const MENU_W = 292;
+/** Panel width — equal to the trigger's `w-[196px]`, so the menu opens in
+ *  place instead of sticking out far to the right of the control. */
+const MENU_W = 196;
 const GAP = 7;
 const EDGE = 8;
 
@@ -56,10 +58,11 @@ interface SortMenuProps {
 
 /**
  * The shelf order control. A native <select> would drop the platform menu into
- * a carefully quiet header, so this is a small anchored panel instead: the
- * trigger keeps the header pill grammar, the panel lists every order with a
- * one-line explanation, and the two shelf-specific orders (prompt variants /
- * lora versions) only appear on the shelf that can honour them.
+ * a carefully quiet header, so this is a small anchored field with a compact
+ * panel instead: the trigger keeps the header pill grammar, and the menu — the
+ * same width as the trigger — lists every order as a single-line row. The two
+ * shelf-specific orders (prompt variants / lora versions) only appear on the
+ * shelf that can honour them.
  *
  * The panel is portalled to <body> because the header's backdrop blur makes it
  * a containing block — a fixed child would be positioned against the 56px bar.
@@ -237,9 +240,12 @@ export function SortMenu({ mode, sort, onSort }: SortMenuProps) {
           if (e.key === "ArrowDown" || e.key === "ArrowUp") {
             e.preventDefault();
             openMenu();
+          } else if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            open ? close() : openMenu();
           }
         }}
-        className={`press flex h-9 cursor-pointer items-center gap-2 rounded-full border bg-card pr-3 pl-3.5 text-[13px] font-medium text-body outline-none transition-colors duration-200 ${
+        className={`press flex h-9 w-[196px] cursor-pointer items-center gap-2 rounded-full border pr-2.5 pl-3 text-[13px] font-medium text-body outline-none transition-colors duration-200 ${
           open
             ? "border-line-active bg-parchment"
             : "border-hairline hover:border-line-hover"
@@ -251,11 +257,11 @@ export function SortMenu({ mode, sort, onSort }: SortMenuProps) {
           className={open ? "text-action" : "text-faint"}
           aria-hidden
         />
-        <span className="hidden max-w-[152px] truncate sm:inline">{t(current.label)}</span>
+        <span className="min-w-0 flex-1 truncate">{t(current.label)}</span>
         <ChevronDown
           size={13}
           aria-hidden
-          className={`text-faint transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] ${
+          className={`shrink-0 text-faint transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] ${
             open ? "rotate-180" : ""
           }`}
         />
@@ -269,13 +275,33 @@ export function SortMenu({ mode, sort, onSort }: SortMenuProps) {
               id={menuId}
               role="menu"
               aria-label={t("sort.label")}
-              initial={reduce ? { opacity: 0 } : { opacity: 0, y: box.up ? 6 : -6, scale: 0.97 }}
-              animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
-              exit={reduce ? { opacity: 0 } : { opacity: 0, y: box.up ? 4 : -4, scale: 0.98 }}
+              // The menu unfurls out of its trigger like the Dock collapsing an
+              // app: `scaleY` grows the panel from the right edge of the button
+              // that opened it. Width is fixed to equal the trigger's, so there
+              // is no sideways growth to fight.
+              initial={
+                reduce
+                  ? { opacity: 0 }
+                  : { opacity: 0, scaleY: box.up ? 0.25 : 0.55 }
+              }
+              animate={
+                reduce
+                  ? { opacity: 1 }
+                  : { opacity: 1, scaleY: 1 }
+              }
+              exit={
+                reduce
+                  ? { opacity: 0 }
+                  : {
+                      opacity: 0,
+                      scaleY: 0.35,
+                      transition: { type: "tween", duration: 0.12, ease: EASE },
+                    }
+              }
               transition={
                 reduce
                   ? { duration: 0.12, ease: EASE }
-                  : { type: "spring", stiffness: 520, damping: 34, mass: 0.7 }
+                  : { type: "spring", stiffness: 520, damping: 30, mass: 0.85 }
               }
               onKeyDown={onMenuKeyDown}
               style={{
@@ -289,17 +315,13 @@ export function SortMenu({ mode, sort, onSort }: SortMenuProps) {
               }}
               className="overflow-x-hidden overflow-y-auto overscroll-contain rounded-[16px] border border-hairline bg-card/95 p-1.5 shadow-tile-hover backdrop-blur-xl"
             >
-              <div className="px-2.5 pt-1 pb-1.5 text-[10.5px] font-semibold tracking-[0.08em] text-faint uppercase">
-                {t("sort.label")}
-              </div>
-
               {options.map((option, i) => {
                 const selected = option.value === sort;
                 const Icon = option.icon;
                 return (
                   <Fragment key={option.value}>
                     {i === CORE.length && (
-                      <div className="my-1 h-px bg-line-soft" aria-hidden />
+                      <div className="my-1.5 h-px bg-line-soft" aria-hidden />
                     )}
                     <button
                       ref={(el) => {
@@ -308,46 +330,37 @@ export function SortMenu({ mode, sort, onSort }: SortMenuProps) {
                       type="button"
                       role="menuitemradio"
                       aria-checked={selected}
+                      title={t(option.hint)}
                       tabIndex={i === active ? 0 : -1}
                       onMouseEnter={() => setActive(i)}
                       onFocus={() => setActive(i)}
                       onClick={() => choose(option.value)}
-                      className={`flex w-full cursor-pointer items-center gap-2.5 rounded-[11px] px-2.5 py-2 text-left outline-none transition-colors duration-150 ${
+                      className={`flex h-8 w-full cursor-pointer items-center gap-2.5 rounded-[10px] px-2.5 text-left outline-none transition-colors duration-150 ${
                         selected ? "bg-parchment" : "hover:bg-parchment/70"
                       }`}
                     >
                       <span
-                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-colors duration-150 ${
+                        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full transition-colors duration-150 ${
                           selected ? "bg-action/10 text-action" : "bg-parchment text-muted"
                         }`}
                         aria-hidden
                       >
-                        <Icon size={14.5} strokeWidth={2} />
+                        <Icon size={14} strokeWidth={2} />
                       </span>
-
-                      <span className="min-w-0 flex-1">
-                        <span
-                          className={`block truncate text-[13px] font-medium ${
-                            selected ? "text-ink" : "text-body"
-                          }`}
-                        >
-                          {t(option.label)}
-                        </span>
-                        <span className="mt-0.5 block text-[11px] leading-snug text-faint">
-                          {t(option.hint)}
-                        </span>
+                      <span
+                        className={`min-w-0 flex-1 truncate text-[13px] font-medium ${
+                          selected ? "text-ink" : "text-body"
+                        }`}
+                      >
+                        {t(option.label)}
                       </span>
-
                       {selected && (
-                        <motion.span
-                          initial={reduce ? false : { scale: 0.4, opacity: 0 }}
-                          animate={{ scale: 1, opacity: 1 }}
-                          transition={{ type: "spring", stiffness: 520, damping: 24 }}
+                        <Check
+                          size={13.5}
+                          strokeWidth={2.6}
                           className="shrink-0 text-action"
                           aria-hidden
-                        >
-                          <Check size={14} strokeWidth={2.6} />
-                        </motion.span>
+                        />
                       )}
                     </button>
                   </Fragment>
