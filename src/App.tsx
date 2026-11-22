@@ -78,8 +78,8 @@ function matchCivitaiLink(text: string, re: RegExp): string | null {
   return text.match(re)?.[0].replace(/[)\]}>.,;!]+$/, "") ?? null;
 }
 
-/** The slot every item arrived in, so an unpinned item can find its way home
- * instead of keeping the row it was floated to. */
+/** The slot an item occupies when nothing is pinned — where an unpinned item
+ * belongs, rather than the row it was floated to. */
 type ShelfOrder = Map<string, number>;
 
 function orderOf<T extends { id: string }>(items: T[]): ShelfOrder {
@@ -88,10 +88,48 @@ function orderOf<T extends { id: string }>(items: T[]): ShelfOrder {
   return order;
 }
 
+/** The shelf a list would have without pins. The backend floats pinned rows to
+ * the top, so the indices it returns are *not* home slots: after a reload a
+ * pinned item would "return" to the row it was floated to. Every key the query
+ * sorts by is on the summary, so the unpinned order is rebuilt here from the
+ * active sort. */
+function homeOrder<
+  T extends { id: string; rating: number; created_at: string },
+>(items: T[], sort: Sort): ShelfOrder {
+  const byDate = (a: T, b: T) =>
+    a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0;
+  const compare =
+    sort === "oldest"
+      ? (a: T, b: T) => -byDate(a, b)
+      : sort === "rating"
+        ? (a: T, b: T) => b.rating - a.rating || byDate(a, b)
+        : byDate;
+  return orderOf([...items].sort(compare));
+}
+
+/** A pin flips optimistically and is written in the background. A shelf load
+ * that was already in flight when the chip flipped comes back with the old
+ * flag, so the pending write is replayed over the fetched list instead of
+ * undoing the click. */
+type PendingPin = { pinned: boolean; token: number };
+
+function applyPendingPins<T extends { id: string; pinned: boolean }>(
+  items: T[],
+  pending: Map<string, PendingPin>,
+): T[] {
+  if (pending.size === 0) return items;
+  return items.map((item) => {
+    const pin = pending.get(item.id);
+    return pin && pin.pinned !== item.pinned
+      ? { ...item, pinned: pin.pinned }
+      : item;
+  });
+}
+
 /** Optimistic shelf order: pinned items float to the top while everything else
- * returns to the slot the backend gave it for the active sort. Sorting by the
- * remembered slot (and not by the current array) is what lets an unpinned item
- * travel back down to its own place. */
+ * returns to the slot the active sort gives it. Sorting by the remembered slot
+ * (and not by the current array) is what lets an unpinned item travel back down
+ * to its own place. */
 function pinnedFirst<T extends { id: string; pinned: boolean }>(
   items: T[],
   order: ShelfOrder,
@@ -316,9 +354,13 @@ function Shell() {
 
   // refs for stable listeners
   const scrollRef = useRef<HTMLElement | null>(null);
-  // the backend's ordering, kept as the home slot of every card and lora
+  // the shelf's unpinned ordering, kept as the home slot of every card and lora
   const cardOrderRef = useRef<ShelfOrder>(new Map());
   const loraOrderRef = useRef<ShelfOrder>(new Map());
+  // pin writes that have not settled yet, so a list response cannot undo them
+  const pendingCardPins = useRef<Map<string, PendingPin>>(new Map());
+  const pendingLoraPins = useRef<Map<string, PendingPin>>(new Map());
+  const pinToken = useRef(0);
   const editorOpenRef = useRef(false);
   const stagedRef = useRef<StagedImage[]>([]);
   const detailOpenRef = useRef(false);
@@ -412,12 +454,14 @@ function Shell() {
       group_id: groupId || null,
     };
     try {
-      const [list, tagList] = await Promise.all([
+      const [fetched, tagList] = await Promise.all([
         api.listCards(filter),
         api.listTags(),
       ]);
-      setCards(list);
-      cardOrderRef.current = orderOf(list);
+      const list = applyPendingPins(fetched, pendingCardPins.current);
+      const order = homeOrder(list, sort);
+      cardOrderRef.current = order;
+      setCards(pinnedFirst(list, order));
       setTags(tagList);
       setLoadError(false);
     } catch {
@@ -457,12 +501,14 @@ function Shell() {
       group_id: loraGroupId || null,
     };
     try {
-      const [list, tagList] = await Promise.all([
+      const [fetched, tagList] = await Promise.all([
         api.listLoras(filter),
         api.listLoraTags(),
       ]);
-      setLoras(list);
-      loraOrderRef.current = orderOf(list);
+      const list = applyPendingPins(fetched, pendingLoraPins.current);
+      const order = homeOrder(list, sort);
+      loraOrderRef.current = order;
+      setLoras(pinnedFirst(list, order));
       setLoraTags(tagList);
       setLoadError(false);
     } catch {
@@ -485,7 +531,15 @@ function Shell() {
       );
     if (pinned) window.setTimeout(settle, PIN_BLOOM_MS);
     else settle();
-    void api.setCardPinned(id, pinned).catch(() => {
+    const token = ++pinToken.current;
+    pendingCardPins.current.set(id, { pinned, token });
+    const release = () => {
+      if (pendingCardPins.current.get(id)?.token === token) {
+        pendingCardPins.current.delete(id);
+      }
+    };
+    void api.setCardPinned(id, pinned).then(release, () => {
+      release();
       holdView(scrollRef.current, () =>
         setCards((prev) =>
           pinnedFirst(
@@ -505,7 +559,15 @@ function Shell() {
       );
     if (pinned) window.setTimeout(settle, PIN_BLOOM_MS);
     else settle();
-    void api.setLoraPinned(id, pinned).catch(() => {
+    const token = ++pinToken.current;
+    pendingLoraPins.current.set(id, { pinned, token });
+    const release = () => {
+      if (pendingLoraPins.current.get(id)?.token === token) {
+        pendingLoraPins.current.delete(id);
+      }
+    };
+    void api.setLoraPinned(id, pinned).then(release, () => {
+      release();
       holdView(scrollRef.current, () =>
         setLoras((prev) =>
           pinnedFirst(
@@ -522,6 +584,17 @@ function Shell() {
   const toggleFamilyPin = useCallback(
     (memberIds: string[], pinned: boolean) => {
       const ids = new Set(memberIds);
+      const token = ++pinToken.current;
+      for (const id of memberIds) {
+        pendingLoraPins.current.set(id, { pinned, token });
+      }
+      const release = () => {
+        for (const id of memberIds) {
+          if (pendingLoraPins.current.get(id)?.token === token) {
+            pendingLoraPins.current.delete(id);
+          }
+        }
+      };
       holdView(scrollRef.current, () => {
         setLoras((prev) =>
           pinnedFirst(
@@ -532,7 +605,8 @@ function Shell() {
       });
       void Promise.all(
         memberIds.map((id) => api.setLoraPinned(id, pinned)),
-      ).catch(() => {
+      ).then(release, () => {
+        release();
         holdView(scrollRef.current, () => {
           setLoras((prev) =>
             pinnedFirst(
