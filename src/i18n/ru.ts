@@ -29,8 +29,15 @@ export const ru: Record<DictKey, string> = {
 
   "sort.label": "Сортировка",
   "sort.newest": "Сначала новые",
+  "sort.newest.hint": "Недавно добавленные",
   "sort.oldest": "Сначала старые",
+  "sort.oldest.hint": "Добавленные раньше всех",
   "sort.rating": "По оценке",
+  "sort.rating.hint": "Сначала с высокой оценкой",
+  "sort.variants": "Больше вариантов",
+  "sort.variants.hint": "Карточки с наибольшим числом вариантов",
+  "sort.versions": "Больше версий",
+  "sort.versions.hint": "Лоры с наибольшим числом версий на полке",
 
   "tags.all": "Все",
   "tags.title": "Теги",

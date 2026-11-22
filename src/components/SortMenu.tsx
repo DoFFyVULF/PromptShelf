@@ -1,0 +1,363 @@
+import { Fragment, useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import {
+  ArrowDownWideNarrow,
+  ArrowUpNarrowWide,
+  Check,
+  ChevronDown,
+  GitBranch,
+  Layers,
+  Star,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { useI18n, type DictKey } from "../i18n";
+import type { Mode, Sort } from "../lib/types";
+
+const EASE = [0.32, 0.72, 0, 1] as const;
+const MENU_W = 292;
+const GAP = 7;
+const EDGE = 8;
+
+interface SortChoice {
+  value: Sort;
+  label: DictKey;
+  hint: DictKey;
+  icon: LucideIcon;
+}
+
+const CORE: SortChoice[] = [
+  { value: "newest", label: "sort.newest", hint: "sort.newest.hint", icon: ArrowDownWideNarrow },
+  { value: "oldest", label: "sort.oldest", hint: "sort.oldest.hint", icon: ArrowUpNarrowWide },
+  { value: "rating", label: "sort.rating", hint: "sort.rating.hint", icon: Star },
+];
+
+/** Each shelf has one extra "depth" order that the other cannot express. */
+const DEPTH: Record<Mode, SortChoice> = {
+  prompt: {
+    value: "variants",
+    label: "sort.variants",
+    hint: "sort.variants.hint",
+    icon: Layers,
+  },
+  lora: {
+    value: "versions",
+    label: "sort.versions",
+    hint: "sort.versions.hint",
+    icon: GitBranch,
+  },
+};
+
+interface SortMenuProps {
+  mode: Mode;
+  sort: Sort;
+  onSort: (sort: Sort) => void;
+}
+
+/**
+ * The shelf order control. A native <select> would drop the platform menu into
+ * a carefully quiet header, so this is a small anchored panel instead: the
+ * trigger keeps the header pill grammar, the panel lists every order with a
+ * one-line explanation, and the two shelf-specific orders (prompt variants /
+ * lora versions) only appear on the shelf that can honour them.
+ *
+ * The panel is portalled to <body> because the header's backdrop blur makes it
+ * a containing block — a fixed child would be positioned against the 56px bar.
+ * Keyboard: ↑/↓ move, Home/End jump, Enter/Space pick, Esc/Tab close.
+ */
+export function SortMenu({ mode, sort, onSort }: SortMenuProps) {
+  const { t } = useI18n();
+  const reduce = useReducedMotion() ?? false;
+  const menuId = useId();
+
+  const options = [...CORE, DEPTH[mode]];
+  const selectedIndex = Math.max(
+    0,
+    options.findIndex((o) => o.value === sort),
+  );
+  const current = options[selectedIndex];
+
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(selectedIndex);
+  const [box, setBox] = useState({ left: 0, top: 0, up: false });
+
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  // The trigger sits in the header, which never scrolls (only <main> does), so
+  // the panel only has to follow a resize. It flips above when the space below
+  // is tighter than the panel itself.
+  const measure = useCallback(() => {
+    const el = buttonRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const height = panelRef.current?.offsetHeight ?? 0;
+    const below = window.innerHeight - r.bottom - GAP - EDGE;
+    const above = r.top - GAP - EDGE;
+    const up = height > 0 && height > below && above > below;
+    setBox({
+      left: Math.max(EDGE, Math.min(r.right - MENU_W, window.innerWidth - MENU_W - EDGE)),
+      top: up ? Math.max(EDGE, r.top - GAP - height) : r.bottom + GAP,
+      up,
+    });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [open, measure]);
+
+  // A pointer anywhere outside the trigger or the panel dismisses the menu.
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent) => {
+      const target = e.target as Node;
+      if (buttonRef.current?.contains(target) || panelRef.current?.contains(target)) return;
+      setOpen(false);
+    };
+    window.addEventListener("pointerdown", onDown, true);
+    return () => window.removeEventListener("pointerdown", onDown, true);
+  }, [open]);
+
+  // Focus leaving the control dismisses the menu (⌘F, a dialog, Tab…). This is
+  // a document-level `focusin` rather than the panel's `onBlur`: WebKit reports
+  // a null `relatedTarget` when focus moves back to the trigger, which closed
+  // the menu before the click and made the same click re-open it.
+  useEffect(() => {
+    if (!open) return;
+    const onFocusIn = (e: FocusEvent) => {
+      const target = e.target as Node | null;
+      if (!target) return;
+      if (panelRef.current?.contains(target) || buttonRef.current?.contains(target)) return;
+      setOpen(false);
+    };
+    document.addEventListener("focusin", onFocusIn);
+    return () => document.removeEventListener("focusin", onFocusIn);
+  }, [open]);
+
+  // Esc closes even when focus sits on the trigger (a mouse-opened menu keeps
+  // it there for a moment); the menu's own handler covers the focused-row case.
+  // Capture + stop: the shelf's global Esc handler must not also act on it.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      const focused = document.activeElement;
+      if (
+        !panelRef.current?.contains(focused) &&
+        !buttonRef.current?.contains(focused)
+      ) {
+        return;
+      }
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      setOpen(false);
+      requestAnimationFrame(() => buttonRef.current?.focus({ preventScroll: true }));
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [open]);
+
+  // Opening moves focus onto the current order, so arrow keys and Enter work
+  // immediately — no extra Tab.
+  useEffect(() => {
+    if (!open) return;
+    itemRefs.current[selectedIndex]?.focus({ preventScroll: true });
+  }, [open, selectedIndex]);
+
+  const openMenu = () => {
+    setActive(selectedIndex);
+    setOpen(true);
+  };
+
+  const close = () => {
+    setOpen(false);
+    requestAnimationFrame(() => buttonRef.current?.focus({ preventScroll: true }));
+  };
+
+  const choose = (value: Sort) => {
+    onSort(value);
+    close();
+  };
+
+  const focusItem = (index: number) => {
+    setActive(index);
+    itemRefs.current[index]?.focus({ preventScroll: true });
+  };
+
+  const onMenuKeyDown = (e: React.KeyboardEvent) => {
+    switch (e.key) {
+      case "ArrowDown":
+        e.preventDefault();
+        focusItem((active + 1) % options.length);
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        focusItem((active - 1 + options.length) % options.length);
+        break;
+      case "Home":
+        e.preventDefault();
+        focusItem(0);
+        break;
+      case "End":
+        e.preventDefault();
+        focusItem(options.length - 1);
+        break;
+      case "Enter":
+      case " ":
+        e.preventDefault();
+        choose(options[active].value);
+        break;
+      case "Tab":
+        e.preventDefault();
+        close();
+        break;
+      default:
+        break;
+    }
+  };
+
+  const CurrentIcon = current.icon;
+
+  return (
+    <>
+      <button
+        ref={buttonRef}
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={open ? menuId : undefined}
+        aria-label={`${t("sort.label")}: ${t(current.label)}`}
+        title={t("sort.label")}
+        onClick={() => (open ? close() : openMenu())}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+            e.preventDefault();
+            openMenu();
+          }
+        }}
+        className={`press flex h-9 cursor-pointer items-center gap-2 rounded-full border bg-card pr-3 pl-3.5 text-[13px] font-medium text-body outline-none transition-colors duration-200 ${
+          open
+            ? "border-line-active bg-parchment"
+            : "border-hairline hover:border-line-hover"
+        } focus-visible:border-line-active focus-visible:shadow-focus`}
+      >
+        <CurrentIcon
+          size={14}
+          strokeWidth={2}
+          className={open ? "text-action" : "text-faint"}
+          aria-hidden
+        />
+        <span className="hidden max-w-[152px] truncate sm:inline">{t(current.label)}</span>
+        <ChevronDown
+          size={13}
+          aria-hidden
+          className={`text-faint transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] ${
+            open ? "rotate-180" : ""
+          }`}
+        />
+      </button>
+
+      {createPortal(
+        <AnimatePresence>
+          {open && (
+            <motion.div
+              ref={panelRef}
+              id={menuId}
+              role="menu"
+              aria-label={t("sort.label")}
+              initial={reduce ? { opacity: 0 } : { opacity: 0, y: box.up ? 6 : -6, scale: 0.97 }}
+              animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
+              exit={reduce ? { opacity: 0 } : { opacity: 0, y: box.up ? 4 : -4, scale: 0.98 }}
+              transition={
+                reduce
+                  ? { duration: 0.12, ease: EASE }
+                  : { type: "spring", stiffness: 520, damping: 34, mass: 0.7 }
+              }
+              onKeyDown={onMenuKeyDown}
+              style={{
+                position: "fixed",
+                left: box.left,
+                top: box.top,
+                width: MENU_W,
+                maxHeight: "calc(100vh - 16px)",
+                zIndex: 130,
+                transformOrigin: box.up ? "bottom right" : "top right",
+              }}
+              className="overflow-x-hidden overflow-y-auto overscroll-contain rounded-[16px] border border-hairline bg-card/95 p-1.5 shadow-tile-hover backdrop-blur-xl"
+            >
+              <div className="px-2.5 pt-1 pb-1.5 text-[10.5px] font-semibold tracking-[0.08em] text-faint uppercase">
+                {t("sort.label")}
+              </div>
+
+              {options.map((option, i) => {
+                const selected = option.value === sort;
+                const Icon = option.icon;
+                return (
+                  <Fragment key={option.value}>
+                    {i === CORE.length && (
+                      <div className="my-1 h-px bg-line-soft" aria-hidden />
+                    )}
+                    <button
+                      ref={(el) => {
+                        itemRefs.current[i] = el;
+                      }}
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={selected}
+                      tabIndex={i === active ? 0 : -1}
+                      onMouseEnter={() => setActive(i)}
+                      onFocus={() => setActive(i)}
+                      onClick={() => choose(option.value)}
+                      className={`flex w-full cursor-pointer items-center gap-2.5 rounded-[11px] px-2.5 py-2 text-left outline-none transition-colors duration-150 ${
+                        selected ? "bg-parchment" : "hover:bg-parchment/70"
+                      }`}
+                    >
+                      <span
+                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-colors duration-150 ${
+                          selected ? "bg-action/10 text-action" : "bg-parchment text-muted"
+                        }`}
+                        aria-hidden
+                      >
+                        <Icon size={14.5} strokeWidth={2} />
+                      </span>
+
+                      <span className="min-w-0 flex-1">
+                        <span
+                          className={`block truncate text-[13px] font-medium ${
+                            selected ? "text-ink" : "text-body"
+                          }`}
+                        >
+                          {t(option.label)}
+                        </span>
+                        <span className="mt-0.5 block text-[11px] leading-snug text-faint">
+                          {t(option.hint)}
+                        </span>
+                      </span>
+
+                      {selected && (
+                        <motion.span
+                          initial={reduce ? false : { scale: 0.4, opacity: 0 }}
+                          animate={{ scale: 1, opacity: 1 }}
+                          transition={{ type: "spring", stiffness: 520, damping: 24 }}
+                          className="shrink-0 text-action"
+                          aria-hidden
+                        >
+                          <Check size={14} strokeWidth={2.6} />
+                        </motion.span>
+                      )}
+                    </button>
+                  </Fragment>
+                );
+              })}
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body,
+      )}
+    </>
+  );
+}

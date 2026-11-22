@@ -92,10 +92,13 @@ function orderOf<T extends { id: string }>(items: T[]): ShelfOrder {
  * the top, so the indices it returns are *not* home slots: after a reload a
  * pinned item would "return" to the row it was floated to. Every key the query
  * sorts by is on the summary, so the unpinned order is rebuilt here from the
- * active sort. */
+ * active sort. The two "depth" orders read a weight the summary cannot carry on
+ * its own (lora version counts are a property of the whole shelf), so callers
+ * pass the accessor in — the backend has no SQL order for them and returns the
+ * list newest-first, which this rebuild replaces. */
 function homeOrder<
   T extends { id: string; rating: number; created_at: string },
->(items: T[], sort: Sort): ShelfOrder {
+>(items: T[], sort: Sort, weight?: (item: T) => number): ShelfOrder {
   const byDate = (a: T, b: T) =>
     a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0;
   const compare =
@@ -103,7 +106,9 @@ function homeOrder<
       ? (a: T, b: T) => -byDate(a, b)
       : sort === "rating"
         ? (a: T, b: T) => b.rating - a.rating || byDate(a, b)
-        : byDate;
+        : (sort === "variants" || sort === "versions") && weight
+          ? (a: T, b: T) => weight(b) - weight(a) || byDate(a, b)
+          : byDate;
   return orderOf([...items].sort(compare));
 }
 
@@ -179,7 +184,11 @@ function Shell() {
   const [debouncedQ, setDebouncedQ] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [matchAllTags, setMatchAllTags] = useState(false);
-  const [sort, setSort] = useState<Sort>("newest");
+  // Each shelf remembers its own order: "most variants" cannot be honoured on
+  // the lora shelf (and "most versions" cannot on the prompt shelf), so the two
+  // states stay independent instead of being clamped on every mode flip.
+  const [promptSort, setPromptSort] = useState<Sort>("newest");
+  const [loraSort, setLoraSort] = useState<Sort>("newest");
 
   const [theme, setTheme] = useState<Theme>(themeFromStorage);
 
@@ -272,6 +281,10 @@ function Shell() {
   const [mode, setMode] = useState<Mode>(() =>
     window.localStorage.getItem("ps-mode") === "lora" ? "lora" : "prompt",
   );
+
+  // The order on screen belongs to the active shelf; the TopBar reads this pair.
+  const sort = mode === "prompt" ? promptSort : loraSort;
+  const setSort = mode === "prompt" ? setPromptSort : setLoraSort;
 
   const [loras, setLoras] = useState<LoraSummary[]>([]);
   const [loraTags, setLoraTags] = useState<TagCount[]>([]);
@@ -450,7 +463,7 @@ function Shell() {
       tags: selectedTags,
       match_all_tags: matchAllTags,
       min_rating: 0,
-      sort,
+      sort: promptSort,
       group_id: groupId || null,
     };
     try {
@@ -459,7 +472,7 @@ function Shell() {
         api.listTags(),
       ]);
       const list = applyPendingPins(fetched, pendingCardPins.current);
-      const order = homeOrder(list, sort);
+      const order = homeOrder(list, promptSort, (card) => card.variant_count);
       cardOrderRef.current = order;
       setCards(pinnedFirst(list, order));
       setTags(tagList);
@@ -469,7 +482,7 @@ function Shell() {
     } finally {
       setLoading(false);
     }
-  }, [debouncedQ, groupId, selectedTags, matchAllTags, sort]);
+  }, [debouncedQ, groupId, selectedTags, matchAllTags, promptSort]);
 
   const loadGroups = useCallback(async () => {
     try {
@@ -497,7 +510,7 @@ function Shell() {
       tags: selectedTags,
       match_all_tags: matchAllTags,
       min_rating: 0,
-      sort,
+      sort: loraSort,
       group_id: loraGroupId || null,
     };
     try {
@@ -506,7 +519,19 @@ function Shell() {
         api.listLoraTags(),
       ]);
       const list = applyPendingPins(fetched, pendingLoraPins.current);
-      const order = homeOrder(list, sort);
+      // "Most versions" is a property of the whole shelf, not of one row: a
+      // lora's weight is the number of distinct variants of that model, the
+      // same set the family deck is folded from. A lone lora counts as one.
+      const versions =
+        loraSort === "versions" ? new Map<string, number>() : null;
+      if (versions) {
+        for (const family of detectFamilies(list)) {
+          for (const member of family.members) {
+            versions.set(member.id, family.members.length);
+          }
+        }
+      }
+      const order = homeOrder(list, loraSort, (lora) => versions?.get(lora.id) ?? 1);
       loraOrderRef.current = order;
       setLoras(pinnedFirst(list, order));
       setLoraTags(tagList);
@@ -516,7 +541,7 @@ function Shell() {
     } finally {
       setLoading(false);
     }
-  }, [debouncedQ, loraGroupId, selectedTags, matchAllTags, sort]);
+  }, [debouncedQ, loraGroupId, selectedTags, matchAllTags, loraSort]);
 
   /** Pinning never touches the shelf data: the tile flips its gild state, the
    * grid slides it into the new slot with a layout spring, and the write goes

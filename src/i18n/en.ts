@@ -27,8 +27,15 @@ export const en = {
 
   "sort.label": "Sort",
   "sort.newest": "Newest first",
+  "sort.newest.hint": "Recently added",
   "sort.oldest": "Oldest first",
+  "sort.oldest.hint": "Earliest added first",
   "sort.rating": "By rating",
+  "sort.rating.hint": "Highest rating first",
+  "sort.variants": "Most variants",
+  "sort.variants.hint": "Cards with the most prompt variants",
+  "sort.versions": "Most versions",
+  "sort.versions.hint": "Loras with the most versions on the shelf",
 
   "tags.all": "All",
   "tags.title": "Tags",

@@ -1,11 +1,12 @@
 import { animate, AnimatePresence, motion, useMotionValue, useReducedMotion, useTransform } from "motion/react";
 import type { MotionValue } from "motion/react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Search, Plus, Settings2, ChevronDown, CloudDownload } from "lucide-react";
+import { Search, Plus, Settings2, CloudDownload } from "lucide-react";
 import { useI18n } from "../i18n";
 import { modKey } from "../lib/platform";
 import type { Mode, Sort } from "../lib/types";
 import { LoraFamilyBanner } from "./LoraFamilyBanner";
+import { SortMenu } from "./SortMenu";
 
 interface TopBarProps {
   mode: Mode;
@@ -323,17 +324,7 @@ export function TopBar({ mode, onToggleMode, query, onQuery, sort, onSort, onNew
       />
 
       <motion.div layout={layout} transition={LAYOUT_SPRING} className="relative">
-        <select
-          aria-label={t("sort.label")}
-          value={sort}
-          onChange={(e) => onSort(e.target.value as Sort)}
-          className="h-9 cursor-pointer appearance-none rounded-full border border-hairline bg-card pr-8 pl-3.5 text-[13px] font-medium text-body transition-[border-color,box-shadow] duration-200 ease-[cubic-bezier(0.32,0.72,0,1)] hover:border-line-hover focus:border-line-active focus:shadow-focus focus:outline-none"
-        >
-          <option value="newest">{t("sort.newest")}</option>
-          <option value="oldest">{t("sort.oldest")}</option>
-          <option value="rating">{t("sort.rating")}</option>
-        </select>
-        <ChevronDown size={13} className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-faint" />
+        <SortMenu mode={mode} sort={sort} onSort={onSort} />
       </motion.div>
 
       <motion.button

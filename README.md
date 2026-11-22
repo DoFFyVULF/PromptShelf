@@ -75,7 +75,7 @@ nothing deletes it.
   copy), arrow-key navigation, click-to-zoom fullscreen. Each card has a LoRA list with quick
   editing and delete-on-hover.
 - **Search & filters** — full-text search across prompts, notes and tags; tag filter;
-  sorting by date and rating.
+  sorting by date, rating, prompt-variant count or lora-version count.
 - **Groups** — every card lives in exactly one group (each shelf has its own groups). The
   default group ("Home"/"Домашняя") cannot be deleted. The groups panel opens from a chip in
   the filter bar: create, rename, delete (cards of a deleted group return to the default one),

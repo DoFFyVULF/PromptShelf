@@ -1,6 +1,9 @@
 export type Lang = "en" | "ru";
 export type Theme = "system" | "light" | "dark";
-export type Sort = "newest" | "oldest" | "rating";
+/** Shelf order. `variants` counts prompt variants and belongs to the prompt
+ * shelf; `versions` counts a lora's distinct shelf variants and belongs to the
+ * lora shelf — each menu only offers its own. */
+export type Sort = "newest" | "oldest" | "rating" | "variants" | "versions";
 /** Which shelf is on screen: the logo toggles these. */
 export type Mode = "prompt" | "lora";
 
