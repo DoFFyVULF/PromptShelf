@@ -58,29 +58,34 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: "PromptShelf ${{ github.ref_name }}"
           releaseBody: |
-            **What's new in v0.2.4**
+            **What's new in v0.2.6**
 
-            **A place for photos without prompts**
+            **Order by what's inside**
 
-            - CivitAI pages published without generation data no longer end in a generic fetch error. The import parks as a quiet "No prompt" tile with a softened preview of the site photo, then asks one clear question: keep the image or let it go. Nothing is downloaded until you say yes — and the download is restricted to CivitAI HTTPS links.
-            - Kept photos become ordinary cards with an empty prompt and a gentle note in the detail view. Rating, tags, notes and variants stay fully editable, so the prompt can be written whenever you like. The floating import receipt and the card pager both understand these cards now.
+            - The sort control is now a small panel of our own instead of the system dropdown: a quiet pill in the header that opens exactly over itself and unfolds from the right edge like a Dock tile. Arrow keys, Home/End, Enter/Space and Esc all work, the selected order keeps its check in the leading chip, and no row clips.
+            - Two orders now read a shelf's depth: PromptShelf can bring cards with the most variants first, LoraShelf the loras with the most versions — counted across the same version family the deck is built from, with a lone lora counting as one. Each shelf keeps its own order as you move between prompts and loras; pinned cards still float above.
 
-            **Every version gets its own shelf slot**
+            **Prompt cards keep their ComfyUI recipe**
 
-            - Pinned `?modelVersionId=` links now survive clipboard auto-import, so the exact version you were looking at reaches the library instead of the model's default one.
-            - LoRA origins are version-scoped (`civitai:model:<model>:<version>`), so the same model built for Moss, Krea 2 and friends lives side by side instead of tripping the duplicate warning. Unpinned links are checked after the fetch, once the version is known, and the CivitAI link on the detail page points at that version too. The duplicate dialog now speaks LoRA rather than prompt.
+            - Import now reads the ComfyUI workflow behind a CivitAI image: node, link and group counts, the busiest node classes, the image id and title. A card that carries a workflow wears a compact seal in its meta row — a dashed, hollow constellation while the JSON lives only on CivitAI, a filled graph with a check once it is archived.
+            - The constellation densifies with the node count across four tiers, so a 40-node graph reads heavier than a 5-node one at a glance. The stamp ring plays only on a real false → true flip, so opening a shelf stays quiet.
+            - Card detail gathers the workflow in a parchment tile: engine, counts, top node chips and a JSON button. It re-fetches the full graph from CivitAI, dedupes by content, writes `Workflows/<slug>.json` into the library, and turns into "Open folder". Saved files are re-checked on read, so a moved library tells the truth.
 
-            **One tile for the whole family**
+            **A deck pins as one**
 
-            - When the same lora turns up in several versions or for several base models, LoraShelf offers to fold them into a single deck — right between search and sort. Accept or decline; the choice sticks.
-            - A group takes exactly one normal-sized tile: mini covers tilted on the Z axis, fanning out on hover. Open it to see every variant, jump into any one of them, or split the group apart — the offer returns when you want to gather them again.
-            - Declined a group and changed your mind later? Each matching lora page carries its own quiet grouping button, so the decision is never buried.
+            - A LoRA deck now carries the same quiet pin as a single tile: one click pins every version in the group, they float to the top together and wear the gold seal; one more click sends them home. Splitting the group has moved into the deck view, beside the variants it affects.
+
+            **The shelf stays where you left it**
+
+            - Pinning no longer drags the view to the top. The scroll anchor is off, focus returns without scrolling, and a reorder keeps the offset it started with — on both Chromium and WebKit.
+            - Unpinning now always sends a card home: the backend's floated-row index is ignored and the home order is rebuilt from the active sort.
+            - Reloading the shelf mid-write no longer re-pins a card behind your back; pending pin writes are replayed over the fetched list, so a late response cannot undo your choice.
 
             **Small things**
 
-            - Fixed: the sort dropdown drew a hard 2px keyboard outline on click. It now fades into the same active border and soft shadow ring as the search field, with the same easing.
+            - Copy in card detail now follows the page you are reading: both the Copy button and the copy shortcut take the open variant instead of the main prompt, and opening another card starts on its main prompt again.
 
-            Installers, built from this tag with the updater signing key:
+            ---
 
             **Windows** — `PromptShelf_*_x64-setup.exe` (recommended) or `.msi`.
             First launch may show a SmartScreen warning: click "More info" → "Run anyway".
