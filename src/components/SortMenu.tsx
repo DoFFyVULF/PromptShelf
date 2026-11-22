@@ -15,9 +15,11 @@ import { useI18n, type DictKey } from "../i18n";
 import type { Mode, Sort } from "../lib/types";
 
 const EASE = [0.32, 0.72, 0, 1] as const;
-/** Panel width — equal to the trigger's `w-[196px]`, so the menu opens in
- *  place instead of sticking out far to the right of the control. */
-const MENU_W = 196;
+/** One width for the trigger and the panel, so the menu opens exactly over the
+ *  control. It is set by the widest row — the longest order label
+ *  (ru: "Больше вариантов") plus its leading glyph — and leaves the trigger's
+ *  centred label even air on both sides. */
+const CONTROL_W = 200;
 const GAP = 7;
 const EDGE = 8;
 
@@ -59,10 +61,11 @@ interface SortMenuProps {
 /**
  * The shelf order control. A native <select> would drop the platform menu into
  * a carefully quiet header, so this is a small anchored field with a compact
- * panel instead: the trigger keeps the header pill grammar, and the menu — the
- * same width as the trigger — lists every order as a single-line row. The two
- * shelf-specific orders (prompt variants / lora versions) only appear on the
- * shelf that can honour them.
+ * panel instead: the trigger keeps the header pill grammar — one stable width,
+ * the order glyph and chevron on the edges, the label centred between them —
+ * and the panel, exactly as wide as the trigger, lists every order as a
+ * single-line row. The two shelf-specific orders (prompt variants / lora
+ * versions) only appear on the shelf that can honour them.
  *
  * The panel is portalled to <body> because the header's backdrop blur makes it
  * a containing block — a fixed child would be positioned against the 56px bar.
@@ -100,7 +103,7 @@ export function SortMenu({ mode, sort, onSort }: SortMenuProps) {
     const above = r.top - GAP - EDGE;
     const up = height > 0 && height > below && above > below;
     setBox({
-      left: Math.max(EDGE, Math.min(r.right - MENU_W, window.innerWidth - MENU_W - EDGE)),
+      left: Math.max(EDGE, Math.min(r.right - CONTROL_W, window.innerWidth - CONTROL_W - EDGE)),
       top: up ? Math.max(EDGE, r.top - GAP - height) : r.bottom + GAP,
       up,
     });
@@ -245,11 +248,12 @@ export function SortMenu({ mode, sort, onSort }: SortMenuProps) {
             open ? close() : openMenu();
           }
         }}
-        className={`press flex h-9 w-[196px] cursor-pointer items-center gap-2 rounded-full border pr-2.5 pl-3 text-[13px] font-medium text-body outline-none transition-colors duration-200 ${
+        className={`press flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-full border pr-3 pl-3.5 text-[13.5px] font-medium text-body outline-none transition-colors duration-200 ${
           open
             ? "border-line-active bg-parchment"
             : "border-hairline hover:border-line-hover"
         } focus-visible:border-line-active focus-visible:shadow-focus`}
+        style={{ width: CONTROL_W }}
       >
         <CurrentIcon
           size={14}
@@ -257,7 +261,7 @@ export function SortMenu({ mode, sort, onSort }: SortMenuProps) {
           className={open ? "text-action" : "text-faint"}
           aria-hidden
         />
-        <span className="min-w-0 flex-1 truncate">{t(current.label)}</span>
+        <span className="min-w-0 flex-1 truncate text-center">{t(current.label)}</span>
         <ChevronDown
           size={13}
           aria-hidden
@@ -276,9 +280,8 @@ export function SortMenu({ mode, sort, onSort }: SortMenuProps) {
               role="menu"
               aria-label={t("sort.label")}
               // The menu unfurls out of its trigger like the Dock collapsing an
-              // app: `scaleY` grows the panel from the right edge of the button
-              // that opened it. Width is fixed to equal the trigger's, so there
-              // is no sideways growth to fight.
+              // app: `scaleY` grows the panel from the right edge it shares with
+              // the button that opened it.
               initial={
                 reduce
                   ? { opacity: 0 }
@@ -308,7 +311,7 @@ export function SortMenu({ mode, sort, onSort }: SortMenuProps) {
                 position: "fixed",
                 left: box.left,
                 top: box.top,
-                width: MENU_W,
+                width: CONTROL_W,
                 maxHeight: "calc(100vh - 16px)",
                 zIndex: 130,
                 transformOrigin: box.up ? "bottom right" : "top right",
@@ -345,7 +348,15 @@ export function SortMenu({ mode, sort, onSort }: SortMenuProps) {
                         }`}
                         aria-hidden
                       >
-                        <Icon size={14} strokeWidth={2} />
+                        {selected ? (
+                          // The check lives in the leading chip, mac-style: the
+                          // row keeps one fixed column, the order glyph is still
+                          // on the trigger, and no trailing gutter has to be
+                          // reserved — so the panel can be as wide as the pill.
+                          <Check size={13.5} strokeWidth={2.6} />
+                        ) : (
+                          <Icon size={14} strokeWidth={2} />
+                        )}
                       </span>
                       <span
                         className={`min-w-0 flex-1 truncate text-[13px] font-medium ${
@@ -354,14 +365,6 @@ export function SortMenu({ mode, sort, onSort }: SortMenuProps) {
                       >
                         {t(option.label)}
                       </span>
-                      {selected && (
-                        <Check
-                          size={13.5}
-                          strokeWidth={2.6}
-                          className="shrink-0 text-action"
-                          aria-hidden
-                        />
-                      )}
                     </button>
                   </Fragment>
                 );
