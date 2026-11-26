@@ -522,7 +522,10 @@ body {
   .prompt-type {
     animation: none !important;
   }
-  .tile-cover {
+  .tile-cover,
+  .detail-panel,
+  .detail-media,
+  .detail-info {
     transition: none !important;
   }
 }
@@ -835,6 +838,72 @@ body {
   outline: 2px solid var(--color-canvas);
   outline-offset: 3px;
   border-radius: 9999px;
+}
+
+/* --------------------------------------------- detail panel: two-tone surface */
+
+/* The detail panel keeps the shelf's two-surface grammar: a parchment photo
+   half and a clean info half. Both colours are declared here (instead of
+   Tailwind utilities) so a pinned card can recolor them with one class change. */
+.detail-panel {
+  transition: box-shadow 0.42s var(--ease-apple);
+}
+.detail-media {
+  background: var(--color-parchment);
+  transition: background-color 0.42s var(--ease-apple);
+}
+.detail-info {
+  background: var(--color-card);
+  border-left: 1px solid var(--color-hairline);
+  transition:
+    background-color 0.42s var(--ease-apple),
+    border-left-color 0.42s var(--ease-apple);
+}
+
+/* A pinned card opens as a gilded, two-tone panel: the photo half carries the
+   exact tint of its tile on the shelf, the info half a quieter ivory, and a
+   single metal hairline runs across the top like the tile's gilded rim. */
+.detail-panel.is-pinned {
+  box-shadow: var(--shadow-panel), 0 0 0 1px color-mix(in oklab, var(--color-gold-edge) 72%, transparent);
+}
+.detail-panel.is-pinned::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 9;
+  height: 1.5px;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklab, var(--color-gold-bright) 88%, transparent) 50%,
+    transparent
+  );
+}
+.detail-panel.is-pinned .detail-media {
+  background: color-mix(in oklab, var(--color-gold-soft) 60%, var(--color-card));
+}
+.detail-panel.is-pinned .detail-info {
+  background: color-mix(in oklab, var(--color-gold-soft) 26%, var(--color-card));
+  border-left-color: color-mix(in oklab, var(--color-gold-edge) 76%, var(--color-hairline));
+}
+
+/* The gold "Pinned" label beside the seal in the photo half. */
+.detail-pin-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 9999px;
+  border: 1px solid color-mix(in oklab, var(--color-gold) 38%, transparent);
+  background: color-mix(in oklab, var(--color-gold-soft) 82%, var(--color-card));
+  color: var(--color-gold);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  box-shadow: var(--shadow-chip);
+  pointer-events: none;
 }
 
 /* ------------------------------------------------------------- pinned tiles */

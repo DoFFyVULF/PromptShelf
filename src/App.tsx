@@ -1780,6 +1780,11 @@ function Shell() {
     updateOpen ||
     familyOpenId !== null;
 
+  // A detail panel inherits the pin state of the tile it was opened from, so
+  // its two-tone surface always matches the card on the main screen.
+  const detailPinned = cards.find((c) => c.id === detailId)?.pinned ?? false;
+  const loraDetailPinned = loras.find((l) => l.id === loraDetailId)?.pinned ?? false;
+
   return (
     <div className="flex h-full flex-col">
       <TopBar
@@ -2007,6 +2012,8 @@ function Shell() {
       {detail && detailId && mode === "prompt" && (
         <CardDetail
           card={detail}
+          pinned={detailPinned}
+          onTogglePin={toggleCardPin}
           promptIdx={detailPromptIdx}
           onPromptIdxChange={setDetailPromptIdx}
           suggestions={tags}
@@ -2029,6 +2036,8 @@ function Shell() {
       {loraDetail && loraDetailId && mode === "lora" && (
         <LoraDetail
           lora={loraDetail}
+          pinned={loraDetailPinned}
+          onTogglePin={toggleLoraPin}
           suggestions={loraTags}
           hasPrev={loras.findIndex((c) => c.id === loraDetailId) > 0}
           hasNext={

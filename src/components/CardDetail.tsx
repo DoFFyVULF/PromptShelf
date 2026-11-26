@@ -33,10 +33,14 @@ import { LoraMenu, resKindLabel } from "./LoraMenu";
 import { LoraEditor, applyLoraDraft, type LoraDraft } from "./LoraEditor";
 import { PromptPager } from "./PromptPager";
 import { ConfirmDeleteButton } from "./ConfirmDeleteButton";
+import { DetailPinControl } from "./DetailPinControl";
 import { IMAGE_EXTS } from "./Editor";
 
 interface CardDetailProps {
   card: CardDetailType;
+  /** Mirrors the pinned state of the tile this panel was opened from. */
+  pinned: boolean;
+  onTogglePin: (id: string, pinned: boolean) => void;
   /** Active prompt page shared with App: 0 is the main prompt, n is variant n-1. */
   promptIdx: number;
   onPromptIdxChange: (idx: number) => void;
@@ -53,7 +57,7 @@ interface CardDetailProps {
   onDeleted: () => void;
 }
 
-export function CardDetail({ card, promptIdx, onPromptIdxChange, suggestions, onImportLora, hasPrev, hasNext, onPrev, onNext, onClose, onChanged, onDeleted }: CardDetailProps) {
+export function CardDetail({ card, pinned, onTogglePin, promptIdx, onPromptIdxChange, suggestions, onImportLora, hasPrev, hasNext, onPrev, onNext, onClose, onChanged, onDeleted }: CardDetailProps) {
   const { t, formatDate } = useI18n();
   const { toast } = useToast();
   const [mainIdx, setMainIdx] = useState(0);
@@ -407,11 +411,14 @@ export function CardDetail({ card, promptIdx, onPromptIdxChange, suggestions, on
         role="dialog"
         aria-modal="true"
         style={{ width: "min(1120px, 94vw)", height: "min(760px, 88vh)" }}
-        className="anim-panel relative grid grid-cols-[minmax(0,1.08fr)_minmax(0,1fr)] overflow-hidden rounded-panel bg-card shadow-panel"
+        className={`anim-panel detail-panel relative grid grid-cols-[minmax(0,1.08fr)_minmax(0,1fr)] overflow-hidden rounded-panel shadow-panel ${
+          pinned ? "is-pinned" : ""
+        }`}
       >
         {/* Left: images */}
-        <div className="flex min-h-0 min-w-0 flex-col bg-parchment">
+        <div className="detail-media flex min-h-0 min-w-0 flex-col">
           <div className="relative flex min-h-0 flex-1 items-center justify-center p-8">
+            <DetailPinControl pinned={pinned} onToggle={() => onTogglePin(card.id, !pinned)} />
             {main ? (
               <button
                 type="button"
@@ -507,7 +514,7 @@ export function CardDetail({ card, promptIdx, onPromptIdxChange, suggestions, on
         </div>
 
         {/* Right: info */}
-        <div className="flex min-h-0 min-w-0 flex-col border-l border-hairline">
+        <div className="detail-info flex min-h-0 min-w-0 flex-col">
           <div className="flex items-start justify-between gap-3 px-7 pt-6 pb-4">
             <div className="min-w-0">
               <div className="text-[11.5px] text-faint">

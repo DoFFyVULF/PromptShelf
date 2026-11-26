@@ -29,10 +29,14 @@ import { Stars } from "./Stars";
 import { TagInput } from "./TagInput";
 import { useToast } from "./Toasts";
 import { ConfirmDeleteButton } from "./ConfirmDeleteButton";
+import { DetailPinControl } from "./DetailPinControl";
 import { IMAGE_EXTS } from "./Editor";
 
 interface LoraDetailProps {
   lora: LoraDetailData;
+  /** Mirrors the pinned state of the tile this panel was opened from. */
+  pinned: boolean;
+  onTogglePin: (id: string, pinned: boolean) => void;
   /** Tags already used across the lora shelf, for the edit mode's tag hints. */
   suggestions: TagCount[];
   hasPrev: boolean;
@@ -50,6 +54,8 @@ interface LoraDetailProps {
 
 export function LoraDetail({
   lora,
+  pinned,
+  onTogglePin,
   suggestions,
   hasPrev,
   hasNext,
@@ -349,11 +355,14 @@ export function LoraDetail({
         role="dialog"
         aria-modal="true"
         style={{ width: "min(1120px, 94vw)", height: "min(760px, 88vh)" }}
-        className="anim-panel relative grid grid-cols-[minmax(0,1.08fr)_minmax(0,1fr)] overflow-hidden rounded-panel bg-card shadow-panel"
+        className={`anim-panel detail-panel relative grid grid-cols-[minmax(0,1.08fr)_minmax(0,1fr)] overflow-hidden rounded-panel shadow-panel ${
+          pinned ? "is-pinned" : ""
+        }`}
       >
         {/* Left: images */}
-        <div className="flex min-h-0 min-w-0 flex-col bg-parchment">
+        <div className="detail-media flex min-h-0 min-w-0 flex-col">
           <div className="relative flex min-h-0 flex-1 items-center justify-center p-8">
+            <DetailPinControl pinned={pinned} onToggle={() => onTogglePin(lora.id, !pinned)} />
             {main ? (
               <button
                 type="button"
@@ -450,7 +459,7 @@ export function LoraDetail({
         </div>
 
         {/* Right: info */}
-        <div className="flex min-h-0 min-w-0 flex-col border-l border-hairline">
+        <div className="detail-info flex min-h-0 min-w-0 flex-col">
           <div className="flex items-start justify-between gap-3 px-7 pt-6 pb-4">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">

@@ -118,6 +118,7 @@ export const en = {
   "card.pin": "Pin to top",
   "card.unpin": "Unpin",
   "detail.noPrompt": "No prompt saved — add one whenever you like.",
+  "detail.pinned": "Pinned",
 
   "dup.title": "Duplicate prompt",
   "dup.lora.title": "Duplicate LoRA",

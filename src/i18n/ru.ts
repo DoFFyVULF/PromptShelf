@@ -120,6 +120,7 @@ export const ru: Record<DictKey, string> = {
   "card.pin": "Закрепить наверху",
   "card.unpin": "Открепить",
   "detail.noPrompt": "Промпт не сохранён — можно добавить в любой момент.",
+  "detail.pinned": "Закреплён",
 
   "dup.title": "Такой промпт уже есть",
   "dup.lora.title": "Такая LoRA уже есть",
