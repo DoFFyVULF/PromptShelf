@@ -12,13 +12,15 @@ import { IMAGE_EXTS } from "./Editor";
 interface LoraEditorProps {
   staged: StagedImage[];
   onStaged: (images: StagedImage[]) => void;
+  /** The group on screen when the editor opened; new loras land there. */
+  groupId: string;
   /** Tags already used across the lora shelf, for the tag field's hints. */
   suggestions: TagCount[];
   onClose: () => void;
   onSaved: (lora: LoraDetailData) => void;
 }
 
-export function LoraShelfEditor({ staged, onStaged, suggestions, onClose, onSaved }: LoraEditorProps) {
+export function LoraShelfEditor({ staged, onStaged, groupId, suggestions, onClose, onSaved }: LoraEditorProps) {
   const { t } = useI18n();
   const { toast } = useToast();
   const [name, setName] = useState("");
@@ -90,6 +92,7 @@ export function LoraShelfEditor({ staged, onStaged, suggestions, onClose, onSave
         description,
         note,
         tags,
+        group_id: groupId,
         images: staged.map((s) => s.path)
       });
       toast(t("toast.saved"));
@@ -98,7 +101,7 @@ export function LoraShelfEditor({ staged, onStaged, suggestions, onClose, onSave
       toast(t("toast.error"), "error");
       setSaving(false);
     }
-  }, [baseModel, description, name, note, onSaved, staged, tags, t, toast, triggerWords, usageTips]);
+  }, [baseModel, description, groupId, name, note, onSaved, staged, tags, t, toast, triggerWords, usageTips]);
 
   /** The dialog is closed with unsaved staged images — their temp files go. */
   const discard = useCallback(() => {

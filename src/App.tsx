@@ -2048,6 +2048,7 @@ function Shell() {
         <LoraShelfEditor
           staged={loraStaged}
           onStaged={setLoraStaged}
+          groupId={loraGroupId}
           suggestions={loraTags}
           onClose={closeLoraEditor}
           onSaved={(fresh: LoraDetailData) => {
