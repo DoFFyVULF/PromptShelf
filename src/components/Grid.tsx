@@ -1,9 +1,12 @@
 import { memo, useState } from "react";
+import type { RefObject } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { ImageOff, Images, Pin, Star } from "lucide-react";
-import { useI18n } from "../i18n";
+import { pluralCategory, useI18n } from "../i18n";
 import { assetUrl } from "../lib/api";
+import { GRID_GAP, useEntranceWindow, useVirtualGrid, VirtualRow } from "../lib/virtualGrid";
 import { attachCardGhost } from "../lib/dragGhost";
+import { GridImage } from "./GridImage";
 import { ImportJobTile, type ImportJob } from "./ImportJobs";
 import { TileShell } from "./PinShell";
 import { WorkflowBadge } from "./WorkflowBadge";
@@ -25,12 +28,16 @@ interface GridProps {
   selection: string[];
   onToggleSelect: (id: string) => void;
   onTogglePin: (id: string, pinned: boolean) => void;
+  /** The shelf's scroll container, used to window the rows. */
+  scrollRef: RefObject<HTMLElement | null>;
 }
 
 interface CardTileProps {
   card: CardSummary;
   onOpen: (id: string) => void;
   delay: number;
+  /** First-screen tiles keep the staggered entrance; scrolled-in ones do not. */
+  enter: boolean;
   selectMode: boolean;
   selected: boolean;
   onToggleSelect: (id: string) => void;
@@ -42,6 +49,7 @@ function CardTileBase({
   card,
   onOpen,
   delay,
+  enter,
   selectMode,
   selected,
   onToggleSelect,
@@ -50,7 +58,7 @@ function CardTileBase({
 }: CardTileProps) {
   const { formatDate, t, lang } = useI18n();
   const reduced = useReducedMotion();
-  const plural = new Intl.PluralRules(lang).select(card.variant_count);
+  const plural = pluralCategory(lang, card.variant_count);
   const variantLabel = t(`variant.more.${plural === "one" || plural === "few" || plural === "many" ? plural : "other"}`, { n: card.variant_count });
   const sheetTransition = { duration: reduced ? 0 : 0.4, ease: [0.32, 0.72, 0, 1] as const };
   // the source tile "picks up": shrinks and fades while the card is dragged.
@@ -59,8 +67,10 @@ function CardTileBase({
   const [dragging, setDragging] = useState(false);
   // The entrance stagger is a mount-time affair. Reading it from the prop after
   // a reorder would rewrite `animation-delay` on every tile, which restarts
-  // `tile-in` and makes the whole shelf flash.
+  // `tile-in` and makes the whole shelf flash. Capture it once instead: a tile
+  // mounted by the virtual window after the first beat stays quiet.
   const [stagger] = useState(() => Math.min(delay, 320));
+  const [entrance] = useState(enter);
 
   const activate = () => {
     if (selectMode) onToggleSelect(card.id);
@@ -89,12 +99,12 @@ function CardTileBase({
       animate="rest"
       whileHover={reduced || selectMode || dragging ? "rest" : "spread"}
       whileFocus={reduced || selectMode ? "rest" : "spread"}
-      className={`anim-tile group relative flex h-full cursor-pointer flex-col overflow-hidden rounded-card border bg-card transition-[border-color,transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-line-hover hover:shadow-tile-hover ${
+      className={`${entrance ? "anim-tile " : ""}group relative flex h-full cursor-pointer flex-col overflow-hidden rounded-card border bg-card transition-[border-color,transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-line-hover hover:shadow-tile-hover ${
         dragging
           ? "scale-[0.9] border-leaf-edge/80 shadow-none"
           : "border-hairline"
       } ${card.pinned ? "tile-pinned" : ""}`}
-      style={{ animationDelay: `${stagger}ms` }}
+      style={entrance ? { animationDelay: `${stagger}ms` } : undefined}
       onClick={activate}
       role="button"
       tabIndex={0}
@@ -124,12 +134,13 @@ function CardTileBase({
       <div className={`p-2.5 pb-0 transition-opacity duration-200 ease-out ${dragging ? "opacity-35" : ""}`}>
         <div data-ghost-box className="relative aspect-[4/3] overflow-hidden rounded-tile bg-parchment">
           {card.cover ? (
-            <img
+            <GridImage
               src={assetUrl(card.cover.thumb)}
               alt=""
               draggable={false}
               loading="lazy"
-              className="no-drag h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+              decoding="async"
+              className="no-drag h-full w-full object-cover group-hover:scale-[1.03]"
             />
           ) : (
             <div className="flex h-full w-full flex-col items-center justify-center gap-3 text-faint">
@@ -227,7 +238,8 @@ function CardTileBase({
             <WorkflowBadge
               saved={card.workflow.saved}
               nodes={card.workflow.node_count}
-              delay={stagger}
+              delay={entrance ? stagger : 0}
+              enter={entrance}
             />
           )}
           {card.tags.slice(0, 10).map((tag) => (
@@ -278,28 +290,64 @@ const CardTile = memo(CardTileBase, (a: CardTileProps, b: CardTileProps) => (
   a.onTogglePin === b.onTogglePin
 ));
 
-export function CardGrid({ cards, jobs, onJobRetry, onJobDismiss, onOpen, selectMode, selection, onToggleSelect, onTogglePin }: GridProps) {
+export function CardGrid({ cards, jobs, onJobRetry, onJobDismiss, onOpen, selectMode, selection, onToggleSelect, onTogglePin, scrollRef }: GridProps) {
+  const entering = useEntranceWindow();
+  const { containerRef, columns, rows, totalHeight, measureRow, ready } = useVirtualGrid({
+    count: cards.length,
+    scrollRef,
+    textBlockHeight: 170,
+    revision: jobs.length
+  });
+
   return (
-    <div className="grid grid-cols-[repeat(auto-fill,minmax(236px,1fr))] gap-4 px-5 pt-5 pb-10">
-      <AnimatePresence mode="popLayout">
-        {jobs.map((job) => (
-          <ImportJobTile key={job.id} job={job} onRetry={onJobRetry} onDismiss={onJobDismiss} />
-        ))}
-      </AnimatePresence>
-      {cards.map((card, i) => (
-        <TileShell key={card.id} pinned={card.pinned}>
-          <CardTile
-            card={card}
-            onOpen={onOpen}
-            delay={i * 28}
-            selectMode={selectMode}
-            selected={selection.includes(card.id)}
-            onToggleSelect={onToggleSelect}
-            onTogglePin={onTogglePin}
-            selection={selection}
-          />
-        </TileShell>
-      ))}
+    <div className="px-5 pt-5 pb-10">
+      <div className="jobs-strip relative grid grid-cols-[repeat(auto-fill,minmax(236px,1fr))] gap-4">
+        <AnimatePresence mode="popLayout">
+          {jobs.map((job) => (
+            <ImportJobTile key={job.id} job={job} onRetry={onJobRetry} onDismiss={onJobDismiss} />
+          ))}
+        </AnimatePresence>
+      </div>
+
+      <div ref={containerRef} className="relative" style={{ height: totalHeight }}>
+        {ready &&
+          rows.map((row) => {
+            const start = row.index * columns;
+            // Only the first screen earns the entrance stagger; rows mounted
+            // by the virtual window fade quietly in the overscan instead.
+            const enter = entering && row.index < 4;
+            return (
+              <VirtualRow
+                key={row.index}
+                index={row.index}
+                top={row.top}
+                columns={columns}
+                gap={GRID_GAP}
+                animate={!enter}
+                onMeasure={measureRow}
+              >
+                {cards.slice(start, start + columns).map((card, column) => {
+                  const index = start + column;
+                  return (
+                    <TileShell key={card.id} pinned={card.pinned} layoutDependency={index}>
+                      <CardTile
+                        card={card}
+                        onOpen={onOpen}
+                        delay={enter ? index * 28 : 0}
+                        enter={enter}
+                        selectMode={selectMode}
+                        selected={selection.includes(card.id)}
+                        onToggleSelect={onToggleSelect}
+                        onTogglePin={onTogglePin}
+                        selection={selection}
+                      />
+                    </TileShell>
+                  );
+                })}
+              </VirtualRow>
+            );
+          })}
+      </div>
     </div>
   );
 }

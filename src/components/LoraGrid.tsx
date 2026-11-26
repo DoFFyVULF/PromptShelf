@@ -1,9 +1,12 @@
 import { memo, useMemo, useState } from "react";
+import type { RefObject } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Layers, Pin, Star } from "lucide-react";
 import { useI18n } from "../i18n";
 import { assetUrl } from "../lib/api";
+import { GRID_GAP, useEntranceWindow, useVirtualGrid, VirtualRow } from "../lib/virtualGrid";
 import { attachCardGhost } from "../lib/dragGhost";
+import { GridImage } from "./GridImage";
 import { ImportJobTile, type ImportJob } from "./ImportJobs";
 import { CARD_DRAG_TYPE } from "./Grid";
 import { LoraFamilyTile } from "./LoraFamilyTile";
@@ -26,12 +29,16 @@ interface LoraGridProps {
   onOpenFamily: (id: string) => void;
   /** Pins every variant in the group, so the deck floats to the top. */
   onToggleFamilyPin: (memberIds: string[], pinned: boolean) => void;
+  /** The shelf's scroll container, used to window the rows. */
+  scrollRef: RefObject<HTMLElement | null>;
 }
 
 interface LoraTileProps {
   lora: LoraSummary;
   onOpen: (id: string) => void;
   delay: number;
+  /** First-screen tiles keep the staggered entrance; scrolled-in ones do not. */
+  enter: boolean;
   selectMode: boolean;
   selected: boolean;
   onToggleSelect: (id: string) => void;
@@ -42,6 +49,7 @@ function LoraTileBase({
   lora,
   onOpen,
   delay,
+  enter,
   selectMode,
   selected,
   onToggleSelect,
@@ -52,6 +60,8 @@ function LoraTileBase({
   const [dragging, setDragging] = useState(false);
   // seeded once: a reorder must not replay the entrance animation
   const [stagger] = useState(() => Math.min(delay, 320));
+  // A tile mounted by the virtual window after the first beat stays quiet.
+  const [entrance] = useState(enter);
 
   const activate = () => {
     if (selectMode) onToggleSelect(lora.id);
@@ -79,10 +89,10 @@ function LoraTileBase({
 
   return (
     <article
-      className={`anim-tile group relative flex h-full cursor-pointer flex-col overflow-hidden rounded-card border bg-card transition-[border-color,transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-line-hover hover:shadow-tile-hover ${
+      className={`${entrance ? "anim-tile " : ""}group relative flex h-full cursor-pointer flex-col overflow-hidden rounded-card border bg-card transition-[border-color,transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-line-hover hover:shadow-tile-hover ${
         dragging ? "scale-[0.9] border-leaf-edge/80 shadow-none" : "border-hairline"
       } ${lora.pinned ? "tile-pinned" : ""}`}
-      style={{ animationDelay: `${stagger}ms` }}
+      style={entrance ? { animationDelay: `${stagger}ms` } : undefined}
       onClick={activate}
       role="button"
       tabIndex={0}
@@ -112,12 +122,13 @@ function LoraTileBase({
       <div className={`p-2.5 pb-0 transition-opacity duration-200 ease-out ${dragging ? "opacity-35" : ""}`}>
         <div data-ghost-box className="relative aspect-[4/3] overflow-hidden rounded-tile bg-parchment">
           {lora.cover ? (
-            <img
+            <GridImage
               src={assetUrl(lora.cover.thumb)}
               alt=""
               draggable={false}
               loading="lazy"
-              className="no-drag h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+              decoding="async"
+              className="no-drag h-full w-full object-cover group-hover:scale-[1.03]"
             />
           ) : (
             <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-faint">
@@ -240,57 +251,103 @@ const LoraTile = memo(LoraTileBase, (a: LoraTileProps, b: LoraTileProps) => (
   a.onTogglePin === b.onTogglePin
 ));
 
-export function LoraGrid({ loras, jobs, onJobRetry, onJobDismiss, onOpen, selectMode, selection, onToggleSelect, onTogglePin, families, onOpenFamily, onToggleFamilyPin }: LoraGridProps) {
+type LoraEntry =
+  | { kind: "lora"; key: string; lora: LoraSummary }
+  | { kind: "family"; key: string; family: LoraFamily };
+
+export function LoraGrid({ loras, jobs, onJobRetry, onJobDismiss, onOpen, selectMode, selection, onToggleSelect, onTogglePin, families, onOpenFamily, onToggleFamilyPin, scrollRef }: LoraGridProps) {
+  const entering = useEntranceWindow();
   // Members disappear from the grid and are represented by one deck tile at
-  // the position of their newest member, so sorting stays intact.
-  const familyByMember = useMemo(() => {
-    const map = new Map<string, LoraFamily>();
+  // the position of their newest member, so sorting stays intact. Building the
+  // entries up front lets the virtual window count shelf rows, not members.
+  const entries = useMemo(() => {
+    const familyByMember = new Map<string, LoraFamily>();
     for (const family of families) {
-      for (const member of family.members) map.set(member.id, family);
+      for (const member of family.members) familyByMember.set(member.id, family);
     }
-    return map;
-  }, [families]);
-  const shownFamilies = new Set<string>();
+    const shownFamilies = new Set<string>();
+    const out: LoraEntry[] = [];
+    for (const lora of loras) {
+      const family = familyByMember.get(lora.id);
+      if (family) {
+        if (shownFamilies.has(family.id)) continue;
+        shownFamilies.add(family.id);
+        out.push({ kind: "family", key: `family-${family.id}`, family });
+      } else {
+        out.push({ kind: "lora", key: lora.id, lora });
+      }
+    }
+    return out;
+  }, [families, loras]);
+
+  const { containerRef, columns, rows, totalHeight, measureRow, ready } = useVirtualGrid({
+    count: entries.length,
+    scrollRef,
+    textBlockHeight: 128,
+    revision: jobs.length
+  });
 
   return (
-    <div className="grid grid-cols-[repeat(auto-fill,minmax(236px,1fr))] gap-4 px-5 pt-5 pb-10">
-      <AnimatePresence mode="popLayout">
-        {jobs.map((job) => (
-          <ImportJobTile key={job.id} job={job} onRetry={onJobRetry} onDismiss={onJobDismiss} lora />
-        ))}
-      </AnimatePresence>
-      {loras.map((lora, i) => {
-        const family = familyByMember.get(lora.id);
-        if (family) {
-          if (shownFamilies.has(family.id)) return null;
-          shownFamilies.add(family.id);
-          // the deck reads as pinned only when every variant is
-          const pinned = family.members.every((m) => m.pinned);
-          return (
-            <TileShell key={`family-${family.id}`} pinned={pinned}>
-              <LoraFamilyTile
-                family={family}
-                onOpen={onOpenFamily}
-                onTogglePin={onToggleFamilyPin}
-                delay={i * 28}
-              />
-            </TileShell>
-          );
-        }
-        return (
-          <TileShell key={lora.id} pinned={lora.pinned}>
-            <LoraTile
-              lora={lora}
-              onOpen={onOpen}
-              delay={i * 28}
-              selectMode={selectMode}
-              selected={selection.includes(lora.id)}
-              onToggleSelect={onToggleSelect}
-              onTogglePin={onTogglePin}
-            />
-          </TileShell>
-        );
-      })}
+    <div className="px-5 pt-5 pb-10">
+      <div className="jobs-strip relative grid grid-cols-[repeat(auto-fill,minmax(236px,1fr))] gap-4">
+        <AnimatePresence mode="popLayout">
+          {jobs.map((job) => (
+            <ImportJobTile key={job.id} job={job} onRetry={onJobRetry} onDismiss={onJobDismiss} lora />
+          ))}
+        </AnimatePresence>
+      </div>
+
+      <div ref={containerRef} className="relative" style={{ height: totalHeight }}>
+        {ready &&
+          rows.map((row) => {
+            const start = row.index * columns;
+            const enter = entering && row.index < 4;
+            return (
+              <VirtualRow
+                key={row.index}
+                index={row.index}
+                top={row.top}
+                columns={columns}
+                gap={GRID_GAP}
+                animate={!enter}
+                onMeasure={measureRow}
+              >
+                {entries.slice(start, start + columns).map((entry, column) => {
+                  const index = start + column;
+                  if (entry.kind === "family") {
+                    // the deck reads as pinned only when every variant is
+                    const pinned = entry.family.members.every((member) => member.pinned);
+                    return (
+                      <TileShell key={entry.key} pinned={pinned} layoutDependency={index}>
+                        <LoraFamilyTile
+                          family={entry.family}
+                          onOpen={onOpenFamily}
+                          onTogglePin={onToggleFamilyPin}
+                          delay={enter ? index * 28 : 0}
+                          enter={enter}
+                        />
+                      </TileShell>
+                    );
+                  }
+                  return (
+                    <TileShell key={entry.key} pinned={entry.lora.pinned} layoutDependency={index}>
+                      <LoraTile
+                        lora={entry.lora}
+                        onOpen={onOpen}
+                        delay={enter ? index * 28 : 0}
+                        enter={enter}
+                        selectMode={selectMode}
+                        selected={selection.includes(entry.lora.id)}
+                        onToggleSelect={onToggleSelect}
+                        onTogglePin={onTogglePin}
+                      />
+                    </TileShell>
+                  );
+                })}
+              </VirtualRow>
+            );
+          })}
+      </div>
     </div>
   );
 }

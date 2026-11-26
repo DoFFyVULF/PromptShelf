@@ -376,6 +376,38 @@ body {
      and swallow later class-driven states (e.g. the drag shrink) */
   animation: tile-in 0.45s var(--ease-apple) backwards;
 }
+/* Virtual rows mount in the overscan; this keeps a fast scroll from popping
+   a whole row of cards in at once. The first screen uses tile-in instead. */
+@keyframes row-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.anim-row {
+  animation: row-in 0.18s var(--ease-apple) backwards;
+}
+/* Covers settle in once decoded; the transform half is the existing hover
+   zoom, so both share one transition. */
+.tile-cover {
+  opacity: 0;
+  transition:
+    opacity 280ms var(--ease-apple),
+    transform 300ms var(--ease-apple);
+}
+.tile-cover[data-loaded="true"] {
+  opacity: 1;
+}
+/* Import tiles sit above the virtual shelf. The strip collapses only once the
+   last exiting tile has actually left, so AnimatePresence still gets its beat. */
+.jobs-strip {
+  margin-bottom: 16px;
+}
+.jobs-strip:empty {
+  margin-bottom: 0;
+}
 .anim-fade {
   animation: fade-in 0.22s var(--ease-apple) both;
 }
@@ -478,6 +510,7 @@ body {
    the gap so the highlight doesn't flicker off. */
 @media (prefers-reduced-motion: reduce) {
   .anim-tile,
+  .anim-row,
   .anim-fade,
   .anim-panel,
   .anim-toast,
@@ -488,6 +521,9 @@ body {
   .sweep-line,
   .prompt-type {
     animation: none !important;
+  }
+  .tile-cover {
+    transition: none !important;
   }
 }
 

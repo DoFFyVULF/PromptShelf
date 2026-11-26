@@ -10,6 +10,8 @@ interface WorkflowBadgeProps {
   nodes: number;
   /** The tile's mount-stagger seed in ms (the shelf caps it at 320ms). */
   delay?: number;
+  /** False for tiles mounted by the virtual window: no entrance replay. */
+  enter?: boolean;
 }
 
 type Geometry = {
@@ -62,7 +64,7 @@ function geometryFor(nodes: number): Geometry {
  * keyed, and the ring stamp fires only on a real false → true flip — not on
  * every shelf mount.
  */
-export function WorkflowBadge({ saved, nodes, delay = 0 }: WorkflowBadgeProps) {
+export function WorkflowBadge({ saved, nodes, delay = 0, enter = true }: WorkflowBadgeProps) {
   const { t } = useI18n();
   const reduced = useReducedMotion();
   const graph = geometryFor(nodes);
@@ -86,7 +88,7 @@ export function WorkflowBadge({ saved, nodes, delay = 0 }: WorkflowBadgeProps) {
         role="img"
         aria-label={hint}
         title={hint}
-        initial={reduced ? false : { opacity: 0, y: 4, scale: 0.9 }}
+        initial={reduced || !enter ? false : { opacity: 0, y: 4, scale: 0.9 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={
           reduced

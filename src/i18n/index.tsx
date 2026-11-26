@@ -16,6 +16,36 @@ interface I18nValue {
 
 const I18nContext = createContext<I18nValue | null>(null);
 
+const DATE_OPTIONS: Intl.DateTimeFormatOptions = {
+  day: "numeric",
+  month: "short",
+  year: "numeric"
+};
+
+// `Intl` constructors are surprisingly expensive, and a shelf of cards asks
+// for the same formatter hundreds of times. One per language is enough.
+const dateFormatters = new Map<Lang, Intl.DateTimeFormat>();
+const pluralRules = new Map<Lang, Intl.PluralRules>();
+
+function dateFormatter(lang: Lang): Intl.DateTimeFormat {
+  let formatter = dateFormatters.get(lang);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat(lang === "ru" ? "ru-RU" : "en-US", DATE_OPTIONS);
+    dateFormatters.set(lang, formatter);
+  }
+  return formatter;
+}
+
+/** Cached plural category for tiles that render the same count repeatedly. */
+export function pluralCategory(lang: Lang, n: number): Intl.LDMLPluralRule {
+  let rules = pluralRules.get(lang);
+  if (!rules) {
+    rules = new Intl.PluralRules(lang);
+    pluralRules.set(lang, rules);
+  }
+  return rules.select(n);
+}
+
 function ruPluralForm(n: number): "one" | "few" | "many" {
   const m10 = n % 10;
   const m100 = n % 100;
@@ -30,7 +60,7 @@ export function I18nProvider({ lang, setLang, children }: { lang: Lang; setLang:
       let s: string = DICTS[lang][key] ?? en[key] ?? key;
       if (vars) {
         for (const [k, v] of Object.entries(vars)) {
-          s = s.replace(new RegExp(`\\{${k}\\}`, "g"), String(v));
+          s = s.replaceAll(`{${k}}`, String(v));
         }
       }
       return s;
@@ -69,11 +99,7 @@ export function I18nProvider({ lang, setLang, children }: { lang: Lang; setLang:
     (iso: string) => {
       const d = new Date(iso);
       if (Number.isNaN(d.getTime())) return "";
-      return new Intl.DateTimeFormat(lang === "ru" ? "ru-RU" : "en-US", {
-        day: "numeric",
-        month: "short",
-        year: "numeric"
-      }).format(d);
+      return dateFormatter(lang).format(d);
     },
     [lang]
   );

@@ -1883,6 +1883,7 @@ function Shell() {
                   selection={selection}
                   onToggleSelect={toggleSelect}
                   onTogglePin={toggleCardPin}
+                  scrollRef={scrollRef}
                 />
               </motion.div>
             ) : (
@@ -1904,6 +1905,7 @@ function Shell() {
                   families={groupedFamilies}
                   onOpenFamily={setFamilyOpenId}
                   onToggleFamilyPin={toggleFamilyPin}
+                  scrollRef={scrollRef}
                 />
               </motion.div>
             )}

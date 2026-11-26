@@ -89,6 +89,12 @@ export function PinBloom({ pulse }: { pulse: number }) {
 
 interface TileShellProps {
   pinned: boolean;
+  /**
+   * The tile's slot in the shelf. Motion only re-measures when this changes,
+   * so scrolling, virtualization and row measurement never replay a layout
+   * flight; a pin (which changes the slot) still glides into place.
+   */
+  layoutDependency?: string | number;
   children: ReactNode;
 }
 
@@ -98,11 +104,12 @@ interface TileShellProps {
  * to share an element with the layout projection. The bloom renders here too —
  * unclipped, so the gold can actually leave the card.
  */
-export function TileShell({ pinned, children }: TileShellProps) {
+export function TileShell({ pinned, layoutDependency, children }: TileShellProps) {
   const { pulse, glow, lift } = usePinFlash(pinned);
   return (
     <motion.div
       layout="position"
+      layoutDependency={layoutDependency}
       transition={PIN_LAYOUT}
       className={`relative min-w-0 ${lift ? "z-10" : ""}`}
     >

@@ -3,6 +3,7 @@ import { motion, useReducedMotion } from "motion/react";
 import { Layers2, Pin } from "lucide-react";
 import { useI18n, type DictKey } from "../i18n";
 import { assetUrl } from "../lib/api";
+import { GridImage } from "./GridImage";
 import type { LoraFamily } from "../lib/loraFamilies";
 
 interface LoraFamilyTileProps {
@@ -11,6 +12,8 @@ interface LoraFamilyTileProps {
   /** Pins or unpins every variant the group is made of. */
   onTogglePin: (memberIds: string[], pinned: boolean) => void;
   delay: number;
+  /** First-screen tiles keep the staggered entrance; scrolled-in ones do not. */
+  enter: boolean;
 }
 
 /**
@@ -24,11 +27,14 @@ export function LoraFamilyTile({
   onOpen,
   onTogglePin,
   delay,
+  enter,
 }: LoraFamilyTileProps) {
   const { t, lang, formatDate } = useI18n();
   const reduce = useReducedMotion() ?? false;
   // seeded once: a reorder must not replay the entrance animation
   const [stagger] = useState(() => Math.min(delay, 320));
+  // A deck mounted by the virtual window after the first beat stays quiet.
+  const [entrance] = useState(enter);
 
   // The deck is one shelf entry: it only reads as pinned when every variant
   // is, and toggling it pins the whole group at once.
@@ -55,10 +61,10 @@ export function LoraFamilyTile({
 
   return (
     <article
-      className={`anim-tile group relative flex h-full cursor-pointer flex-col overflow-hidden rounded-card border bg-card transition-[border-color,transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-line-hover hover:shadow-tile-hover ${
+      className={`${entrance ? "anim-tile " : ""}group relative flex h-full cursor-pointer flex-col overflow-hidden rounded-card border bg-card transition-[border-color,transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-line-hover hover:shadow-tile-hover ${
         pinned ? "tile-pinned" : "border-hairline"
       }`}
-      style={{ animationDelay: `${stagger}ms` }}
+      style={entrance ? { animationDelay: `${stagger}ms` } : undefined}
       onClick={activate}
       role="button"
       tabIndex={0}
@@ -99,11 +105,12 @@ export function LoraFamilyTile({
                 }
               >
                 {lora.cover ? (
-                  <img
+                  <GridImage
                     src={assetUrl(lora.cover.thumb)}
                     alt=""
                     draggable={false}
                     loading="lazy"
+                    decoding="async"
                     className="no-drag h-full w-full object-cover"
                   />
                 ) : (
