@@ -290,6 +290,60 @@ const CardTile = memo(CardTileBase, (a: CardTileProps, b: CardTileProps) => (
   a.onTogglePin === b.onTogglePin
 ));
 
+interface CardRowProps {
+  cards: CardSummary[];
+  start: number;
+  columns: number;
+  enter: boolean;
+  selectMode: boolean;
+  selection: string[];
+  onOpen: (id: string) => void;
+  onToggleSelect: (id: string) => void;
+  onTogglePin: (id: string, pinned: boolean) => void;
+}
+
+/**
+ * Row contents are memoized separately from the row's position. Virtualization
+ * nudges `top` as heights are measured; if the tiles re-rendered on every nudge,
+ * Motion would re-project their `layout="position"` boxes from a stale snapshot
+ * and the shelf would visibly jitter (worst when many narrow rows are visible).
+ * A real reorder still changes `cards`/`start`, so pin flights keep working.
+ */
+const CardRow = memo(function CardRow({
+  cards,
+  start,
+  columns,
+  enter,
+  selectMode,
+  selection,
+  onOpen,
+  onToggleSelect,
+  onTogglePin
+}: CardRowProps) {
+  return (
+    <>
+      {cards.slice(start, start + columns).map((card, column) => {
+        const index = start + column;
+        return (
+          <TileShell key={card.id} pinned={card.pinned}>
+            <CardTile
+              card={card}
+              onOpen={onOpen}
+              delay={enter ? index * 28 : 0}
+              enter={enter}
+              selectMode={selectMode}
+              selected={selection.includes(card.id)}
+              onToggleSelect={onToggleSelect}
+              onTogglePin={onTogglePin}
+              selection={selection}
+            />
+          </TileShell>
+        );
+      })}
+    </>
+  );
+});
+
 export function CardGrid({ cards, jobs, onJobRetry, onJobDismiss, onOpen, selectMode, selection, onToggleSelect, onTogglePin, scrollRef }: GridProps) {
   const entering = useEntranceWindow();
   const { containerRef, columns, rows, totalHeight, measureRow, ready } = useVirtualGrid({
@@ -326,24 +380,17 @@ export function CardGrid({ cards, jobs, onJobRetry, onJobDismiss, onOpen, select
                 animate={!enter}
                 onMeasure={measureRow}
               >
-                {cards.slice(start, start + columns).map((card, column) => {
-                  const index = start + column;
-                  return (
-                    <TileShell key={card.id} pinned={card.pinned} layoutDependency={index}>
-                      <CardTile
-                        card={card}
-                        onOpen={onOpen}
-                        delay={enter ? index * 28 : 0}
-                        enter={enter}
-                        selectMode={selectMode}
-                        selected={selection.includes(card.id)}
-                        onToggleSelect={onToggleSelect}
-                        onTogglePin={onTogglePin}
-                        selection={selection}
-                      />
-                    </TileShell>
-                  );
-                })}
+                <CardRow
+                  cards={cards}
+                  start={start}
+                  columns={columns}
+                  enter={enter}
+                  selectMode={selectMode}
+                  selection={selection}
+                  onOpen={onOpen}
+                  onToggleSelect={onToggleSelect}
+                  onTogglePin={onTogglePin}
+                />
               </VirtualRow>
             );
           })}

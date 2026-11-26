@@ -2,18 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { motion, useReducedMotion } from "motion/react";
 
-/**
- * Reorder spring shared by both shelves. `layout="position"` means Motion only
- * has to animate a translation between the old and the new slot — the cheap
- * half of a layout animation, and exactly what a pin needs.
- */
-export const PIN_LAYOUT = {
-  type: "spring" as const,
-  stiffness: 430,
-  damping: 34,
-  mass: 0.9
-};
-
 /** The bloom outlives its own animation a touch, so it can finish the fade. */
 const GLOW_MS = 820;
 /** The tile hovers off the shelf long enough to be seen, then settles. */
@@ -89,34 +77,23 @@ export function PinBloom({ pulse }: { pulse: number }) {
 
 interface TileShellProps {
   pinned: boolean;
-  /**
-   * The tile's slot in the shelf. Motion only re-measures when this changes,
-   * so scrolling, virtualization and row measurement never replay a layout
-   * flight; a pin (which changes the slot) still glides into place.
-   */
-  layoutDependency?: string | number;
   children: ReactNode;
 }
 
 /**
- * One grid cell. The outer node is the item Motion measures and slides to the
- * new slot; the inner node carries the lift, so a transform animation never has
- * to share an element with the layout projection. The bloom renders here too —
- * unclipped, so the gold can actually leave the card.
+ * One grid cell. No `layout` animation here on purpose: virtual rows move as
+ * their measured heights change, and a layout projection would turn every such
+ * nudge into a spring transform (visible jitter, worst in narrow windows with
+ * many rows). The pin beat lives in the bloom and the lift, not in a flight.
  */
-export function TileShell({ pinned, layoutDependency, children }: TileShellProps) {
+export function TileShell({ pinned, children }: TileShellProps) {
   const { pulse, glow, lift } = usePinFlash(pinned);
   return (
-    <motion.div
-      layout="position"
-      layoutDependency={layoutDependency}
-      transition={PIN_LAYOUT}
-      className={`relative min-w-0 ${lift ? "z-10" : ""}`}
-    >
+    <div className={`relative min-w-0 ${lift ? "z-10" : ""}`}>
       <div className={`relative h-full ${lift ? "pin-lift" : ""}`}>
         {glow && <PinBloom pulse={pulse} />}
         {children}
       </div>
-    </motion.div>
+    </div>
   );
 }

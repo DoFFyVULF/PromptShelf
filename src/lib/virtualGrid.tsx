@@ -84,14 +84,40 @@ export function useVirtualGrid({
   const [size, setSize] = useState({ width: 0, viewport: 0 });
   const [version, setVersion] = useState(0);
   const [range, setRange] = useState<Range | null>(null);
+  const [columns, setColumns] = useState(1);
+  const columnsReadyRef = useRef(false);
   const heightsRef = useRef<number[]>([]);
   const offsetsRef = useRef<number[]>([]);
   const layoutKeyRef = useRef("");
 
-  const columns = Math.max(
+  const idealColumns = Math.max(
     1,
     Math.floor((size.width + gap) / (minColumnWidth + gap)),
   );
+
+  // A grid sitting right on a column boundary would otherwise flip between,
+  // say, three and two columns whenever a scrollbar appears or the width wobbles
+  // by a pixel — every card would slide sideways. Give the switch a dead zone
+  // after the first measurement.
+  useLayoutEffect(() => {
+    if (size.width <= 0) return;
+    if (!columnsReadyRef.current) {
+      columnsReadyRef.current = true;
+      setColumns(idealColumns);
+      return;
+    }
+    setColumns((current) => {
+      if (idealColumns === current) return current;
+      const threshold = (n: number) => n * (minColumnWidth + gap) - gap;
+      if (idealColumns > current) {
+        return size.width >= threshold(idealColumns) + 12
+          ? idealColumns
+          : current;
+      }
+      return size.width < threshold(current) - 12 ? idealColumns : current;
+    });
+  }, [size.width, idealColumns, gap, minColumnWidth]);
+
   const rowCount = Math.ceil(count / columns);
   const tileWidth =
     size.width > 0

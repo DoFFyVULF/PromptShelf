@@ -255,6 +255,76 @@ type LoraEntry =
   | { kind: "lora"; key: string; lora: LoraSummary }
   | { kind: "family"; key: string; family: LoraFamily };
 
+interface LoraRowProps {
+  entries: LoraEntry[];
+  start: number;
+  columns: number;
+  enter: boolean;
+  selectMode: boolean;
+  selection: string[];
+  onOpen: (id: string) => void;
+  onToggleSelect: (id: string) => void;
+  onTogglePin: (id: string, pinned: boolean) => void;
+  onOpenFamily: (id: string) => void;
+  onToggleFamilyPin: (memberIds: string[], pinned: boolean) => void;
+}
+
+/**
+ * See CardRow: keeping the tiles out of the `top`-only re-render stops Motion
+ * from re-projecting their layout boxes while rows are being measured. The
+ * family replacement is already baked into `entries`, so it stays a single tile.
+ */
+const LoraRow = memo(function LoraRow({
+  entries,
+  start,
+  columns,
+  enter,
+  selectMode,
+  selection,
+  onOpen,
+  onToggleSelect,
+  onTogglePin,
+  onOpenFamily,
+  onToggleFamilyPin
+}: LoraRowProps) {
+  return (
+    <>
+      {entries.slice(start, start + columns).map((entry, column) => {
+        const index = start + column;
+        if (entry.kind === "family") {
+          // the deck reads as pinned only when every variant is
+          const pinned = entry.family.members.every((member) => member.pinned);
+          return (
+            <TileShell key={entry.key} pinned={pinned}>
+              <LoraFamilyTile
+                family={entry.family}
+                onOpen={onOpenFamily}
+                onTogglePin={onToggleFamilyPin}
+                delay={enter ? index * 28 : 0}
+                enter={enter}
+              />
+            </TileShell>
+          );
+        }
+        return (
+          <TileShell key={entry.key} pinned={entry.lora.pinned}>
+            <LoraTile
+              lora={entry.lora}
+              onOpen={onOpen}
+              delay={enter ? index * 28 : 0}
+              enter={enter}
+              selectMode={selectMode}
+              selected={selection.includes(entry.lora.id)}
+              onToggleSelect={onToggleSelect}
+              onTogglePin={onTogglePin}
+            />
+          </TileShell>
+        );
+      })}
+    </>
+  );
+});
+
 export function LoraGrid({ loras, jobs, onJobRetry, onJobDismiss, onOpen, selectMode, selection, onToggleSelect, onTogglePin, families, onOpenFamily, onToggleFamilyPin, scrollRef }: LoraGridProps) {
   const entering = useEntranceWindow();
   // Members disappear from the grid and are represented by one deck tile at
@@ -312,38 +382,19 @@ export function LoraGrid({ loras, jobs, onJobRetry, onJobDismiss, onOpen, select
                 animate={!enter}
                 onMeasure={measureRow}
               >
-                {entries.slice(start, start + columns).map((entry, column) => {
-                  const index = start + column;
-                  if (entry.kind === "family") {
-                    // the deck reads as pinned only when every variant is
-                    const pinned = entry.family.members.every((member) => member.pinned);
-                    return (
-                      <TileShell key={entry.key} pinned={pinned} layoutDependency={index}>
-                        <LoraFamilyTile
-                          family={entry.family}
-                          onOpen={onOpenFamily}
-                          onTogglePin={onToggleFamilyPin}
-                          delay={enter ? index * 28 : 0}
-                          enter={enter}
-                        />
-                      </TileShell>
-                    );
-                  }
-                  return (
-                    <TileShell key={entry.key} pinned={entry.lora.pinned} layoutDependency={index}>
-                      <LoraTile
-                        lora={entry.lora}
-                        onOpen={onOpen}
-                        delay={enter ? index * 28 : 0}
-                        enter={enter}
-                        selectMode={selectMode}
-                        selected={selection.includes(entry.lora.id)}
-                        onToggleSelect={onToggleSelect}
-                        onTogglePin={onTogglePin}
-                      />
-                    </TileShell>
-                  );
-                })}
+                <LoraRow
+                  entries={entries}
+                  start={start}
+                  columns={columns}
+                  enter={enter}
+                  selectMode={selectMode}
+                  selection={selection}
+                  onOpen={onOpen}
+                  onToggleSelect={onToggleSelect}
+                  onTogglePin={onTogglePin}
+                  onOpenFamily={onOpenFamily}
+                  onToggleFamilyPin={onToggleFamilyPin}
+                />
               </VirtualRow>
             );
           })}

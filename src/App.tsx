@@ -1824,7 +1824,7 @@ function Shell() {
 
       <main
         ref={scrollRef}
-        style={{ overflowAnchor: "none" }}
+        style={{ overflowAnchor: "none", scrollbarGutter: "stable" }}
         className="relative min-h-0 flex-1 overflow-y-auto"
       >
         {loading && activeCards.length === 0 ? (
