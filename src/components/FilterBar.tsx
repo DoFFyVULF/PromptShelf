@@ -1,6 +1,6 @@
 import { ChevronDown, Folder, ListChecks, Tag, X } from "lucide-react";
 import { useI18n } from "../i18n";
-import { groupColorVar } from "../lib/groupStyle";
+import { groupColorStyle } from "../lib/groupStyle";
 import type { GroupInfo, TagCount } from "../lib/types";
 import { GroupGlyph } from "./GroupGlyph";
 
@@ -36,6 +36,7 @@ export function FilterBar({
 }: FilterBarProps) {
   const { t, count } = useI18n();
   const hasTagsFilter = selected.length > 0;
+  const tint = groupColorStyle(group?.color ?? "");
 
   return (
     <div className="flex h-11 shrink-0 items-center gap-2 overflow-x-auto border-b border-line-soft px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -50,8 +51,8 @@ export function FilterBar({
           <GroupGlyph group={group} size={13} fallback={<Folder size={13} />} />
         </span>
         <span
-          className="max-w-[160px] truncate"
-          style={group?.color ? { color: groupColorVar(group.color) } : undefined}
+          className={`max-w-[160px] truncate ${tint ? "group-tint" : ""}`}
+          style={tint}
         >
           {group?.name ?? t("group.home")}
         </span>

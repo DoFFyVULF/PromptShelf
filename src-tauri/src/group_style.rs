@@ -31,12 +31,30 @@ pub const ICONS: &[&str] = &[
     "lightbulb",
 ];
 
-/// Unknown values are rejected instead of silently stored: a typo would show
-/// up as a blank swatch in the UI and would be impossible to fix by hand.
+/// Accepts a palette key, an empty value ("unset") or a custom colour. Custom
+/// colours are stored as `#rrggbb` in the same column — `#abc` shorthand is
+/// expanded so every stored hex has one canonical form. Anything else is
+/// rejected instead of silently stored: a typo would show up as a blank swatch
+/// in the UI and would be impossible to fix by hand.
 pub fn clean_color(value: &str) -> Result<String, String> {
     let value = value.trim();
     if value.is_empty() || COLORS.contains(&value) {
-        Ok(value.to_string())
+        return Ok(value.to_string());
+    }
+    let digits = value.strip_prefix('#').unwrap_or(value);
+    let valid = matches!(digits.len(), 3 | 6)
+        && digits.bytes().all(|b| b.is_ascii_hexdigit());
+    if valid {
+        let hex = if digits.len() == 3 {
+            digits
+                .bytes()
+                .flat_map(|b| [b, b])
+                .map(char::from)
+                .collect::<String>()
+        } else {
+            digits.to_ascii_lowercase()
+        };
+        Ok(format!("#{hex}"))
     } else {
         Err("GROUP_COLOR_INVALID".to_string())
     }
@@ -59,7 +77,12 @@ mod tests {
     fn appearance_values_are_validated() {
         assert_eq!(clean_color(" blue ").unwrap(), "blue");
         assert_eq!(clean_color("").unwrap(), "");
+        assert_eq!(clean_color(" #4F46E5 ").unwrap(), "#4f46e5");
+        assert_eq!(clean_color("#abc").unwrap(), "#aabbcc");
+        assert_eq!(clean_color("f0a").unwrap(), "#ff00aa");
+        assert_eq!(clean_color("#12345").unwrap_err(), "GROUP_COLOR_INVALID");
         assert_eq!(clean_color("neon").unwrap_err(), "GROUP_COLOR_INVALID");
+        assert_eq!(clean_color("#gggggg").unwrap_err(), "GROUP_COLOR_INVALID");
         assert_eq!(clean_icon("sparkles").unwrap(), "sparkles");
         assert_eq!(clean_icon("paw").unwrap(), "paw");
         assert_eq!(clean_icon("not_an_icon").unwrap_err(), "GROUP_ICON_INVALID");

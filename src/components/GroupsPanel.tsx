@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { CornerDownRight, GripVertical, Home, Palette, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useI18n } from "../i18n";
 import { api } from "../lib/api";
-import { groupColorVar } from "../lib/groupStyle";
+import { groupColorStyle } from "../lib/groupStyle";
 import type { GroupInfo } from "../lib/types";
 import { GroupAppearance } from "./GroupAppearance";
 import { GroupGlyph } from "./GroupGlyph";
@@ -459,8 +459,8 @@ export function GroupsPanel({
                   />
                 ) : (
                   <span
-                    className={`min-w-0 flex-1 truncate text-[13.5px] font-medium ${current ? "text-leaf" : ""}`}
-                    style={!current && g.color ? { color: groupColorVar(g.color) } : undefined}
+                    className={`min-w-0 flex-1 truncate text-[13.5px] font-medium ${current ? "text-leaf" : groupColorStyle(g.color) ? "group-tint" : ""}`}
+                    style={!current ? groupColorStyle(g.color) : undefined}
                   >
                     {g.name}
                   </span>
@@ -496,24 +496,34 @@ export function GroupsPanel({
                       </button>
                     )}
 
-                    {!g.is_default && !dragActive && (
+                    {/* Every row carries the same action slot — Home's is
+                        invisible — so names and counts never shift sideways
+                        between the default group and a created one. */}
+                    {!dragActive && (
                       <span
-                        className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100"
+                        aria-hidden={g.is_default || undefined}
+                        className={`flex shrink-0 items-center gap-0.5 ${
+                          g.is_default
+                            ? "invisible"
+                            : "opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+                        }`}
                       >
                         <button
                           type="button"
+                          disabled={g.is_default}
                           aria-label={t("groups.style")}
                           title={t("groups.style")}
                           onClick={(e) => {
                             e.stopPropagation();
                             openStyle(g);
                           }}
-                          className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-md text-muted transition-colors hover:bg-parchment hover:text-ink"
+                          className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-md text-muted transition-colors hover:bg-parchment hover:text-ink disabled:pointer-events-none"
                         >
                           <Palette size={12} />
                         </button>
                         <button
                           type="button"
+                          disabled={g.is_default}
                           aria-label={t("action.edit")}
                           title={t("action.edit")}
                           onClick={(e) => {
@@ -521,19 +531,20 @@ export function GroupsPanel({
                             setEditName(g.name);
                             setEditingId(g.id);
                           }}
-                          className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-md text-muted transition-colors hover:bg-parchment hover:text-ink"
+                          className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-md text-muted transition-colors hover:bg-parchment hover:text-ink disabled:pointer-events-none"
                         >
                           <Pencil size={12} />
                         </button>
                         <button
                           type="button"
+                          disabled={g.is_default}
                           aria-label={t("action.delete")}
                           title={armDelete === g.id ? t("groups.deleteHint", { name: groupNameOf(groups) }) : t("action.delete")}
                           onClick={(e) => {
                             e.stopPropagation();
                             void removeGroup(g);
                           }}
-                          className={`flex h-6 w-6 cursor-pointer items-center justify-center rounded-md transition-colors ${
+                          className={`flex h-6 w-6 cursor-pointer items-center justify-center rounded-md transition-colors disabled:pointer-events-none ${
                             armDelete === g.id
                               ? "bg-destructive text-on-ink"
                               : "text-muted hover:bg-parchment hover:text-destructive"

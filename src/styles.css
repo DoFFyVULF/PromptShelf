@@ -136,6 +136,24 @@
   --group-slate: #475569;
 }
 
+/* Group tints — palette keys and custom hex values share one rendering path.
+   `groupColorStyle()` sets both variables inline; in dark mode a custom hex is
+   lifted toward white so a manually chosen dark colour stays legible. */
+.group-tint {
+  color: var(--group-tint);
+}
+.group-tint-bg {
+  background-color: var(--group-tint);
+}
+.dark .group-tint {
+  color: var(--group-tint);
+  color: var(--group-tint-dark, var(--group-tint));
+}
+.dark .group-tint-bg {
+  background-color: var(--group-tint);
+  background-color: var(--group-tint-dark, var(--group-tint));
+}
+
 /* ------------------------------------------------------------------ base */
 
 html,
