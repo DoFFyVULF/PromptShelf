@@ -537,32 +537,32 @@ export function PromptPager({ card, idx, onIdxChange, onChanged, copyText, trans
         </div>
 
         <div className={`flex items-center gap-0.5 ${mode === "view" ? "" : "pointer-events-none opacity-0"}`}>
-          {/* translation stays visible: it is the one action worth finding
-              without hovering, and its active state doubles as a language tag */}
-          <motion.button
-            type="button"
-            aria-label={translated ? t("prompt.translate.showOriginal") : t("prompt.translate")}
-            aria-pressed={translated}
-            title={translated ? t("prompt.translate.showOriginal") : t("prompt.translate")}
-            onClick={() => void toggleTranslation()}
-            disabled={translating || (!translated && !pageText.trim())}
-            initial={false}
-            whileTap={reduced ? undefined : { scale: 0.9 }}
-            transition={{ type: "spring", visualDuration: 0.2, bounce: 0 }}
-            className={`press-bg flex h-6.5 w-6.5 shrink-0 cursor-pointer items-center justify-center rounded-md transition-colors disabled:cursor-default disabled:opacity-40 ${
-              translated
-                ? "bg-action/10 text-action hover:bg-action/15"
-                : "text-faint hover:bg-parchment hover:text-ink"
-            }`}
-          >
-            {translating ? <Loader2 size={12} className="spin" /> : <Languages size={12.5} strokeWidth={2.1} />}
-          </motion.button>
-
+          {/* all tools share one hover reveal; the language badge on the left
+              stays visible as metadata even while the buttons are hidden */}
           <div
             className={`flex items-center transition-opacity duration-150 ${
               mode === "view" ? "opacity-0 group-hover/pager:opacity-100 focus-within:opacity-100" : ""
             }`}
           >
+            <motion.button
+              type="button"
+              aria-label={translated ? t("prompt.translate.showOriginal") : t("prompt.translate")}
+              aria-pressed={translated}
+              title={translated ? t("prompt.translate.showOriginal") : t("prompt.translate")}
+              onClick={() => void toggleTranslation()}
+              disabled={translating || (!translated && !pageText.trim())}
+              initial={false}
+              whileTap={reduced ? undefined : { scale: 0.9 }}
+              transition={{ type: "spring", visualDuration: 0.2, bounce: 0 }}
+              className={`press-bg flex h-6.5 w-6.5 shrink-0 cursor-pointer items-center justify-center rounded-md transition-colors disabled:cursor-default disabled:opacity-40 ${
+                translated
+                  ? "bg-action/10 text-action hover:bg-action/15"
+                  : "text-faint hover:bg-parchment hover:text-ink"
+              }`}
+            >
+              {translating ? <Loader2 size={12} className="spin" /> : <Languages size={12.5} strokeWidth={2.1} />}
+            </motion.button>
+
             <button
               type="button"
               aria-label={t("action.copy")}
