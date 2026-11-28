@@ -104,10 +104,10 @@ export function SortMenu({ mode, sort, onSort }: SortMenuProps) {
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const lastBox = useRef({ left: 0, top: 0, up: false });
 
-  // The trigger sits in the header, which never scrolls (only <main> does), so
-  // the panel only has to follow a resize. It flips above when the space below
-  // is tighter than the panel itself.
+  // The panel is right-aligned to the trigger, so it sits exactly over the
+  // pill. It flips above when the space below is tighter than the panel.
   const measure = useCallback(() => {
     const el = buttonRef.current;
     if (!el) return;
@@ -116,18 +116,28 @@ export function SortMenu({ mode, sort, onSort }: SortMenuProps) {
     const below = window.innerHeight - r.bottom - GAP - EDGE;
     const above = r.top - GAP - EDGE;
     const up = height > 0 && height > below && above > below;
-    setBox({
-      left: Math.max(EDGE, Math.min(r.right - CONTROL_W, window.innerWidth - CONTROL_W - EDGE)),
-      top: up ? Math.max(EDGE, r.top - GAP - height) : r.bottom + GAP,
-      up,
-    });
+    const left = Math.max(EDGE, Math.min(r.right - CONTROL_W, window.innerWidth - CONTROL_W - EDGE));
+    const top = up ? Math.max(EDGE, r.top - GAP - height) : r.bottom + GAP;
+    const prev = lastBox.current;
+    if (prev.left === left && prev.top === top && prev.up === up) return;
+    lastBox.current = { left, top, up };
+    setBox({ left, top, up });
   }, []);
 
   useLayoutEffect(() => {
     if (!open) return;
     measure();
-    window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
+    // The trigger lives in a layout-animated header: opening the menu while
+    // the shelf flips (or a banner/badge appears) measured it mid-glide and
+    // left the portalled panel stranded a few pixels off the pill. Follow the
+    // button every frame while open; unchanged geometry costs no re-render.
+    let frame = 0;
+    const tick = () => {
+      measure();
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
   }, [open, measure]);
 
   // A pointer anywhere outside the trigger or the panel dismisses the menu.
