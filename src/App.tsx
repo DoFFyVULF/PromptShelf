@@ -862,6 +862,55 @@ function Shell() {
     [mode],
   );
 
+  /** Ctrl+Tab steps through the groups of the active shelf in the same order
+   * the panel shows them; Shift reverses. Ctrl is used on macOS as well:
+   * Cmd+Tab belongs to the OS and never reaches the window. */
+  const cycleGroup = useCallback(
+    (dir: 1 | -1) => {
+      // a group switch behind an open editor/viewer would swap the shelf under
+      // it, so the shortcut is only live on the plain grid
+      if (
+        editorOpenRef.current ||
+        loraEditorOpenRef.current ||
+        detailOpenRef.current ||
+        loraDetailOpenRef.current ||
+        importOpen ||
+        settingsOpen ||
+        tagsOpen ||
+        updateOpen ||
+        dupHits !== null ||
+        missingPrompt !== null ||
+        loraDupHits !== null ||
+        familyOpenId !== null
+      ) {
+        return;
+      }
+      const list = mode === "prompt" ? groups : loraGroups;
+      if (list.length < 2) return;
+      const current = mode === "prompt" ? groupId : loraGroupId;
+      const at = list.findIndex((g) => g.id === current);
+      // a stale id wraps to the first group forward, the last one backward
+      const from = at === -1 ? (dir === 1 ? -1 : 0) : at;
+      switchGroup(list[(from + dir + list.length) % list.length].id);
+    },
+    [
+      mode,
+      groups,
+      loraGroups,
+      groupId,
+      loraGroupId,
+      switchGroup,
+      importOpen,
+      settingsOpen,
+      tagsOpen,
+      updateOpen,
+      dupHits,
+      missingPrompt,
+      loraDupHits,
+      familyOpenId,
+    ],
+  );
+
   const toggleSelectMode = useCallback(() => {
     setSelectMode((on) => {
       if (on) setSelection([]);
@@ -1555,7 +1604,12 @@ function Shell() {
         target?.tagName === "INPUT" ||
         target?.isContentEditable;
 
-      if (meta && key === "n" && !e.shiftKey) {
+      if (e.ctrlKey && !e.metaKey && !e.altKey && e.key === "Tab") {
+        e.preventDefault();
+        // one press = one step; a held key would spin past the groups faster
+        // than the shelf can settle
+        if (!e.repeat) cycleGroup(e.shiftKey ? -1 : 1);
+      } else if (meta && key === "n" && !e.shiftKey) {
         e.preventDefault();
         if (modeRef.current === "prompt") {
           if (!editorOpenRef.current) openEditorNew();
@@ -1655,6 +1709,7 @@ function Shell() {
     return () => window.removeEventListener("keydown", onKey);
   }, [
     copyPromptText,
+    cycleGroup,
     detail,
     detailPromptIdx,
     loraDetail,

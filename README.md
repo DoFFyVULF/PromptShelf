@@ -161,6 +161,7 @@ npm run tauri dev
 | ⌘/Ctrl + F       | Focus search                                         |
 | ⌘/Ctrl + C       | Copy the prompt; on the LoRA shelf — the card's trigger words |
 | ⌘/Ctrl + ,       | Settings                                             |
+| Ctrl + Tab       | Next group of the active shelf (Shift + Ctrl + Tab — previous) |
 | ← / →            | Previous / next card                                 |
 | Esc              | Close groups panel → viewer → dialog/zoom            |
 
