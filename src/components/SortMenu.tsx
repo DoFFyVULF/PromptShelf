@@ -9,6 +9,7 @@ import {
   GitBranch,
   Layers,
   Star,
+  Workflow,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useI18n, type DictKey } from "../i18n";
@@ -36,20 +37,32 @@ const CORE: SortChoice[] = [
   { value: "rating", label: "sort.rating", hint: "sort.rating.hint", icon: Star },
 ];
 
-/** Each shelf has one extra "depth" order that the other cannot express. */
-const DEPTH: Record<Mode, SortChoice> = {
-  prompt: {
-    value: "variants",
-    label: "sort.variants",
-    hint: "sort.variants.hint",
-    icon: Layers,
-  },
-  lora: {
-    value: "versions",
-    label: "sort.versions",
-    hint: "sort.versions.hint",
-    icon: GitBranch,
-  },
+/** Shelf-specific modes that the other shelf cannot express. Most variants
+ *  orders the prompt shelf; with workflow narrows it to cards carrying a
+ *  ComfyUI graph; most versions orders the lora shelf. */
+const DEPTH: Record<Mode, SortChoice[]> = {
+  prompt: [
+    {
+      value: "variants",
+      label: "sort.variants",
+      hint: "sort.variants.hint",
+      icon: Layers,
+    },
+    {
+      value: "workflow",
+      label: "sort.workflow",
+      hint: "sort.workflow.hint",
+      icon: Workflow,
+    },
+  ],
+  lora: [
+    {
+      value: "versions",
+      label: "sort.versions",
+      hint: "sort.versions.hint",
+      icon: GitBranch,
+    },
+  ],
 };
 
 interface SortMenuProps {
@@ -64,8 +77,9 @@ interface SortMenuProps {
  * panel instead: the trigger keeps the header pill grammar — one stable width,
  * the order glyph and chevron on the edges, the label centred between them —
  * and the panel, exactly as wide as the trigger, lists every order as a
- * single-line row. The two shelf-specific orders (prompt variants / lora
- * versions) only appear on the shelf that can honour them.
+ * single-line row. Shelf-specific modes only appear on the shelf that can
+ * honour them: prompt variants and workflow on the prompt shelf, lora versions
+ * on the lora shelf.
  *
  * The panel is portalled to <body> because the header's backdrop blur makes it
  * a containing block — a fixed child would be positioned against the 56px bar.
@@ -76,7 +90,7 @@ export function SortMenu({ mode, sort, onSort }: SortMenuProps) {
   const reduce = useReducedMotion() ?? false;
   const menuId = useId();
 
-  const options = [...CORE, DEPTH[mode]];
+  const options = [...CORE, ...DEPTH[mode]];
   const selectedIndex = Math.max(
     0,
     options.findIndex((o) => o.value === sort),

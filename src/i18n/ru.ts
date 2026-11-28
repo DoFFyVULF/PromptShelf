@@ -48,6 +48,8 @@ export const ru: Record<DictKey, string> = {
   "sort.variants.hint": "Карточки с наибольшим числом вариантов",
   "sort.versions": "Больше версий",
   "sort.versions.hint": "Лоры с наибольшим числом версий на полке",
+  "sort.workflow": "С воркфлоу",
+  "sort.workflow.hint": "Только карточки с воркфлоу ComfyUI",
 
   "tags.all": "Все",
   "tags.title": "Теги",

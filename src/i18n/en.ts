@@ -46,6 +46,8 @@ export const en = {
   "sort.variants.hint": "Cards with the most prompt variants",
   "sort.versions": "Most versions",
   "sort.versions.hint": "Loras with the most versions on the shelf",
+  "sort.workflow": "With workflow",
+  "sort.workflow.hint": "Only cards with a ComfyUI workflow",
 
   "tags.all": "All",
   "tags.title": "Tags",

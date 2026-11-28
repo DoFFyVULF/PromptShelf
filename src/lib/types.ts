@@ -2,8 +2,15 @@ export type Lang = "en" | "ru";
 export type Theme = "system" | "light" | "dark";
 /** Shelf order. `variants` counts prompt variants and belongs to the prompt
  * shelf; `versions` counts a lora's distinct shelf variants and belongs to the
- * lora shelf — each menu only offers its own. */
-export type Sort = "newest" | "oldest" | "rating" | "variants" | "versions";
+ * lora shelf — each menu only offers its own. `workflow` is a prompt-only view
+ * that keeps cards carrying a ComfyUI graph (newest first). */
+export type Sort =
+  | "newest"
+  | "oldest"
+  | "rating"
+  | "variants"
+  | "versions"
+  | "workflow";
 /** Which shelf is on screen: the logo toggles these. */
 export type Mode = "prompt" | "lora";
 

@@ -442,7 +442,19 @@ function Shell() {
     });
   }, []);
 
-  const anyFilter = debouncedQ.trim() !== "" || selectedTags.length > 0;
+  // "With workflow" narrows the prompt shelf like a filter, even though it is
+  // chosen in the sort menu — an empty result must read as "nothing matched".
+  const anyFilter =
+    debouncedQ.trim() !== "" ||
+    selectedTags.length > 0 ||
+    (mode === "prompt" && sort === "workflow");
+
+  const clearFilters = useCallback(() => {
+    setSelectedTags([]);
+    setQuery("");
+    setDebouncedQ("");
+    if (sort === "workflow") setSort("newest");
+  }, [sort, setSort]);
 
   // ---------------------------------------------------------------- load
 
@@ -478,7 +490,14 @@ function Shell() {
         api.listCards(filter),
         api.listTags(),
       ]);
-      const list = applyPendingPins(fetched, pendingCardPins.current);
+      const pinned = applyPendingPins(fetched, pendingCardPins.current);
+      // "With workflow" is a view the backend has no order for: it returns the
+      // shelf newest-first, and only cards carrying a ComfyUI graph survive.
+      // Pinning, home slots and the tile count all use the narrowed list.
+      const list =
+        promptSort === "workflow"
+          ? pinned.filter((card) => card.workflow)
+          : pinned;
       const order = homeOrder(list, promptSort, (card) => card.variant_count);
       cardOrderRef.current = order;
       setCards(pinnedFirst(list, order));
@@ -1833,11 +1852,7 @@ function Shell() {
             prev.includes(tag) ? prev.filter((x) => x !== tag) : [...prev, tag],
           )
         }
-        onClear={() => {
-          setSelectedTags([]);
-          setQuery("");
-          setDebouncedQ("");
-        }}
+        onClear={clearFilters}
         shown={activeCards.length}
         filtering={anyFilter}
         group={currentGroup}
@@ -1885,11 +1900,7 @@ function Shell() {
             hasFilters
             onNew={mode === "prompt" ? openEditorNew : openLoraEditorNew}
             onPaste={() => undefined}
-            onClear={() => {
-              setSelectedTags([]);
-              setQuery("");
-              setDebouncedQ("");
-            }}
+            onClear={clearFilters}
           />
         ) : (
           <AnimatePresence mode="wait" initial={false}>
