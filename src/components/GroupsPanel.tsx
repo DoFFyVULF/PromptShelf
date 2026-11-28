@@ -331,6 +331,10 @@ export function GroupsPanel({
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
         {orderedGroups.map((g, index) => {
           const current = g.id === currentGroupId;
+          const tint = groupColorStyle(g.color);
+          // A group with an Appearance colour owns its selected state — the
+          // default emerald highlight only stays for untouched groups.
+          const tinted = current && Boolean(tint);
           // with an active selection a row click moves the cards instead of
           // switching the view — switching would silently drop the selection
           // and look like "nothing happened"
@@ -382,20 +386,27 @@ export function GroupsPanel({
                     : undefined
                 }
                 className={`group relative flex cursor-pointer items-center gap-2.5 rounded-[10px] border px-2.5 py-2 transition-[background-color,border-color,color] duration-150 ${
+                  tinted ? "group-accent" : ""
+                } ${
                   dragActive
                     ? current
                       ? dragOverId === g.id
-                        ? "border-leaf-icon bg-leaf-target text-leaf-strong"
+                        ? tinted
+                          ? "border-accent bg-accent-target text-accent-ink"
+                          : "border-leaf-icon bg-leaf-target text-leaf-strong"
                         : "border-dashed border-leaf-edge/80 bg-leaf-soft/70 text-leaf"
                       : dragOverId === g.id
                         ? "border-leaf-icon bg-leaf-target text-leaf-strong"
                         : "border-dashed border-leaf-edge/70 bg-leaf-soft/50 text-leaf/80"
                     : current
-                      ? "border-leaf-edge bg-leaf-soft text-leaf"
+                      ? tinted
+                        ? "border-accent-edge bg-accent-soft text-accent-ink"
+                        : "border-leaf-edge bg-leaf-soft text-leaf"
                       : moveActive
                         ? "border-transparent text-body hover:border-leaf-edge hover:bg-leaf-soft/60"
                         : "border-transparent text-body hover:bg-parchment"
                 } ${reorderId === g.id ? "opacity-40" : ""}`}
+                style={tinted ? tint : undefined}
               >
                 {reorderId && dropIndex === index && (
                   <span aria-hidden className="pointer-events-none absolute -top-px right-2 left-2 z-20 h-0.5 rounded-full bg-leaf-icon" />
@@ -426,7 +437,7 @@ export function GroupsPanel({
                 <span
                   aria-hidden
                   className={`flex h-6 w-6 shrink-0 items-center justify-center ${
-                    current ? "text-leaf-icon" : "text-faint"
+                    current ? (tinted ? "text-accent" : "text-leaf-icon") : "text-faint"
                   }`}
                 >
                   <GroupGlyph
@@ -459,8 +470,10 @@ export function GroupsPanel({
                   />
                 ) : (
                   <span
-                    className={`min-w-0 flex-1 truncate text-[13.5px] font-medium ${current ? "text-leaf" : groupColorStyle(g.color) ? "group-tint" : ""}`}
-                    style={!current ? groupColorStyle(g.color) : undefined}
+                    className={`min-w-0 flex-1 truncate text-[13.5px] font-medium ${
+                      current ? (tinted ? "text-accent-ink" : "text-leaf") : tint ? "group-tint" : ""
+                    }`}
+                    style={!current ? tint : undefined}
                   >
                     {g.name}
                   </span>
@@ -468,7 +481,9 @@ export function GroupsPanel({
 
                 {!editingId && (
                   <>
-                    <span className={`shrink-0 text-[11px] tabular-nums ${current ? "text-leaf-icon/80" : "text-faint"}`}>
+                    <span className={`shrink-0 text-[11px] tabular-nums ${
+                      current ? (tinted ? "text-accent-ink" : "text-leaf-icon/80") : "text-faint"
+                    }`}>
                       {g.count}
                     </span>
 

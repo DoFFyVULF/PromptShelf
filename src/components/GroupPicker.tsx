@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Check, ChevronDown, Folder, Home } from "lucide-react";
 import { useI18n } from "../i18n";
+import { groupColorStyle } from "../lib/groupStyle";
 import type { GroupInfo } from "../lib/types";
 import { GroupGlyph } from "./GroupGlyph";
 
@@ -99,6 +100,10 @@ export function GroupPicker({
   };
 
   const label = current?.name ?? t("groups.default");
+  // The checked group borrows its Appearance colour for the selection state;
+  // untouched groups keep the emerald accent.
+  const currentTint = groupColorStyle(current?.color ?? "");
+  const openTinted = open && Boolean(currentTint);
 
   return (
     <div ref={rootRef} className="relative">
@@ -122,9 +127,12 @@ export function GroupPicker({
         }}
         className={`press flex h-7 max-w-[168px] shrink-0 cursor-pointer items-center gap-1.5 rounded-full border px-2.5 text-[11.5px] font-medium outline-none transition-colors focus-visible:shadow-focus ${
           open
-            ? "border-leaf-edge bg-leaf-soft text-leaf"
+            ? openTinted
+              ? "group-accent border-accent-edge bg-accent-soft text-accent-ink"
+              : "border-leaf-edge bg-leaf-soft text-leaf"
             : "border-hairline bg-card text-muted hover:bg-parchment hover:text-ink"
         }`}
+        style={openTinted ? currentTint : undefined}
       >
         <GroupGlyph
           group={current}
@@ -160,6 +168,8 @@ export function GroupPicker({
             </p>
             {groups.map((group) => {
               const active = group.id === (current?.id ?? currentGroupId);
+              const tint = groupColorStyle(group.color);
+              const activeTinted = active && Boolean(tint);
               return (
                 <button
                   key={group.id}
@@ -171,13 +181,18 @@ export function GroupPicker({
                     if (!active) onPick(group);
                   }}
                   className={`flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[12.5px] outline-none transition-colors focus-visible:shadow-focus ${
-                    active ? "bg-leaf-soft text-leaf" : "text-body hover:bg-parchment"
+                    active
+                      ? activeTinted
+                        ? "group-accent bg-accent-soft text-accent-ink"
+                        : "bg-leaf-soft text-leaf"
+                      : "text-body hover:bg-parchment"
                   }`}
+                  style={activeTinted ? tint : undefined}
                 >
                   <span
                     aria-hidden
                     className={`flex h-5 w-5 shrink-0 items-center justify-center ${
-                      active ? "text-leaf-icon" : "text-faint"
+                      active ? (activeTinted ? "text-accent" : "text-leaf-icon") : "text-faint"
                     }`}
                   >
                     <GroupGlyph
@@ -187,11 +202,15 @@ export function GroupPicker({
                     />
                   </span>
                   <span className="min-w-0 flex-1 truncate font-medium">{group.name}</span>
-                  <span className={`shrink-0 text-[10.5px] tabular-nums ${active ? "text-leaf-icon/80" : "text-faint"}`}>
+                  <span className={`shrink-0 text-[10.5px] tabular-nums ${
+                    active ? (activeTinted ? "text-accent-ink" : "text-leaf-icon/80") : "text-faint"
+                  }`}>
                     {group.count}
                   </span>
                   <span className="flex w-3.5 shrink-0 justify-end">
-                    {active && <Check size={12} className="text-leaf-icon" aria-hidden />}
+                    {active && (
+                      <Check size={12} className={activeTinted ? "text-accent-ink" : "text-leaf-icon"} aria-hidden />
+                    )}
                   </span>
                 </button>
               );

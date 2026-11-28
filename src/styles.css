@@ -75,6 +75,13 @@
   --color-leaf-soft: #ecfdf5;
   --color-leaf-edge: #a7f3d0;
   --color-leaf-target: #d1fae5;
+  /* Active-group selection. Defaults to emerald; `.group-accent` swaps these
+     for shades of the group's own Appearance colour (see below). */
+  --color-accent: var(--color-leaf-icon);
+  --color-accent-ink: var(--color-leaf);
+  --color-accent-soft: var(--color-leaf-soft);
+  --color-accent-edge: var(--color-leaf-edge);
+  --color-accent-target: var(--color-leaf-target);
   --color-destructive: #dc2626;
   --color-destructive-soft: #fef2f2;
   /* CivitAI violet family: trigger-word chips on the lora shelf */
@@ -152,6 +159,25 @@
 .dark .group-tint-bg {
   background-color: var(--group-tint);
   background-color: var(--group-tint-dark, var(--group-tint));
+}
+
+/* A tinted group owns its selection state: every `accent-*` utility inside
+   `.group-accent` becomes a shade of the group's Appearance colour. Text is
+   mixed toward the theme ink so it keeps contrast on the soft fill; custom
+   hex values use the lifted `--group-tint-dark` sibling in dark mode. */
+.group-accent {
+  --color-accent: var(--group-tint, var(--color-leaf-icon));
+  --color-accent-ink: color-mix(in oklab, var(--color-accent) 50%, var(--color-ink));
+  --color-accent-soft: color-mix(in oklab, var(--color-accent) 9%, var(--color-card));
+  --color-accent-edge: color-mix(in oklab, var(--color-accent) 34%, var(--color-card));
+  --color-accent-target: color-mix(in oklab, var(--color-accent) 18%, var(--color-card));
+}
+.dark .group-accent {
+  --color-accent: var(--group-tint-dark, var(--group-tint, var(--color-leaf-icon)));
+  --color-accent-ink: color-mix(in oklab, var(--color-accent) 72%, var(--color-ink));
+  --color-accent-soft: color-mix(in oklab, var(--color-accent) 16%, var(--color-card));
+  --color-accent-edge: color-mix(in oklab, var(--color-accent) 44%, var(--color-card));
+  --color-accent-target: color-mix(in oklab, var(--color-accent) 26%, var(--color-card));
 }
 
 /* ------------------------------------------------------------------ base */
