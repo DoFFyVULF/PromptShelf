@@ -438,6 +438,28 @@ body {
   background: linear-gradient(100deg, transparent 25%, rgb(255 255 255 / 0.55) 50%, transparent 75%);
   animation: import-sweep 1.6s var(--ease-apple) infinite;
 }
+
+/* Prompt translation: the hairline at the top of the parchment block while
+   the request is in flight. Same glide, a much quieter dose. */
+@keyframes translate-sweep {
+  from {
+    transform: translateX(-110%);
+  }
+  to {
+    transform: translateX(310%);
+  }
+}
+.translate-sweep {
+  animation: translate-sweep 1.15s var(--ease-apple) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .translate-sweep {
+    animation: none;
+    transform: none;
+    width: 100%;
+    opacity: 0.45;
+  }
+}
 .dark .import-sweep {
   background: linear-gradient(100deg, transparent 25%, rgb(255 255 255 / 0.08) 50%, transparent 75%);
 }

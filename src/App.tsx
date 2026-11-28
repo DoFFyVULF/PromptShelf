@@ -223,6 +223,10 @@ function Shell() {
   // active prompt page in the detail view: 0 = main prompt, n = variant n-1.
   // Shared with CardDetail so both the footer button and ⌘C copy the open page.
   const [detailPromptIdx, setDetailPromptIdx] = useState(0);
+  // Text the prompt pager is showing instead of the stored page (a live
+  // translation). It lives here so the global ⌘C shortcut copies what is on
+  // screen; the original text in the card is never modified.
+  const [promptOverride, setPromptOverride] = useState<{ cardId: string; idx: number; text: string } | null>(null);
 
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorCard, setEditorCard] = useState<CardDetailData | null>(null);
@@ -256,6 +260,9 @@ function Shell() {
   const [receipts, setReceipts] = useState<ImportReceipt[]>([]);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // Which settings section to reveal when the dialog opens (the card's
+  // "translation isn't set up" bubble lands on the translation row).
+  const [settingsFocus, setSettingsFocus] = useState<"translation" | null>(null);
   const [dragging, setDragging] = useState(false);
 
   // ---------------------------------------------------------------- updates
@@ -704,6 +711,7 @@ function Shell() {
   // a different card always opens on its main prompt
   useEffect(() => {
     setDetailPromptIdx(0);
+    setPromptOverride(null);
   }, [detailId]);
 
   // ---------------------------------------------------------------- detail
@@ -796,6 +804,13 @@ function Shell() {
     },
     [t, toast],
   );
+
+  /** Opens settings already scrolled to (and briefly highlighting) the
+   *  translation row — the card's setup bubble uses this. */
+  const openTranslationSettings = useCallback(() => {
+    setSettingsFocus("translation");
+    setSettingsOpen(true);
+  }, []);
 
   // ---------------------------------------------------------------- groups & selection
 
@@ -1545,7 +1560,12 @@ function Shell() {
           ) {
             const d = detail;
             if (d) {
-              const prompt = [d.prompt, ...d.variants][detailPromptIdx];
+              const stored = [d.prompt, ...d.variants][detailPromptIdx];
+              // the translation is what the user sees — copy that while it is on
+              const prompt =
+                promptOverride && promptOverride.cardId === d.id && promptOverride.idx === detailPromptIdx
+                  ? promptOverride.text
+                  : stored;
               if (prompt?.trim()) {
                 e.preventDefault();
                 void copyPromptText(prompt);
@@ -1624,6 +1644,7 @@ function Shell() {
     openEditorNew,
     openLoraEditorNew,
     pasteFromClipboard,
+    promptOverride,
     settingsOpen,
   ]);
 
@@ -2016,6 +2037,10 @@ function Shell() {
           onTogglePin={toggleCardPin}
           promptIdx={detailPromptIdx}
           onPromptIdxChange={setDetailPromptIdx}
+          promptOverride={promptOverride}
+          onPromptOverride={setPromptOverride}
+          translateLang={settings?.translate_lang ?? ""}
+          onOpenSettings={openTranslationSettings}
           suggestions={tags}
           onImportLora={(url) => {
             // jump to the lora shelf so the background job tile is in view
@@ -2093,9 +2118,13 @@ function Shell() {
           onLang={switchLang}
           theme={theme}
           onTheme={switchTheme}
-          onClose={() => setSettingsOpen(false)}
+          onClose={() => {
+            setSettingsOpen(false);
+            setSettingsFocus(null);
+          }}
           onSaved={setSettings}
           onImported={onImported}
+          focusSection={settingsFocus}
           updateVersion={update.hasUpdate ? update.version : null}
           onUpdateOpen={() => setUpdateOpen(true)}
           onUpdateDismissed={update.dismiss}

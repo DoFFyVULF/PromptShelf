@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useInsertionEffect, useLayoutEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { Check, ChevronLeft, ChevronRight, Copy, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Copy, Languages, Loader2, Pencil, Plus, Settings2, Trash2 } from "lucide-react";
 import { useI18n } from "../i18n";
 import { api } from "../lib/api";
 import { modKey } from "../lib/platform";
+import { readCachedTranslation, writeCachedTranslation } from "../lib/promptTranslation";
+import { translateLanguageName, translateLanguageShort } from "../lib/translateLanguages";
 import type { CardDetail as CardDetailType } from "../lib/types";
 import { useToast } from "./Toasts";
 
@@ -53,9 +55,16 @@ interface PromptPagerProps {
   onChanged: (card: CardDetailType) => void;
   /** Clipboard helper with the Tauri fallback (shared with the detail view). */
   copyText: (text: string) => Promise<boolean>;
+  /** Target language from settings ("" → translation hasn't been set up). */
+  translateLang: string;
+  /** Opens settings, scrolled to the translation section. */
+  onOpenSettings: () => void;
+  /** Publishes the text on screen (the translation while it is shown), so the
+   *  footer copy button and ⌘C copy exactly what the user reads. */
+  onDisplayedPrompt: (page: { idx: number; text: string } | null) => void;
 }
 
-export function PromptPager({ card, idx, onIdxChange, onChanged, copyText }: PromptPagerProps) {
+export function PromptPager({ card, idx, onIdxChange, onChanged, copyText, translateLang, onOpenSettings, onDisplayedPrompt }: PromptPagerProps) {
   const { t } = useI18n();
   const { toast } = useToast();
   const reduced = useReducedMotion();
@@ -69,6 +78,22 @@ export function PromptPager({ card, idx, onIdxChange, onChanged, copyText }: Pro
   const [copied, setCopied] = useState(false);
   const [armed, setArmed] = useState(false); // two-tap delete
   const [saving, setSaving] = useState(false);
+
+  // ---------------------------------------------------------- translation
+  // The original page text is never mutated: a translation is a second string
+  // that replaces the parchment content for as long as the user keeps it on.
+  const [translation, setTranslation] = useState<{ lang: string; text: string; source: string } | null>(null);
+  const [translating, setTranslating] = useState(false);
+  const [setupHint, setSetupHint] = useState(false);
+  const [sheen, setSheen] = useState(0); // bumps once per landed translation
+  const translateSeq = useRef(0); // drops answers to a page we already left
+
+  const pageText = pages[idx] ?? "";
+  // a translation only counts while it belongs to the text on screen — editing
+  // the prompt falls back to the original instantly, no cleanup effect needed
+  const shownTranslation = translation && translation.source === pageText ? translation : null;
+  const shownText = shownTranslation?.text ?? pageText;
+  const translated = shownTranslation !== null;
 
   const armTimer = useRef<number | null>(null);
   const copyTimer = useRef<number | null>(null);
@@ -98,6 +123,35 @@ export function PromptPager({ card, idx, onIdxChange, onChanged, copyText }: Pro
     setMode("view");
     setArmed(false);
   }, [card.id]);
+
+  // a different page (or a different target language) always starts from the
+  // original; an answer still in flight is dropped by the sequence bump
+  useEffect(() => {
+    translateSeq.current += 1;
+    setTranslation(null);
+    setTranslating(false);
+    setSetupHint(false);
+  }, [card.id, idx, translateLang]);
+
+  // Esc closes the "language isn't set" hint, not the whole detail panel
+  useEffect(() => {
+    if (!setupHint) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      e.stopPropagation();
+      setSetupHint(false);
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [setupHint]);
+
+  // Publish what is on screen so the footer copy button and the global ⌘C
+  // handler copy the translation while it is visible, and the original after.
+  useEffect(() => {
+    onDisplayedPrompt(shownTranslation ? { idx, text: shownTranslation.text } : null);
+    return () => onDisplayedPrompt(null);
+  }, [idx, onDisplayedPrompt, shownTranslation]);
 
   useEffect(
     () => () => {
@@ -271,7 +325,7 @@ export function PromptPager({ card, idx, onIdxChange, onChanged, copyText }: Pro
     const delta = shell && p.railVisible && p.h !== null ? shell.offsetHeight - p.h : 0;
     const target = p.top + delta;
     if (Math.abs(p.el.scrollTop - target) > 1) p.el.scrollTop = target;
-  }, [card, idx, mode]);
+  }, [card, idx, mode, shownTranslation]);
 
   const go = useCallback(
     (next: number) => {
@@ -287,13 +341,64 @@ export function PromptPager({ card, idx, onIdxChange, onChanged, copyText }: Pro
   );
 
   const copy = useCallback(async () => {
-    if (!pages[idx].trim()) return;
-    if (await copyText(pages[idx])) {
+    if (!shownText.trim()) return;
+    if (await copyText(shownText)) {
       setCopied(true);
       if (copyTimer.current) window.clearTimeout(copyTimer.current);
       copyTimer.current = window.setTimeout(() => setCopied(false), 1600);
     }
-  }, [copyText, idx, pages]);
+  }, [copyText, shownText]);
+
+  // A translation can be much longer than the original (or shorter). Capture
+  // the scroll context before either swap so the page digits stay put — the
+  // same correction the pager already uses for flips and edits.
+  const showOriginal = useCallback(() => {
+    capturePin();
+    setTranslation(null);
+  }, [capturePin]);
+
+  // Translate / show original. One button, two beats: an unconfigured target
+  // opens the setup hint; a configured one fetches (or restores from the
+  // session cache) and crossfades the parchment content.
+  const toggleTranslation = useCallback(async () => {
+    if (!translateLang) {
+      setSetupHint(true);
+      return;
+    }
+    if (shownTranslation) {
+      showOriginal();
+      return;
+    }
+    if (!pageText.trim()) return;
+
+    const cached = readCachedTranslation(card.id, idx, translateLang, pageText);
+    if (cached) {
+      capturePin();
+      setTranslation({ lang: translateLang, text: cached, source: pageText });
+      setSheen((n) => n + 1);
+      return;
+    }
+
+    const seq = ++translateSeq.current;
+    setTranslating(true);
+    try {
+      const text = await api.translatePrompt(pageText, translateLang);
+      if (translateSeq.current !== seq) return;
+      capturePin();
+      writeCachedTranslation(card.id, idx, translateLang, pageText, text);
+      setTranslation({ lang: translateLang, text, source: pageText });
+      setSheen((n) => n + 1);
+    } catch {
+      if (translateSeq.current === seq) toast(t("prompt.translate.error"), "error");
+    } finally {
+      if (translateSeq.current === seq) setTranslating(false);
+    }
+  }, [capturePin, card.id, idx, pageText, showOriginal, shownTranslation, t, toast, translateLang]);
+
+  const openTranslationSettings = useCallback(() => {
+    setSetupHint(false);
+    onOpenSettings();
+  }, [onOpenSettings]);
 
   const startEdit = useCallback(() => {
     capturePin();
@@ -401,56 +506,135 @@ export function PromptPager({ card, idx, onIdxChange, onChanged, copyText }: Pro
 
   return (
     <section className="group/pager relative">
-      {/* header: label + page counter + hover actions */}
+      {/* header: label + page counter + translation chip + actions */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
+        <div className="flex min-w-0 items-center gap-2.5">
           <p className="text-[10.5px] font-semibold tracking-[0.07em] text-faint uppercase select-none">{t("editor.prompt")}</p>
           {multi && (
             <span className="rounded-full bg-parchment px-1.5 py-0.5 text-[10px] font-medium text-muted tabular-nums select-none">
               {t("detail.imageOf", { i: idx + 1, n: pages.length })}
             </span>
           )}
+          <AnimatePresence initial={false}>
+            {mode === "view" && shownTranslation && (
+              <motion.button
+                key="translated-chip"
+                type="button"
+                initial={{ opacity: 0, scale: 0.82 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.82 }}
+                transition={reduced ? { duration: 0 } : { type: "spring", visualDuration: 0.24, bounce: 0.2 }}
+                onClick={showOriginal}
+                aria-label={t("prompt.translate.active", { lang: translateLanguageName(shownTranslation.lang) })}
+                title={`${t("prompt.translate.active", { lang: translateLanguageName(shownTranslation.lang) })} · ${t("prompt.translate.showOriginal")}`}
+                className="press-bg flex shrink-0 cursor-pointer items-center gap-1 rounded-full bg-action/10 px-1.5 py-0.5 text-[10px] font-semibold tracking-[0.03em] text-action transition-colors hover:bg-action/15"
+              >
+                <Languages size={9} strokeWidth={2.6} />
+                {translateLanguageShort(shownTranslation.lang)}
+              </motion.button>
+            )}
+          </AnimatePresence>
         </div>
 
-        <div
-          className={`flex items-center transition-opacity duration-150 ${
-            mode === "view" ? "opacity-0 group-hover/pager:opacity-100 focus-within:opacity-100" : "pointer-events-none opacity-0"
-          }`}
-        >
-          <button
+        <div className={`flex items-center gap-0.5 ${mode === "view" ? "" : "pointer-events-none opacity-0"}`}>
+          {/* translation stays visible: it is the one action worth finding
+              without hovering, and its active state doubles as a language tag */}
+          <motion.button
             type="button"
-            aria-label={t("action.copy")}
-            title={t("action.copy")}
-            onClick={copy}
-            disabled={!pages[idx].trim()}
-            className="press -mr-1 flex h-6.5 w-6.5 cursor-pointer items-center justify-center rounded-md text-faint hover:bg-parchment hover:text-ink disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-faint"
+            aria-label={translated ? t("prompt.translate.showOriginal") : t("prompt.translate")}
+            aria-pressed={translated}
+            title={translated ? t("prompt.translate.showOriginal") : t("prompt.translate")}
+            onClick={() => void toggleTranslation()}
+            disabled={translating || (!translated && !pageText.trim())}
+            initial={false}
+            whileTap={reduced ? undefined : { scale: 0.9 }}
+            transition={{ type: "spring", visualDuration: 0.2, bounce: 0 }}
+            className={`press-bg flex h-6.5 w-6.5 shrink-0 cursor-pointer items-center justify-center rounded-md transition-colors disabled:cursor-default disabled:opacity-40 ${
+              translated
+                ? "bg-action/10 text-action hover:bg-action/15"
+                : "text-faint hover:bg-parchment hover:text-ink"
+            }`}
           >
-            {copied ? <Check size={12.5} className="text-leaf-icon" /> : <Copy size={12.5} />}
-          </button>
-          <button
-            type="button"
-            aria-label={t("action.edit")}
-            title={t("action.edit")}
-            onClick={startEdit}
-            className="press flex h-6.5 w-6.5 cursor-pointer items-center justify-center rounded-md text-faint hover:bg-parchment hover:text-ink"
+            {translating ? <Loader2 size={12} className="spin" /> : <Languages size={12.5} strokeWidth={2.1} />}
+          </motion.button>
+
+          <div
+            className={`flex items-center transition-opacity duration-150 ${
+              mode === "view" ? "opacity-0 group-hover/pager:opacity-100 focus-within:opacity-100" : ""
+            }`}
           >
-            <Pencil size={12} />
-          </button>
-          {canDelete && (
             <button
               type="button"
-              aria-label={armed ? t("action.confirmDelete") : t("variant.deleteTitle")}
-              title={armed ? t("action.confirmDelete") : t("variant.deleteTitle")}
-              onClick={removeCurrent}
-              className={`press flex h-6.5 w-6.5 cursor-pointer items-center justify-center rounded-md ${
-                armed ? "bg-destructive text-on-ink" : "text-faint hover:bg-destructive-soft hover:text-destructive"
-              }`}
+              aria-label={t("action.copy")}
+              title={t("action.copy")}
+              onClick={copy}
+              disabled={!shownText.trim()}
+              className="press -mr-1 flex h-6.5 w-6.5 cursor-pointer items-center justify-center rounded-md text-faint hover:bg-parchment hover:text-ink disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-faint"
             >
-              <Trash2 size={12} />
+              {copied ? <Check size={12.5} className="text-leaf-icon" /> : <Copy size={12.5} />}
             </button>
-          )}
+            <button
+              type="button"
+              aria-label={t("action.edit")}
+              title={t("action.edit")}
+              onClick={startEdit}
+              className="press flex h-6.5 w-6.5 cursor-pointer items-center justify-center rounded-md text-faint hover:bg-parchment hover:text-ink"
+            >
+              <Pencil size={12} />
+            </button>
+            {canDelete && (
+              <button
+                type="button"
+                aria-label={armed ? t("action.confirmDelete") : t("variant.deleteTitle")}
+                title={armed ? t("action.confirmDelete") : t("variant.deleteTitle")}
+                onClick={removeCurrent}
+                className={`press flex h-6.5 w-6.5 cursor-pointer items-center justify-center rounded-md ${
+                  armed ? "bg-destructive text-on-ink" : "text-faint hover:bg-destructive-soft hover:text-destructive"
+                }`}
+              >
+                <Trash2 size={12} />
+              </button>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* "translation isn't set up" bubble: anchored under the translate
+          button, dismissible by clicking anywhere or pressing Esc */}
+      <AnimatePresence>
+        {setupHint && (
+          <>
+            <div className="fixed inset-0 z-[20]" onMouseDown={() => setSetupHint(false)} aria-hidden />
+            <motion.div
+              role="dialog"
+              aria-label={t("prompt.translate.notSet")}
+              initial={{ opacity: 0, y: reduced ? 0 : -6, scale: reduced ? 1 : 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: reduced ? 0 : -4, scale: reduced ? 1 : 0.97 }}
+              transition={reduced ? { duration: 0 } : { type: "spring", visualDuration: 0.28, bounce: 0.18 }}
+              className="absolute top-[27px] right-0 z-[21] w-[272px] origin-top-right rounded-xl border border-hairline bg-card p-3.5 shadow-panel"
+            >
+              <div className="flex items-start gap-2.5">
+                <span className="mt-px flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-action/10 text-action">
+                  <Languages size={12.5} strokeWidth={2.2} />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[12.5px] font-semibold text-ink">{t("prompt.translate.notSet")}</p>
+                  <p className="mt-1 text-[11.5px] leading-[1.5] text-faint">{t("prompt.translate.notSet.hint")}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={openTranslationSettings}
+                className="press mt-3 flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-full bg-action px-3 py-1.5 text-[11.5px] font-semibold text-on-ink transition-colors hover:bg-action/90"
+              >
+                <Settings2 size={12} />
+                {t("prompt.translate.setup")}
+              </button>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* parchment block: the flipping page surface. The old page pops out of
          layout during the flip so the block never collapses to zero height —
@@ -465,7 +649,7 @@ export function PromptPager({ card, idx, onIdxChange, onChanged, copyText }: Pro
         <AnimatePresence initial={false} custom={dir} mode="popLayout">
           {mode === "view" ? (
             <motion.div
-              key={`page-${idx}-${pages[idx].length}`}
+              key={`page-${idx}-${pageText.length}`}
               custom={dir}
               variants={{
                 enter: (d: number) => ({ opacity: 0, x: reduced ? 0 : d * 40 }),
@@ -476,13 +660,76 @@ export function PromptPager({ card, idx, onIdxChange, onChanged, copyText }: Pro
               animate="center"
               exit="exit"
               transition={{ duration: reduced ? 0.14 : 0.3, ease: APPLE_EASE }}
-              className="rounded-xl bg-parchment px-4 py-3.5 text-[13.5px] leading-[1.62] whitespace-pre-wrap text-body select-text"
+              className="relative overflow-hidden rounded-xl bg-parchment"
             >
-              {pages[idx].trim() ? (
-                pages[idx]
-              ) : (
-                <span className="text-faint italic">{t("detail.noPrompt")}</span>
+              {/* the original and its translation share one surface: whichever
+                  is entering fades in from a soft blur while the other leaves
+                  upward, so the parchment never flashes empty */}
+              <AnimatePresence initial={false} mode="popLayout">
+                {shownTranslation ? (
+                  <motion.div
+                    key={`translated-${shownTranslation.lang}`}
+                    initial={{ opacity: 0, y: reduced ? 0 : 7, filter: reduced ? "blur(0px)" : "blur(7px)" }}
+                    animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                    exit={{ opacity: 0, y: reduced ? 0 : -5, filter: reduced ? "blur(0px)" : "blur(5px)" }}
+                    transition={{ duration: reduced ? 0.14 : 0.36, ease: APPLE_EASE }}
+                    lang={shownTranslation.lang}
+                    className="px-4 py-3.5 text-[13.5px] leading-[1.62] whitespace-pre-wrap text-body select-text"
+                  >
+                    {shownTranslation.text}
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key={`original-${idx}-${pageText.length}`}
+                    initial={{ opacity: 0, y: reduced ? 0 : 5, filter: reduced ? "blur(0px)" : "blur(4px)" }}
+                    animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                    exit={{ opacity: 0, y: reduced ? 0 : -5, filter: reduced ? "blur(0px)" : "blur(4px)" }}
+                    transition={{ duration: reduced ? 0.14 : 0.3, ease: APPLE_EASE }}
+                    className="px-4 py-3.5 text-[13.5px] leading-[1.62] whitespace-pre-wrap text-body select-text"
+                  >
+                    {pageText.trim() ? pageText : <span className="text-faint italic">{t("detail.noPrompt")}</span>}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* a single hairline sweeps the top edge while the request is
+                  in flight — the quietest possible "working" cue */}
+              <AnimatePresence>
+                {translating && (
+                  <motion.span
+                    key="translating-line"
+                    aria-hidden
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.18 }}
+                    className="pointer-events-none absolute inset-x-0 top-0 h-[1.5px] overflow-hidden"
+                  >
+                    <span className="translate-sweep absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-action to-transparent" />
+                  </motion.span>
+                )}
+              </AnimatePresence>
+
+              {/* one soft blue sheen when a translation lands: a reward, not
+                  a loop — it plays once and stays out of the way */}
+              {sheen > 0 && !reduced && (
+                <motion.span
+                  key={sheen}
+                  aria-hidden
+                  initial={{ x: "-130%", opacity: 0.85 }}
+                  animate={{ x: "130%", opacity: 0 }}
+                  transition={{ duration: 1.05, ease: [0.3, 0.7, 0.2, 1] }}
+                  className="pointer-events-none absolute inset-y-0 left-0 w-2/3 bg-gradient-to-r from-transparent via-action/[0.09] to-transparent"
+                />
               )}
+
+              <span className="sr-only" aria-live="polite">
+                {translating
+                  ? t("prompt.translate.translating")
+                  : shownTranslation
+                    ? t("prompt.translate.done")
+                    : ""}
+              </span>
             </motion.div>
           ) : (
             <motion.div

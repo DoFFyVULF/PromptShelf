@@ -379,6 +379,14 @@ pub fn read_settings(conn: &Connection) -> Result<AppSettings, String> {
                 }
             }
             "update_auto_check" => s.update_auto_check = v != "false", // absent → default true
+            "translate_lang" => {
+                // An empty value means "not set up yet" and stays empty.
+                if v.trim().is_empty() {
+                    s.translate_lang = String::new();
+                } else if let Ok(code) = crate::translate::normalize_target(&v) {
+                    s.translate_lang = code;
+                }
+            }
             _ => {}
         }
     }
@@ -442,6 +450,14 @@ pub fn set_settings(
     }
     if let Some(v) = patch.update_auto_check {
         put_setting(&conn, "update_auto_check", if v { "true" } else { "false" })?;
+    }
+    if let Some(v) = patch.translate_lang {
+        // An empty string clears the choice (the card then offers setup).
+        if v.trim().is_empty() {
+            put_setting(&conn, "translate_lang", "")?;
+        } else if let Ok(code) = crate::translate::normalize_target(&v) {
+            put_setting(&conn, "translate_lang", &code)?;
+        }
     }
     read_settings(&conn)
 }

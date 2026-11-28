@@ -183,6 +183,8 @@ export interface AppSettings {
   lora_previews: number;
   /** Check GitHub releases for a new version at startup. */
   update_auto_check: boolean;
+  /** Google language tag prompts are translated into ("" → not set up). */
+  translate_lang: string;
 }
 
 export interface SettingsPatch {
@@ -196,6 +198,7 @@ export interface SettingsPatch {
   civitai_api_key?: string | null;
   lora_previews?: number;
   update_auto_check?: boolean;
+  translate_lang?: string;
 }
 
 export interface LibraryPaths {

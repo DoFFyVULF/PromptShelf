@@ -23,6 +23,16 @@ export const ru: Record<DictKey, string> = {
   "action.retry": "Повторить",
   "action.clear": "Сбросить",
 
+  "prompt.translate": "Перевести промпт",
+  "prompt.translate.showOriginal": "Показать оригинал",
+  "prompt.translate.translating": "Перевожу…",
+  "prompt.translate.done": "Промпт переведён",
+  "prompt.translate.active": "Переведено на {lang}",
+  "prompt.translate.error": "Не удалось перевести. Проверьте подключение и попробуйте ещё раз.",
+  "prompt.translate.notSet": "Язык перевода не настроен",
+  "prompt.translate.notSet.hint": "Выберите язык, на который переводить промпты, — это займёт секунду.",
+  "prompt.translate.setup": "Настроить",
+
   "nav.settings": "Настройки",
   "nav.language": "Язык",
   "nav.scrollTop": "Наверх",
@@ -350,6 +360,12 @@ export const ru: Record<DictKey, string> = {
   "settings.updates.autoCheck.hint": "При запуске PromptShelf тихо проверит страницу релизов GitHub в фоне.",
   "settings.updates.open": "Открыть",
   "settings.updates.badge": "Доступно обновление — открыть окно обновления",
+
+  "settings.translation": "Перевод",
+  "settings.translation.target": "Переводить промпты на",
+  "settings.translation.target.hint": "Язык, на который переводит кнопка на карточке.",
+  "settings.translation.notSet": "Не выбран",
+  "settings.translation.note": "Промпты переводятся по запросу через Google Translate. Оригинальный текст не меняется — перевод лишь временно заменяет его на экране, а копируется то, что вы видите.",
 
   "settings.civitai": "Импорт из CivitAI",
   "settings.civitaiKey": "API-ключ",

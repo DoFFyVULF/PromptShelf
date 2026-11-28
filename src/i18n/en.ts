@@ -21,6 +21,16 @@ export const en = {
   "action.retry": "Retry",
   "action.clear": "Clear",
 
+  "prompt.translate": "Translate prompt",
+  "prompt.translate.showOriginal": "Show original",
+  "prompt.translate.translating": "Translating…",
+  "prompt.translate.done": "Prompt translated",
+  "prompt.translate.active": "Translated into {lang}",
+  "prompt.translate.error": "Couldn't translate. Check your connection and try again.",
+  "prompt.translate.notSet": "Translation language isn't set",
+  "prompt.translate.notSet.hint": "Pick the language prompts should be translated into — it takes a second.",
+  "prompt.translate.setup": "Set up",
+
   "nav.settings": "Settings",
   "nav.language": "Language",
   "nav.scrollTop": "Back to top",
@@ -350,6 +360,12 @@ export const en = {
   "settings.updates.autoCheck.hint": "At launch PromptShelf quietly checks the GitHub releases page in the background.",
   "settings.updates.open": "View",
   "settings.updates.badge": "Update available — open the update dialog",
+
+  "settings.translation": "Translation",
+  "settings.translation.target": "Translate prompts into",
+  "settings.translation.target.hint": "The language the translate button on a card uses.",
+  "settings.translation.notSet": "Not set",
+  "settings.translation.note": "Prompts are translated on demand with Google Translate. The original text is never changed — the translation only replaces it on screen, and copying copies what you see.",
 
   "settings.civitai": "CivitAI import",
   "settings.civitaiKey": "API key",

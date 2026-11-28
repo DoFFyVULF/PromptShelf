@@ -3,7 +3,7 @@ name = "promptshelf"
 version = "0.2.7"
 description = "Local prompt library with image results"
 edition = "2021"
-rust-version = "1.77"
+rust-version = "1.85"
 
 [lib]
 name = "promptshelf_lib"
@@ -28,6 +28,9 @@ zip = { version = "2", default-features = false, features = ["deflate"] }
 kamadak-exif = "0.6"
 base64 = "0.22"
 ureq = { version = "2", features = ["gzip"] }
+# Prompt translation. Google Translate without an API key; the async flavour
+# keeps the request off the UI thread (Tauri commands run on its tokio runtime).
+translators = { version = "0.2.1", default-features = false, features = ["google", "tokio-async"] }
 sha2 = "0.10"
 unicode-normalization = "0.1"
 ammonia = "4"

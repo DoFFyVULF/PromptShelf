@@ -44,6 +44,13 @@ interface CardDetailProps {
   /** Active prompt page shared with App: 0 is the main prompt, n is variant n-1. */
   promptIdx: number;
   onPromptIdxChange: (idx: number) => void;
+  /** Text the pager is showing instead of the stored page (a translation). */
+  promptOverride: { cardId: string; idx: number; text: string } | null;
+  onPromptOverride: (page: { cardId: string; idx: number; text: string } | null) => void;
+  /** Target language for prompt translation ("" → not set up). */
+  translateLang: string;
+  /** Opens settings focused on the translation section. */
+  onOpenSettings: () => void;
   /** Tags already used across the prompt shelf, for the edit mode's tag hints. */
   suggestions: TagCount[];
   /** Starts a background CivitAI lora import from a model page link. */
@@ -57,7 +64,7 @@ interface CardDetailProps {
   onDeleted: () => void;
 }
 
-export function CardDetail({ card, pinned, onTogglePin, promptIdx, onPromptIdxChange, suggestions, onImportLora, hasPrev, hasNext, onPrev, onNext, onClose, onChanged, onDeleted }: CardDetailProps) {
+export function CardDetail({ card, pinned, onTogglePin, promptIdx, onPromptIdxChange, promptOverride, onPromptOverride, translateLang, onOpenSettings, suggestions, onImportLora, hasPrev, hasNext, onPrev, onNext, onClose, onChanged, onDeleted }: CardDetailProps) {
   const { t, formatDate } = useI18n();
   const { toast } = useToast();
   const [mainIdx, setMainIdx] = useState(0);
@@ -71,7 +78,20 @@ export function CardDetail({ card, pinned, onTogglePin, promptIdx, onPromptIdxCh
   const [workflowSaving, setWorkflowSaving] = useState(false);
 
   const promptPages = [card.prompt, ...card.variants];
-  const activePrompt = promptPages[Math.min(promptIdx, promptPages.length - 1)] ?? "";
+  const storedPrompt = promptPages[Math.min(promptIdx, promptPages.length - 1)] ?? "";
+  // A translation only stands in while it belongs to this card and page; the
+  // footer copy button and ⌘C both follow whatever the pager shows.
+  const activePrompt =
+    promptOverride && promptOverride.cardId === card.id && promptOverride.idx === promptIdx
+      ? promptOverride.text
+      : storedPrompt;
+
+  const handleDisplayedPrompt = useCallback(
+    (page: { idx: number; text: string } | null) => {
+      onPromptOverride(page ? { cardId: card.id, ...page } : null);
+    },
+    [card.id, onPromptOverride]
+  );
 
   // The import's loras list also carries other CivitAI resources (upscalers,
   // embeddings, workflows) tagged with their kind; they render as plain links
@@ -632,6 +652,9 @@ export function CardDetail({ card, pinned, onTogglePin, promptIdx, onPromptIdxCh
                   onIdxChange={onPromptIdxChange}
                   onChanged={onChanged}
                   copyText={copyText}
+                  translateLang={translateLang}
+                  onOpenSettings={onOpenSettings}
+                  onDisplayedPrompt={handleDisplayedPrompt}
                 />
 
                 {card.negative_prompt && (

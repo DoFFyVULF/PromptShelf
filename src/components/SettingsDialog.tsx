@@ -8,6 +8,7 @@ import { useI18n } from "../i18n";
 import { api } from "../lib/api";
 import type { UpdateAvailability } from "../lib/useUpdateCheck";
 import type { AppSettings, Lang, LibraryPaths, Theme } from "../lib/types";
+import { TRANSLATE_LANGUAGES } from "../lib/translateLanguages";
 import { Dialog } from "./Dialog";
 import { useToast } from "./Toasts";
 import { SegmentedControl } from "./SegmentedControl";
@@ -31,6 +32,8 @@ interface SettingsDialogProps {
   onUpdateOpen: () => void;
   onUpdateDismissed: () => void;
   onUpdateFound: (a: UpdateAvailability) => void;
+  /** Section to reveal on open (the card's translation setup bubble). */
+  focusSection?: "translation" | null;
 }
 
 /** A soft checkbox: the box fills with ink and the checkmark draws itself,
@@ -77,7 +80,7 @@ function FancyCheckbox({ checked, onChange, label, hint }: {
   );
 }
 
-export function SettingsDialog({ open, settings, paths, lang, onLang, theme, onTheme, onClose, onSaved, onImported, updateVersion, onUpdateOpen, onUpdateDismissed, onUpdateFound }: SettingsDialogProps) {
+export function SettingsDialog({ open, settings, paths, lang, onLang, theme, onTheme, onClose, onSaved, onImported, updateVersion, onUpdateOpen, onUpdateDismissed, onUpdateFound, focusSection }: SettingsDialogProps) {
   const { t } = useI18n();
   const { toast } = useToast();
 
@@ -87,6 +90,8 @@ export function SettingsDialog({ open, settings, paths, lang, onLang, theme, onT
   const [moving, setMoving] = useState(false);
   const [updatesOpen, setUpdatesOpen] = useState(false);
   const [version, setVersion] = useState("");
+  const translationRef = useRef<HTMLElement>(null);
+  const [translationFlash, setTranslationFlash] = useState(false);
 
   useEffect(() => {
     getVersion().then(setVersion).catch(() => undefined);
@@ -105,6 +110,25 @@ export function SettingsDialog({ open, settings, paths, lang, onLang, theme, onT
     }
   }, [open, settings]);
 
+  // The card's "translation isn't set up" bubble opens the dialog here:
+  // scroll the row into view once the panel has its final height, then let a
+  // single soft ring fade out — a pointer, not a permanent highlight.
+  useEffect(() => {
+    if (!open || focusSection !== "translation") {
+      setTranslationFlash(false);
+      return;
+    }
+    const scroll = window.setTimeout(() => {
+      translationRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+      setTranslationFlash(true);
+    }, 70);
+    const clear = window.setTimeout(() => setTranslationFlash(false), 1900);
+    return () => {
+      window.clearTimeout(scroll);
+      window.clearTimeout(clear);
+    };
+  }, [open, focusSection]);
+
   const save = useCallback(
     async (next: AppSettings) => {
       setSaving(true);
@@ -118,7 +142,8 @@ export function SettingsDialog({ open, settings, paths, lang, onLang, theme, onT
           theme: next.theme,
           civitai_api_key: next.civitai_api_key ?? "",
           lora_previews: next.lora_previews,
-          update_auto_check: next.update_auto_check
+          update_auto_check: next.update_auto_check,
+          translate_lang: next.translate_lang ?? ""
         });
         onSaved(s);
         toast(t("toast.settingsSaved"));
@@ -328,6 +353,39 @@ export function SettingsDialog({ open, settings, paths, lang, onLang, theme, onT
                 />
               </div>
             </div>
+          </div>
+        </section>
+
+        <section
+          ref={translationRef}
+          className={`-mx-2 rounded-xl px-2 py-2 ring-1 transition-all duration-500 ${
+            translationFlash ? "bg-action/[0.05] ring-action/25" : "bg-transparent ring-transparent"
+          }`}
+        >
+          <h3 className="t-section">{t("settings.translation")}</h3>
+          <div className="mt-3 space-y-2">
+            <div className="grid grid-cols-[1fr_150px] items-center gap-4">
+              <div>
+                <label className="block text-[13.5px] font-medium text-ink" htmlFor="settings-translate-lang">
+                  {t("settings.translation.target")}
+                </label>
+                <p className="mt-0.5 text-[11.5px] text-faint">{t("settings.translation.target.hint")}</p>
+              </div>
+              <select
+                id="settings-translate-lang"
+                className="field"
+                value={draft.translate_lang ?? ""}
+                onChange={(e) => update({ translate_lang: e.target.value })}
+              >
+                <option value="">{t("settings.translation.notSet")}</option>
+                {TRANSLATE_LANGUAGES.map((l) => (
+                  <option key={l.code} value={l.code}>
+                    {l.native}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <p className="text-[11.5px] text-faint">{t("settings.translation.note")}</p>
           </div>
         </section>
 

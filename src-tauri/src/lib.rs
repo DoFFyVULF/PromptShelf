@@ -7,6 +7,7 @@ mod loras;
 mod models;
 mod store;
 mod transfer;
+mod translate;
 mod util;
 
 #[cfg(test)]
@@ -106,7 +107,8 @@ pub fn run() {
             util::reveal_file,
             util::open_url,
             util::copy_text,
-            util::paste_text_from_clipboard
+            util::paste_text_from_clipboard,
+            translate::translate_prompt
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

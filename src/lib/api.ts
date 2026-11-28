@@ -65,6 +65,11 @@ export const api = {
   getSettings: () => invoke<AppSettings>("get_settings"),
   setSettings: (patch: SettingsPatch) => invoke<AppSettings>("set_settings", { patch }),
 
+  /** Translates one prompt page. Runs in Rust via the `translators` crate —
+   * the original text is never touched, the result is only rendered. */
+  translatePrompt: (text: string, target: string) =>
+    invoke<string>("translate_prompt", { text, target }),
+
   pasteImageFromClipboard: () => invoke<PasteImageResult | null>("paste_image_from_clipboard"),
   saveTempImage: (bytes: Uint8Array) => invoke<PasteImageResult | null>("save_temp_image", { bytes: Array.from(bytes) }),
   importDroppedFile: (name: string, base64: string) => invoke<PasteImageResult>("import_dropped_file", { input: { name, data: base64 } }),

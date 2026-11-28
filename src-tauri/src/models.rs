@@ -402,6 +402,9 @@ pub struct AppSettings {
     pub lora_previews: u32,
     /// Check GitHub releases for a new version at startup (deferred to idle).
     pub update_auto_check: bool,
+    /// Language prompts are translated into ("" → translation not set up yet).
+    /// A Google language tag: "ru", "de", "zh-CN".
+    pub translate_lang: String,
 }
 
 #[derive(Deserialize, Default)]
@@ -416,6 +419,7 @@ pub struct SettingsPatch {
     pub civitai_api_key: Option<String>,
     pub lora_previews: Option<u32>,
     pub update_auto_check: Option<bool>,
+    pub translate_lang: Option<String>,
 }
 
 /// Valid values for the persisted `theme` setting.
@@ -518,6 +522,7 @@ pub fn app_settings_default() -> AppSettings {
         civitai_api_key: String::new(),
         lora_previews: 1,
         update_auto_check: true,
+        translate_lang: String::new(),
     }
 }
 
